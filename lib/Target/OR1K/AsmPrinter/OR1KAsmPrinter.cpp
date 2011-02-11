@@ -70,41 +70,6 @@ namespace {
 
 void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int opNum,
                                    raw_ostream &O) {
-  const MachineOperand &MO = MI->getOperand (opNum);
-  bool CloseParen = false;
-  if (MI->getOpcode() == SP::SETHIi && !MO.isReg() && !MO.isImm()) {
-    O << "%hi(";
-    CloseParen = true;
-  } else if ((MI->getOpcode() == SP::ORri || MI->getOpcode() == SP::ADDri) &&
-             !MO.isReg() && !MO.isImm()) {
-    O << "%lo(";
-    CloseParen = true;
-  }
-  switch (MO.getType()) {
-  case MachineOperand::MO_Register:
-    O << "%" << LowercaseString(getRegisterName(MO.getReg()));
-    break;
-
-  case MachineOperand::MO_Immediate:
-    O << (int)MO.getImm();
-    break;
-  case MachineOperand::MO_MachineBasicBlock:
-    O << *MO.getMBB()->getSymbol();
-    return;
-  case MachineOperand::MO_GlobalAddress:
-    O << *Mang->getSymbol(MO.getGlobal());
-    break;
-  case MachineOperand::MO_ExternalSymbol:
-    O << MO.getSymbolName();
-    break;
-  case MachineOperand::MO_ConstantPoolIndex:
-    O << MAI->getPrivateGlobalPrefix() << "CPI" << getFunctionNumber() << "_"
-      << MO.getIndex();
-    break;
-  default:
-    llvm_unreachable("<unknown operand type>");
-  }
-  if (CloseParen) O << ")";
 }
 
 void OR1KAsmPrinter::printMemOperand(const MachineInstr *MI, int opNum,
@@ -118,9 +83,6 @@ void OR1KAsmPrinter::printMemOperand(const MachineInstr *MI, int opNum,
     return;
   }
 
-  if (MI->getOperand(opNum+1).isReg() &&
-      MI->getOperand(opNum+1).getReg() == SP::G0)
-    return;   // don't print "+%g0"
   if (MI->getOperand(opNum+1).isImm() &&
       MI->getOperand(opNum+1).getImm() == 0)
     return;   // don't print "+0"
@@ -170,8 +132,6 @@ bool OR1KAsmPrinter::printGetPCX(const MachineInstr *MI, unsigned opNum,
 
 void OR1KAsmPrinter::printCCOperand(const MachineInstr *MI, int opNum,
                                      raw_ostream &O) {
-  int CC = (int)MI->getOperand(opNum).getImm();
-  O << SPARCCondCodeToString((SPCC::CondCodes)CC);
 }
 
 /// PrintAsmOperand - Print out an operand for an inline asm expression.
@@ -245,5 +205,4 @@ isBlockOnlyReachableByFallthrough(const MachineBasicBlock *MBB) const {
 // Force static initialization.
 extern "C" void LLVMInitializeOR1KAsmPrinter() { 
   RegisterAsmPrinter<OR1KAsmPrinter> X(TheOR1KTarget);
-  RegisterAsmPrinter<OR1KAsmPrinter> Y(TheOR1KV9Target);
 }

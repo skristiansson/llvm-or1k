@@ -18,7 +18,7 @@
 #include "OR1KInstrInfo.h"
 #include "OR1KISelLowering.h"
 #include "OR1KSelectionDAGInfo.h"
-#include "OR1KIntrinsicInfo.h"
+//#include "OR1KIntrinsicInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameInfo.h"
@@ -33,7 +33,7 @@ namespace llvm {
     TargetFrameInfo     FrameInfo;
     OR1KTargetLowering  TLInfo;
     OR1KSelectionDAGInfo TSInfo;
-    OR1KIntrinsicInfo IntrinsicInfo;
+/*    OR1KIntrinsicInfo IntrinsicInfo;*/
   public:
     OR1KTargetMachine(const Target &T, const std::string &TT,
                       const std::string &FS);
@@ -59,9 +59,9 @@ namespace llvm {
     virtual const OR1KSelectionDAGInfo* getSelectionDAGInfo() const
     { return &TSInfo; }
 
-    const TargetIntrinsicInfo *getIntrinsicInfo() const
+/*    const TargetIntrinsicInfo *getIntrinsicInfo() const
     { return &IntrinsicInfo; }
-
+*/
     // Pass Pipeline Configuration
     virtual bool addInstSelector(PassManagerBase &PM,
                                  CodeGenOpt::Level OptLevel);

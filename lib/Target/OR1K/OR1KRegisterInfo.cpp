@@ -25,19 +25,20 @@
 #include "llvm/ADT/STLExtras.h"
 using namespace llvm;
 
-OR1KRegisterInfo::OR1KRegisterInfo(OR1KSubtarget &st,
-                                   const TargetInstrInfo &tii)
+OR1KRegisterInfo::OR1KRegisterInfo(const TargetInstrInfo &tii)
   : OR1KGenRegisterInfo(OR1K::ADJCALLSTACKDOWN, OR1K::ADJCALLSTACKUP),
-    Subtarget(st), TII(tii) {
+    TII(tii) {
 }
 
 const unsigned*
 OR1KRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   static const unsigned CalleeSavedRegs[] = {
-    OR1K::R12, OR1K::R14, OR1K::R16, OR1K::R18,
+    OR1K::R14, OR1K::R16, OR1K::R18,
+    OR1K::R9, OR1K::R14, OR1K::R16, OR1K::R18,
     OR1K::R20, OR1K::R22, OR1K::R24, OR1K::R26,
-    0
+    OR1K::R28, OR1K::R30
   };
+  return CalleeSavedRegs;
 }
 
 BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
@@ -184,5 +185,5 @@ int SparcRegisterInfo::getDwarfRegNum(unsigned RegNum, bool isEH) const {
   return SparcGenRegisterInfo::getDwarfRegNumFull(RegNum, 0);
 }
 */
-#include "SparcGenRegisterInfo.inc"
+#include "OR1KGenRegisterInfo.inc"
 

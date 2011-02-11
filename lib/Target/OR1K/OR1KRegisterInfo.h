@@ -19,15 +19,13 @@
 
 namespace llvm {
 
-class OR1KSubtarget;
 class TargetInstrInfo;
 class Type;
 
 struct OR1KRegisterInfo : public OR1KGenRegisterInfo {
-  OR1KSubtarget &Subtarget;
   const TargetInstrInfo &TII;
   
-  OR1KRegisterInfo(OR1KSubtarget &st, const TargetInstrInfo &tii);
+  OR1KRegisterInfo(const TargetInstrInfo &tii);
 
   /// Code Generation virtual methods...  
   const unsigned *getCalleeSavedRegs(const MachineFunction *MF = 0) const;

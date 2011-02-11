@@ -158,8 +158,8 @@ def GPR : RegisterClass<"OR1K", [i32], 32, [R3, R4, R5, R6, R7,
     iterator allocation_order_end(const MachineFunction &MF) const;
   }];
   let MethodBodies = [{
-    IntRegsClass::iterator
-    IntRegsClass::allocation_order_end(const MachineFunction &MF) const {
+    GPRClass::iterator
+    GPRClass::allocation_order_end(const MachineFunction &MF) const {
       // FIXME: These special regs should be taken out of the regclass!
       return end() - 6;
     }
