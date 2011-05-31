@@ -53,7 +53,6 @@ struct OR1KRegisterInfo : public OR1KGenRegisterInfo {
   // Exception handling queries.
   unsigned getEHExceptionRegister() const;
   unsigned getEHHandlerRegister() const;
-
   int getDwarfRegNum(unsigned RegNum, bool isEH) const;
 };
 

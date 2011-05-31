@@ -37,7 +37,8 @@ OR1KTargetMachine(const Target &T, const std::string &TT,
   Subtarget(TT, FS),
   DataLayout("E-p:32:32-i8:8:8-i16:16:16-i64:32:32-"
              "f64:32:32-v64:32:32-v128:32:32-n32"),
-  TLInfo(*this), TSInfo(*this), InstrInfo(),
+//  TLInfo(*this), TSInfo(*this), InstrInfo(),
+  InstrInfo(), TLInfo(*this), TSInfo(*this),
   FrameInfo(TargetFrameInfo::StackGrowsDown, 8, 0) {}
 
 // Install an instruction selector pass using
@@ -51,10 +52,9 @@ addInstSelector(PassManagerBase &PM, CodeGenOpt::Level OptLevel) {
 // Implemented by targets that want to run passes immediately before
 // machine code is emitted. return true if -print-machineinstrs should
 // print out the code after the passes.
-/*
+
 bool OR1KTargetMachine::
 addPreEmitPass(PassManagerBase &PM, CodeGenOpt::Level OptLevel) {
-  PM.add(createOR1KDelaySlotFillerPass(*this));
+//  PM.add(createOR1KDelaySlotFillerPass(*this));
   return true;
 }
-*/

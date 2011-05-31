@@ -90,13 +90,14 @@ namespace llvm {
                             SmallVectorImpl<SDValue> &InVals) const;
 
     // Lower Operand specifics
+#if 1
     SDValue LowerConstantPool(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerJumpTable(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerVASTART(SDValue Op, SelectionDAG &DAG) const;
-
+#endif
     virtual SDValue
       LowerFormalArguments(SDValue Chain,
                            CallingConv::ID CallConv, bool isVarArg,
@@ -121,10 +122,10 @@ namespace llvm {
                   const SmallVectorImpl<SDValue> &OutVals,
                   DebugLoc dl, SelectionDAG &DAG) const;
 
-    virtual MachineBasicBlock *
+/*    virtual MachineBasicBlock *
       EmitInstrWithCustomInserter(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const;
-
+*/
     // Inline asm support
     ConstraintType getConstraintType(const std::string &Constraint) const;
 

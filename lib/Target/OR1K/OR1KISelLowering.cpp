@@ -163,7 +163,7 @@ unsigned OR1KTargetLowering::getFunctionAlignment(const Function *) const {
 
 SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
                                              SelectionDAG &DAG) const {
-  switch (Op.getOpcode())
+/*  switch (Op.getOpcode())
   {
     case ISD::ConstantPool:       return LowerConstantPool(Op, DAG);
     case ISD::GlobalAddress:      return LowerGlobalAddress(Op, DAG);
@@ -172,6 +172,7 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
     case ISD::SELECT_CC:          return LowerSELECT_CC(Op, DAG);
     case ISD::VASTART:            return LowerVASTART(Op, DAG);
   }
+*/
   return SDValue();
 }
 
@@ -233,16 +234,20 @@ LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const {
   return SDValue(); // Not reached
 }
 
-/*
+
 SDValue OR1KTargetLowering::
 LowerJumpTable(SDValue Op, SelectionDAG &DAG) const {
-
+  return SDValue();
+#if 0
   SDValue JTI = DAG.getTargetJumpTable(JT->getIndex(), PtrVT, OpFlag);
   return JTI;
+#endif
 }
-*/
-/*SDValue OR1KTargetLowering::
+
+SDValue OR1KTargetLowering::
 LowerConstantPool(SDValue Op, SelectionDAG &DAG) const {
+  return SDValue();
+#if 0
   SDValue ResNode;
   ConstantPoolSDNode *N = cast<ConstantPoolSDNode>(Op);
   const Constant *C = N->getConstVal();
@@ -251,8 +256,9 @@ LowerConstantPool(SDValue Op, SelectionDAG &DAG) const {
   SDValue CP = DAG.getTargetConstantPool(C, MVT::i32, N->getAlignment(),
                                          N->getOffset(), OR1KII::MO_ABS_HILO);
   return DAG.getNode(OR1KISD::Wrap, dl, MVT::i32, CP);
+#endif
 }
-*/
+
 
 //===----------------------------------------------------------------------===//
 //                      Calling Convention Implementation
@@ -273,7 +279,7 @@ static bool CC_OR1K2(unsigned ValNo, EVT ValVT,
 /// LowerCall - functions arguments are copied from virtual regs to
 /// (physical regs)/(stack frame), CALLSEQ_START and CALLSEQ_END are emitted.
 /// TODO: isVarArg, isTailCall.
-/*
+
 SDValue OR1KTargetLowering::
 LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
           bool isVarArg, bool &isTailCall,
@@ -282,6 +288,11 @@ LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
           const SmallVectorImpl<ISD::InputArg> &Ins,
           DebugLoc dl, SelectionDAG &DAG,
           SmallVectorImpl<SDValue> &InVals) const {
+
+
+  return SDValue();
+#if 0
+
   // OR1K does not yet support tail call optimization
   isTailCall = false;
 
@@ -409,8 +420,10 @@ LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
   // return.
   return LowerCallResult(Chain, InFlag, CallConv, isVarArg,
                          Ins, dl, DAG, InVals);
+
+#endif
 }
-*/
+
 /// LowerCallResult - Lower the result values of a call into the
 /// appropriate copies out of appropriate physical registers.
 /*
@@ -456,12 +469,16 @@ LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
 //===----------------------------------------------------------------------===//
 //               Return Value Calling Convention Implementation
 //===----------------------------------------------------------------------===//
-/*
+
 SDValue OR1KTargetLowering::
 LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
             const SmallVectorImpl<ISD::OutputArg> &Outs,
             const SmallVectorImpl<SDValue> &OutVals,
             DebugLoc dl, SelectionDAG &DAG) const {
+
+    return DAG.getNode(OR1KISD::Ret, dl, MVT::Other,
+                       Chain, DAG.getRegister(OR1K::R15, MVT::i32));
+#if 0
   // CCValAssign - represent the assignment of
   // the return value to a location
   SmallVector<CCValAssign, 16> RVLocs;
@@ -503,8 +520,9 @@ LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
   else // Return Void
     return DAG.getNode(OR1KISD::Ret, dl, MVT::Other,
                        Chain, DAG.getRegister(OR1K::R15, MVT::i32));
+#endif
 }
-*/
+
 //===----------------------------------------------------------------------===//
 //                           OR1K Inline Assembly Support
 //===----------------------------------------------------------------------===//

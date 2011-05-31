@@ -45,7 +45,7 @@ public:
   /// always be able to get register info as well (through this method).
   ///
   virtual const OR1KRegisterInfo &getRegisterInfo() const { return RI; }
-
+/*
   /// isLoadFromStackSlot - If the specified machine instruction is a direct
   /// load from a stack slot, return the virtual or physical register number of
   /// the destination along with the FrameIndex of the loaded stack slot.  If
@@ -62,31 +62,35 @@ public:
   virtual unsigned isStoreToStackSlot(const MachineInstr *MI,
                                       int &FrameIndex) const;
   
-  
-  virtual unsigned InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
+  */
+/*  virtual unsigned InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                                 MachineBasicBlock *FBB,
                                 const SmallVectorImpl<MachineOperand> &Cond,
                                 DebugLoc DL) const;
+*/
 
+/*
   virtual void copyPhysReg(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator I, DebugLoc DL,
                            unsigned DestReg, unsigned SrcReg,
                            bool KillSrc) const;
-  
+*/
+/*
   virtual void storeRegToStackSlot(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator MBBI,
                                    unsigned SrcReg, bool isKill, int FrameIndex,
                                    const TargetRegisterClass *RC,
                                    const TargetRegisterInfo *TRI) const;
-
+*/
+/*
   virtual void loadRegFromStackSlot(MachineBasicBlock &MBB,
                                     MachineBasicBlock::iterator MBBI,
                                     unsigned DestReg, int FrameIndex,
                                     const TargetRegisterClass *RC,
                                     const TargetRegisterInfo *TRI) const;
+*/
   
 };
-
 }
 
 #endif

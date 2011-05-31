@@ -59,15 +59,18 @@ namespace llvm {
     virtual const OR1KSelectionDAGInfo* getSelectionDAGInfo() const
     { return &TSInfo; }
 
+
 /*    const TargetIntrinsicInfo *getIntrinsicInfo() const
     { return &IntrinsicInfo; }
 */
     // Pass Pipeline Configuration
+#if 1
     virtual bool addInstSelector(PassManagerBase &PM,
                                  CodeGenOpt::Level OptLevel);
 
     virtual bool addPreEmitPass(PassManagerBase &PM,
                                 CodeGenOpt::Level OptLevel);
+#endif
   };
 } // End llvm namespace
 
