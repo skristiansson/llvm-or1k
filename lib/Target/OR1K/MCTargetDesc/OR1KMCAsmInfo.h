@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MBLAZETARGETASMINFO_H
-#define MBLAZETARGETASMINFO_H
+#ifndef OR1K_MCASM_INFO_H
+#define OR1K_MCASM_INFO_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/MC/MCAsmInfo.h"
