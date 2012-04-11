@@ -22,9 +22,8 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Target/Mangler.h"
-#include "llvm/Target/TargetRegistry.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
@@ -103,11 +102,11 @@ bool OR1KAsmPrinter::printGetPCX(const MachineInstr *MI, unsigned opNum,
   std::string operand = "";
   const MachineOperand &MO = MI->getOperand(opNum);
   switch (MO.getType()) {
-  default: assert(0 && "Operand is not a register ");
+  default: llvm_unreachable("Operand is not a register");
   case MachineOperand::MO_Register:
     assert(TargetRegisterInfo::isPhysicalRegister(MO.getReg()) &&
            "Operand is not a physical register ");
-    operand = "%" + LowercaseString(getRegisterName(MO.getReg()));
+    operand = "%" + StringRef(getRegisterName(MO.getReg())).lower();
     break;
   }
 
@@ -118,8 +117,8 @@ bool OR1KAsmPrinter::printGetPCX(const MachineInstr *MI, unsigned opNum,
   O << "\tcall\t.LLGETPC" << mfNum << '_' << bbNum << '\n' ;
 
   O << "\t  sethi\t"
-    << "%hi(_GLOBAL_OFFSET_TABLE_+(.-.LLGETPCH" << mfNum << '_' << bbNum << ")), "  
-    << operand << '\n' ;
+    << "%hi(_GLOBAL_OFFSET_TABLE_+(.-.LLGETPCH" << mfNum << '_' << bbNum 
+    << ")), "  << operand << '\n' ;
 
   O << ".LLGETPC" << mfNum << '_' << bbNum << ":\n" ;
   O << "\tor\t" << operand  
