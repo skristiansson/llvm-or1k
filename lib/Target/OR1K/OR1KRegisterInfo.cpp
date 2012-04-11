@@ -23,6 +23,8 @@
 #include "llvm/Type.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
+#define GET_REGINFO_TARGET_DESC
+#include "OR1KGenRegisterInfo.inc"
 using namespace llvm;
 
 OR1KRegisterInfo::OR1KRegisterInfo(const TargetInstrInfo &tii)
@@ -30,9 +32,9 @@ OR1KRegisterInfo::OR1KRegisterInfo(const TargetInstrInfo &tii)
     TII(tii) {
 }
 
-const unsigned*
+const uint16_t*
 OR1KRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
-  static const unsigned CalleeSavedRegs[] = {
+  static const uint16_t CalleeSavedRegs[] = {
     OR1K::R14, OR1K::R16, OR1K::R18,
     OR1K::R9, OR1K::R14, OR1K::R16, OR1K::R18,
     OR1K::R20, OR1K::R22, OR1K::R24, OR1K::R26,
@@ -95,9 +97,3 @@ unsigned OR1KRegisterInfo::getEHHandlerRegister() const {
   llvm_unreachable("What is the exception handler register");
   return 0;
 }
-
-int OR1KRegisterInfo::getDwarfRegNum(unsigned RegNum, bool isEH) const {
-  return OR1KGenRegisterInfo::getDwarfRegNumFull(RegNum, 0);
-}
-#include "OR1KGenRegisterInfo.inc"
-

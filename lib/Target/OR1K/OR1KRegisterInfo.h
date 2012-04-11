@@ -1,4 +1,4 @@
-//===- SparcRegisterInfo.h - Sparc Register Information Impl ----*- C++ -*-===//
+//===- OR1KRegisterInfo.h - OR1K Register Information Impl ------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -15,7 +15,9 @@
 #define OR1KREGISTERINFO_H
 
 #include "llvm/Target/TargetRegisterInfo.h"
-#include "OR1KGenRegisterInfo.h.inc"
+
+#define GET_REGINFO_HEADER
+#include "OR1KGenRegisterInfo.inc"
 
 namespace llvm {
 
@@ -24,11 +26,11 @@ class Type;
 
 struct OR1KRegisterInfo : public OR1KGenRegisterInfo {
   const TargetInstrInfo &TII;
-  
+
   OR1KRegisterInfo(const TargetInstrInfo &tii);
 
-  /// Code Generation virtual methods...  
-  const unsigned *getCalleeSavedRegs(const MachineFunction *MF = 0) const;
+  /// Code Generation virtual methods...
+  const uint16_t *getCalleeSavedRegs(const MachineFunction *MF = 0) const;
 
   BitVector getReservedRegs(const MachineFunction &MF) const;
 
@@ -45,7 +47,7 @@ struct OR1KRegisterInfo : public OR1KGenRegisterInfo {
 
   void emitPrologue(MachineFunction &MF) const;
   void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const;
-  
+
   // Debug information queries.
   unsigned getRARegister() const;
   unsigned getFrameRegister(const MachineFunction &MF) const;

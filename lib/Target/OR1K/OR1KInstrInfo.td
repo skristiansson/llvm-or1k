@@ -38,9 +38,9 @@ def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                         SDTCisVT<1, i32> ]>;
 
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
-                           [SDNPHasChain, SDNPOutFlag]>;
+                           [SDNPHasChain, SDNPOutGlue]>;
 def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
-                           [SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
+                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 
 
 // -------------------------------------------------- //

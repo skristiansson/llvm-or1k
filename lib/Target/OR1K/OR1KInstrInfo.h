@@ -14,8 +14,12 @@
 #ifndef OR1KINSTRUCTIONINFO_H
 #define OR1KINSTRUCTIONINFO_H
 
-#include "llvm/Target/TargetInstrInfo.h"
 #include "OR1KRegisterInfo.h"
+#include "OR1KSubtarget.h"
+#include "llvm/Target/TargetInstrInfo.h"
+
+#define GET_INSTRINFO_HEADER
+#include "OR1KGenInstrInfo.inc"
 
 namespace llvm {
 
@@ -33,11 +37,9 @@ namespace OR1KII {
 }
 #endif
 
-class OR1KInstrInfo : public TargetInstrInfoImpl {
+class OR1KInstrInfo : public OR1KGenInstrInfo {
   const OR1KRegisterInfo RI;
-//  const OR1KSubtarget& Subtarget;
 public:
-  //explicit OR1KInstrInfo(OR1KSubtarget &ST);
   OR1KInstrInfo();
 
   /// getRegisterInfo - TargetInstrInfo is a superset of MRegister info.  As

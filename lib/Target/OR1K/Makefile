@@ -12,16 +12,10 @@ LIBRARYNAME = LLVMOR1KCodeGen
 TARGET = OR1K
 
 # Make sure that tblgen is run, first thing.
-BUILT_SOURCES = OR1KGenRegisterInfo.h.inc OR1KGenRegisterNames.inc \
-                OR1KGenRegisterInfo.inc OR1KGenInstrNames.inc \
-                OR1KGenInstrInfo.inc OR1KGenAsmWriter.inc \
-                OR1KGenDAGISel.inc OR1KGenSubtarget.inc OR1KGenCallingConv.inc
-#BUILT_SOURCES = SparcGenRegisterInfo.h.inc SparcGenRegisterNames.inc \
-#                SparcGenRegisterInfo.inc SparcGenInstrNames.inc \
-#                SparcGenInstrInfo.inc SparcGenAsmWriter.inc \
-#                SparcGenDAGISel.inc SparcGenSubtarget.inc SparcGenCallingConv.inc
+BUILT_SOURCES = OR1KGenRegisterInfo.inc OR1KGenInstrInfo.inc \
+		OR1KGenAsmWriter.inc OR1KGenDAGISel.inc \
+		OR1KGenSubtargetInfo.inc OR1KGenCallingConv.inc
 
-DIRS = AsmPrinter TargetInfo
+DIRS = TargetInfo MCTargetDesc
 
 include $(LEVEL)/Makefile.common
-

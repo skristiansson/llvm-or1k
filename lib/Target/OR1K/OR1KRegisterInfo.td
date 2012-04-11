@@ -142,7 +142,7 @@ def D15 : Rd<30, "F30", [F30, F31]>, DwarfRegNum<[62]>;
 // FIXME: the register order should be defined in terms of the preferred
 // allocation order...
 //
-def GPR : RegisterClass<"OR1K", [i32], 32, [R3, R4, R5, R6, R7,
+def GPR : RegisterClass<"OR1K", [i32], 32, (add R3, R4, R5, R6, R7,
                                      R8,
                                      R12, R13, R14, R15,
                                      R16, R17, R18, R19, R20, R21, R22, R23,
@@ -153,18 +153,7 @@ def GPR : RegisterClass<"OR1K", [i32], 32, [R3, R4, R5, R6, R7,
                                      R2,  // frame ptr
                                      R9,  // link register
                                      R0  // constant 0
-                                     ]> {
-  let MethodProtos = [{
-    iterator allocation_order_end(const MachineFunction &MF) const;
-  }];
-  let MethodBodies = [{
-    GPRClass::iterator
-    GPRClass::allocation_order_end(const MachineFunction &MF) const {
-      // FIXME: These special regs should be taken out of the regclass!
-      return end() - 6;
-    }
-  }];
-}
+                                     )>;
 
 /*
 def FPRegs : RegisterClass<"SP", [f32], 32, [F0, F1, F2, F3, F4, F5, F6, F7, F8,

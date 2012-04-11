@@ -13,8 +13,15 @@
 
 #include "OR1KSubtarget.h"
 #include "OR1K.h"
+#define GET_SUBTARGETINFO_TARGET_DESC
+#define GET_SUBTARGETINFO_CTOR
+#include "OR1KGenSubtargetInfo.inc"
 using namespace llvm;
 
-OR1KSubtarget::OR1KSubtarget(const std::string &TT, const std::string &FS)
+void OR1KSubtarget::anchor() { }
+
+OR1KSubtarget::OR1KSubtarget(const std::string &TT,
+                             const std::string &CPU, const std::string &FS)
+  : OR1KGenSubtargetInfo(TT, CPU, FS)
 {
 }

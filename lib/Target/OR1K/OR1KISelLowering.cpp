@@ -88,8 +88,8 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &TM)
   setOperationAction(ISD::UDIVREM, MVT::i32, Expand);
 
   // Expand unsupported conversions
-  setOperationAction(ISD::BIT_CONVERT, MVT::f32, Expand);
-  setOperationAction(ISD::BIT_CONVERT, MVT::i32, Expand);
+  setOperationAction(ISD::BITCAST, MVT::f32, Expand);
+  setOperationAction(ISD::BITCAST, MVT::i32, Expand);
 
   // Expand SELECT_CC
   setOperationAction(ISD::SELECT_CC, MVT::Other, Expand);
@@ -152,7 +152,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &TM)
   computeRegisterProperties();
 }
 
-MVT::SimpleValueType OR1KTargetLowering::getSetCCResultType(EVT VT) const {
+EVT OR1KTargetLowering::getSetCCResultType(EVT VT) const {
   return MVT::i32;
 }
 
@@ -282,7 +282,7 @@ static bool CC_OR1K2(unsigned ValNo, EVT ValVT,
 
 SDValue OR1KTargetLowering::
 LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
-          bool isVarArg, bool &isTailCall,
+          bool isVarArg, bool doesNotRet, bool &isTailCall,
           const SmallVectorImpl<ISD::OutputArg> &Outs,
           const SmallVectorImpl<SDValue> &OutVals,
           const SmallVectorImpl<ISD::InputArg> &Ins,
@@ -320,7 +320,7 @@ LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
   // Walk the register/memloc assignments, inserting copies/loads.
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
     CCValAssign &VA = ArgLocs[i];
-    EVT RegVT = VA.getLocVT();
+    MVT RegVT = VA.getLocVT();
     SDValue Arg = OutVals[i];
 
     // Promote the value if needed.

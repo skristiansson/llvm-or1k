@@ -12,16 +12,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "OR1K.h"
-#include "OR1KMCAsmInfo.h"
 #include "OR1KTargetMachine.h"
 #include "llvm/PassManager.h"
-#include "llvm/Target/TargetRegistry.h"
+#include "llvm/CodeGen/Passes.h"
+#include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Target/TargetOptions.h"
 using namespace llvm;
 
 extern "C" void LLVMInitializeOR1KTarget() {
   // Register the target.
   RegisterTargetMachine<OR1KTargetMachine> X(TheOR1KTarget);
-  RegisterAsmInfo<OR1KMCAsmInfo> A(TheOR1KTarget);
+  //RegisterAsmInfo<OR1KMCAsmInfo> A(TheOR1KTarget);
 }
 
 // DataLayout --> Big-endian, 32-bit pointer/ABI/alignment
@@ -31,21 +33,42 @@ extern "C" void LLVMInitializeOR1KTarget() {
 // offset from the stack/frame pointer, using StackGrowsUp enables
 // an easier handling.
 OR1KTargetMachine::
-OR1KTargetMachine(const Target &T, const std::string &TT,
-                    const std::string &FS):
-  LLVMTargetMachine(T, TT),
-  Subtarget(TT, FS),
+OR1KTargetMachine(const Target &T, StringRef TT,
+                    StringRef CPU, StringRef FS, const TargetOptions &Options,
+                    Reloc::Model RM, CodeModel::Model CM,
+                    CodeGenOpt::Level OL)
+  : LLVMTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL),
+  Subtarget(TT, CPU, FS),
   DataLayout("E-p:32:32-i8:8:8-i16:16:16-i64:32:32-"
              "f64:32:32-v64:32:32-v128:32:32-n32"),
 //  TLInfo(*this), TSInfo(*this), InstrInfo(),
   InstrInfo(), TLInfo(*this), TSInfo(*this),
-  FrameInfo(TargetFrameInfo::StackGrowsDown, 8, 0) {}
+  FrameLowering(Subtarget) {
+}
+namespace {
+/// OR1K Code Generator Pass Configuration Options.
+class OR1KPassConfig : public TargetPassConfig {
+public:
+  OR1KPassConfig(OR1KTargetMachine *TM, PassManagerBase &PM)
+    : TargetPassConfig(TM, PM) {}
+
+  OR1KTargetMachine &getOR1KTargetMachine() const {
+    return getTM<OR1KTargetMachine>();
+  }
+
+  virtual bool addInstSelector();
+  virtual bool addPreEmitPass();
+};
+} // namespace
+
+TargetPassConfig *OR1KTargetMachine::createPassConfig(PassManagerBase &PM) {
+  return new OR1KPassConfig(this, PM);
+}
 
 // Install an instruction selector pass using
 // the ISelDag to gen OR1K code.
-bool OR1KTargetMachine::
-addInstSelector(PassManagerBase &PM, CodeGenOpt::Level OptLevel) {
-  PM.add(createOR1KISelDag(*this));
+bool OR1KPassConfig::addInstSelector() {
+  PM.add(createOR1KISelDag(getOR1KTargetMachine()));
   return false;
 }
 
@@ -53,8 +76,7 @@ addInstSelector(PassManagerBase &PM, CodeGenOpt::Level OptLevel) {
 // machine code is emitted. return true if -print-machineinstrs should
 // print out the code after the passes.
 
-bool OR1KTargetMachine::
-addPreEmitPass(PassManagerBase &PM, CodeGenOpt::Level OptLevel) {
-//  PM.add(createOR1KDelaySlotFillerPass(*this));
+bool OR1KPassConfig::addPreEmitPass() {
+//  PM.add(createOR1KDelaySlotFillerPass(getOR1KTargetMachine()));
   return true;
 }

@@ -12,19 +12,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "OR1KInstrInfo.h"
-#include "OR1KSubtarget.h"
 #include "OR1K.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
+#include "OR1KMachineFunctionInfo.h"
+#include "OR1KSubtarget.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+
+#define GET_INSTRINFO_CTOR
 #include "OR1KGenInstrInfo.inc"
-#include "OR1KMachineFunctionInfo.h"
+
 using namespace llvm;
 
 OR1KInstrInfo::OR1KInstrInfo()
-  : TargetInstrInfoImpl(OR1KInsts, array_lengthof(OR1KInsts)),
+  : OR1KGenInstrInfo(OR1K::ADJCALLSTACKDOWN, OR1K::ADJCALLSTACKUP),
     RI(*this) {
 }
 

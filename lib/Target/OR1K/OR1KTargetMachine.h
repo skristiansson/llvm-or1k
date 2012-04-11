@@ -19,9 +19,10 @@
 #include "OR1KISelLowering.h"
 #include "OR1KSelectionDAGInfo.h"
 //#include "OR1KIntrinsicInfo.h"
+#include "OR1KFrameLowering.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetData.h"
-#include "llvm/Target/TargetFrameInfo.h"
+#include "llvm/Target/TargetFrameLowering.h"
 
 namespace llvm {
   class formatted_raw_ostream;
@@ -30,19 +31,22 @@ namespace llvm {
     OR1KSubtarget       Subtarget;
     const TargetData    DataLayout; // Calculates type size & alignment
     OR1KInstrInfo       InstrInfo;
-    TargetFrameInfo     FrameInfo;
+    OR1KFrameLowering   FrameLowering;
     OR1KTargetLowering  TLInfo;
     OR1KSelectionDAGInfo TSInfo;
 /*    OR1KIntrinsicInfo IntrinsicInfo;*/
   public:
-    OR1KTargetMachine(const Target &T, const std::string &TT,
-                      const std::string &FS);
+    OR1KTargetMachine(const Target &T, StringRef TT,
+                        StringRef CPU, StringRef FS,
+                        const TargetOptions &Options,
+                        Reloc::Model RM, CodeModel::Model CM,
+                        CodeGenOpt::Level OL);
 
     virtual const OR1KInstrInfo *getInstrInfo() const
     { return &InstrInfo; }
 
-    virtual const TargetFrameInfo *getFrameInfo() const
-    { return &FrameInfo; }
+    virtual const TargetFrameLowering *getFrameLowering() const
+    { return &FrameLowering; }
 
     virtual const OR1KSubtarget *getSubtargetImpl() const
     { return &Subtarget; }
@@ -64,13 +68,7 @@ namespace llvm {
     { return &IntrinsicInfo; }
 */
     // Pass Pipeline Configuration
-#if 1
-    virtual bool addInstSelector(PassManagerBase &PM,
-                                 CodeGenOpt::Level OptLevel);
-
-    virtual bool addPreEmitPass(PassManagerBase &PM,
-                                CodeGenOpt::Level OptLevel);
-#endif
+    virtual TargetPassConfig *createPassConfig(PassManagerBase &PM);
   };
 } // End llvm namespace
 

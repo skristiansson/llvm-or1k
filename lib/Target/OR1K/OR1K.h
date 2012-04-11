@@ -12,9 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TARGET_XCORE_H
-#define TARGET_XCORE_H
+#ifndef TARGET_OR1K_H
+#define TARGET_OR1K_H
 
+#include "MCTargetDesc/OR1KMCTargetDesc.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
@@ -28,14 +29,5 @@ namespace llvm {
   extern Target TheOR1KTarget;
 
 } // end namespace llvm;
-
-// Defines symbolic names for OR1K registers.  This defines a mapping from
-// register name to register number.
-//
-#include "OR1KGenRegisterNames.inc"
-
-// Defines symbolic names for the OR1K instructions.
-//
-#include "OR1KGenInstrNames.inc"
 
 #endif

@@ -15,10 +15,10 @@
 #ifndef OR1KISELLOWERING_H
 #define OR1KISELLOWERING_H
 
-#include "llvm/CodeGen/SelectionDAG.h"
-#include "llvm/Target/TargetLowering.h"
 #include "OR1K.h"
 #include "OR1KSubtarget.h"
+#include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/Target/TargetLowering.h"
 
 namespace llvm {
   namespace OR1KCC {
@@ -74,7 +74,7 @@ namespace llvm {
     virtual const char *getTargetNodeName(unsigned Opcode) const;
 
     /// getSetCCResultType - get the ISD::SETCC result ValueType
-    MVT::SimpleValueType getSetCCResultType(EVT VT) const;
+    EVT getSetCCResultType(EVT VT) const;
 
     virtual unsigned getFunctionAlignment(const Function *F) const;
   private:
@@ -108,7 +108,7 @@ namespace llvm {
     virtual SDValue
       LowerCall(SDValue Chain, SDValue Callee,
                 CallingConv::ID CallConv, bool isVarArg,
-                bool &isTailCall,
+                bool doesNotRet, bool &isTailCall,
                 const SmallVectorImpl<ISD::OutputArg> &Outs,
                 const SmallVectorImpl<SDValue> &OutVals,
                 const SmallVectorImpl<ISD::InputArg> &Ins,
