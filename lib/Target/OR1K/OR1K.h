@@ -25,7 +25,7 @@ namespace llvm {
   class formatted_raw_ostream;
 
   FunctionPass *createOR1KISelDag(OR1KTargetMachine &TM);
-
+  FunctionPass *createOR1KDelaySlotFillerPass(OR1KTargetMachine &TM);
   extern Target TheOR1KTarget;
 
 } // end namespace llvm;

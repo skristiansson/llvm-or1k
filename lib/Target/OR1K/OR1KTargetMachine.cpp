@@ -77,6 +77,6 @@ bool OR1KPassConfig::addInstSelector() {
 // print out the code after the passes.
 
 bool OR1KPassConfig::addPreEmitPass() {
-//  PM.add(createOR1KDelaySlotFillerPass(getOR1KTargetMachine()));
+  PM.add(createOR1KDelaySlotFillerPass(getOR1KTargetMachine()));
   return true;
 }
