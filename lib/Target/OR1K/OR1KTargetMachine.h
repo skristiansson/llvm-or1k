@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MBLAZE_TARGETMACHINE_H
-#define MBLAZE_TARGETMACHINE_H
+#ifndef OR1K_TARGETMACHINE_H
+#define OR1K_TARGETMACHINE_H
 
 #include "OR1KSubtarget.h"
 #include "OR1KInstrInfo.h"

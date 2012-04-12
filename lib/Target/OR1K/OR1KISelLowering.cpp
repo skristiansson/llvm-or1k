@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "mblaze-lower"
+#define DEBUG_TYPE "or1k-lower"
 #include "OR1KISelLowering.h"
 #include "OR1KMachineFunctionInfo.h"
 #include "OR1KTargetMachine.h"
