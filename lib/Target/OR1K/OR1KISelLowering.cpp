@@ -55,7 +55,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &TM)
   setBooleanContents(ZeroOrOneBooleanContent);
 
   // Set up the register classes
-//  addRegisterClass(MVT::i32, OR1K::CPURegsRegisterClass);
+  addRegisterClass(MVT::i32, OR1K::GPRRegisterClass);
 
   // Floating point operations which are not supported
   setOperationAction(ISD::FREM,       MVT::f32, Expand);
