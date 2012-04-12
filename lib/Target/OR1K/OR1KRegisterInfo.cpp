@@ -28,8 +28,7 @@
 using namespace llvm;
 
 OR1KRegisterInfo::OR1KRegisterInfo(const TargetInstrInfo &tii)
-  : OR1KGenRegisterInfo(OR1K::ADJCALLSTACKDOWN, OR1K::ADJCALLSTACKUP),
-    TII(tii) {
+  : OR1KGenRegisterInfo(OR1K::R9), TII(tii) {
 }
 
 const uint16_t*
