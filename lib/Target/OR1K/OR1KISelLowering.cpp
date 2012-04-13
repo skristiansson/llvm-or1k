@@ -426,7 +426,7 @@ LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
 
 /// LowerCallResult - Lower the result values of a call into the
 /// appropriate copies out of appropriate physical registers.
-/*
+
 SDValue OR1KTargetLowering::
 LowerCallResult(SDValue Chain, SDValue InFlag, CallingConv::ID CallConv,
                 bool isVarArg, const SmallVectorImpl<ISD::InputArg> &Ins,
@@ -434,10 +434,10 @@ LowerCallResult(SDValue Chain, SDValue InFlag, CallingConv::ID CallConv,
                 SmallVectorImpl<SDValue> &InVals) const {
   // Assign locations to each value returned by this call.
   SmallVector<CCValAssign, 16> RVLocs;
-  CCState CCInfo(CallConv, isVarArg, getTargetMachine(),
-                 RVLocs, *DAG.getContext());
+  CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
+                 getTargetMachine(), RVLocs, *DAG.getContext());
 
-  CCInfo.AnalyzeCallResult(Ins, RetCC_OR1K);
+  CCInfo.AnalyzeCallResult(Ins, RetCC_OR1K32);
 
   // Copy all of the result registers out of their specified physreg.
   for (unsigned i = 0; i != RVLocs.size(); ++i) {
@@ -445,11 +445,11 @@ LowerCallResult(SDValue Chain, SDValue InFlag, CallingConv::ID CallConv,
                                RVLocs[i].getValVT(), InFlag).getValue(1);
     InFlag = Chain.getValue(2);
     InVals.push_back(Chain.getValue(0));
-  } 
+  }
 
   return Chain;
 }
-*/
+
 //===----------------------------------------------------------------------===//
 //             Formal Arguments Calling Convention Implementation
 //===----------------------------------------------------------------------===//
@@ -463,7 +463,98 @@ LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
                      DebugLoc dl, SelectionDAG &DAG,
                      SmallVectorImpl<SDValue> &InVals) const {
 
-	return Chain;
+  switch (CallConv)
+  {
+    default:
+      llvm_unreachable("Unsupported calling convention");
+    case CallingConv::C:
+    case CallingConv::Fast:
+      return LowerCCCArguments(Chain, CallConv, isVarArg,
+                               Ins, dl, DAG, InVals);
+  }
+}
+
+/// LowerCCCArguments - transform physical registers into virtual registers and
+/// generate load operations for arguments places on the stack.
+SDValue
+OR1KTargetLowering::LowerCCCArguments(SDValue Chain,
+                                      CallingConv::ID CallConv,
+                                      bool isVarArg,
+                                      const SmallVectorImpl<ISD::InputArg> &Ins,
+                                      DebugLoc dl,
+                                      SelectionDAG &DAG,
+                                      SmallVectorImpl<SDValue> &InVals)
+                                        const {
+  MachineFunction &MF = DAG.getMachineFunction();
+  MachineFrameInfo *MFI = MF.getFrameInfo();
+  MachineRegisterInfo &RegInfo = MF.getRegInfo();
+
+  // Assign locations to all of the incoming arguments.
+  SmallVector<CCValAssign, 16> ArgLocs;
+  CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
+                 getTargetMachine(), ArgLocs, *DAG.getContext());
+  CCInfo.AnalyzeFormalArguments(Ins, CC_OR1K32);
+
+  assert(!isVarArg && "Varargs not supported yet");
+
+  for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
+    CCValAssign &VA = ArgLocs[i];
+    if (VA.isRegLoc()) {
+      // Arguments passed in registers
+      EVT RegVT = VA.getLocVT();
+      switch (RegVT.getSimpleVT().SimpleTy) {
+      default:
+        {
+#ifndef NDEBUG
+          errs() << "LowerFormalArguments Unhandled argument type: "
+               << RegVT.getSimpleVT().SimpleTy << "\n";
+#endif
+          llvm_unreachable(0);
+        }
+      case MVT::i32:
+        unsigned VReg =
+          RegInfo.createVirtualRegister(OR1K::GPRRegisterClass);
+        RegInfo.addLiveIn(VA.getLocReg(), VReg);
+        SDValue ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, RegVT);
+
+        // If this is an 8/16-bit value, it is really passed promoted to 32
+        // bits. Insert an assert[sz]ext to capture this, then truncate to the
+        // right size.
+        if (VA.getLocInfo() == CCValAssign::SExt)
+          ArgValue = DAG.getNode(ISD::AssertSext, dl, RegVT, ArgValue,
+                                 DAG.getValueType(VA.getValVT()));
+        else if (VA.getLocInfo() == CCValAssign::ZExt)
+          ArgValue = DAG.getNode(ISD::AssertZext, dl, RegVT, ArgValue,
+                                 DAG.getValueType(VA.getValVT()));
+
+        if (VA.getLocInfo() != CCValAssign::Full)
+          ArgValue = DAG.getNode(ISD::TRUNCATE, dl, VA.getValVT(), ArgValue);
+
+        InVals.push_back(ArgValue);
+      }
+    } else {
+      // Sanity check
+      assert(VA.isMemLoc());
+      // Load the argument to a virtual register
+      unsigned ObjSize = VA.getLocVT().getSizeInBits()/8;
+      if (ObjSize > 2) {
+        errs() << "LowerFormalArguments Unhandled argument type: "
+             << EVT(VA.getLocVT()).getEVTString()
+             << "\n";
+      }
+      // Create the frame index object for this incoming parameter...
+      int FI = MFI->CreateFixedObject(ObjSize, VA.getLocMemOffset(), true);
+
+      // Create the SelectionDAG nodes corresponding to a load
+      //from this parameter
+      SDValue FIN = DAG.getFrameIndex(FI, MVT::i32);
+      InVals.push_back(DAG.getLoad(VA.getLocVT(), dl, Chain, FIN,
+                                   MachinePointerInfo::getFixedStack(FI),
+                                   false, false, false, 0));
+    }
+  }
+
+  return Chain;
 }
 
 //===----------------------------------------------------------------------===//
@@ -488,7 +579,7 @@ LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
                  RVLocs, *DAG.getContext());
 
   // Analize return values.
-  CCInfo.AnalyzeReturn(Outs, RetCC_OR1K);
+  CCInfo.AnalyzeReturn(Outs, RetCC_OR1K32);
 
   // If this is the first return lowered for this function, add
   // the regs to the liveout set for the function.
