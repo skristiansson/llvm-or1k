@@ -17,8 +17,8 @@
 
 // OR1K 32-bit C return-value convention.
 def RetCC_OR1K32 : CallingConv<[
-  CCIfType<[i32], CCAssignToReg<[R3, R4, R5, R6, R7, R8]>>,
-  CCIfType<[f32], CCAssignToReg<[R3, R4, R5, R6, R7, R8]>>
+  CCIfType<[i32], CCAssignToReg<[R11]>>,
+  CCIfType<[f32], CCAssignToReg<[R11]>>
 ]>;
 
 // OR1K 32-bit C Calling convention.
