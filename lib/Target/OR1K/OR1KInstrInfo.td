@@ -276,7 +276,7 @@ def LHS : LOAD<0x6, "l.lhs">;
 
 
 class BRANCH<bits<4> subOp, string asmstring>
-        : InstOR1K<(outs), (ins i32imm:$imm),
+        : InstBR<subOp, (outs), (ins i32imm:$imm),
 		!strconcat(asmstring, " $imm"),
 		[]>
 {
@@ -284,7 +284,6 @@ class BRANCH<bits<4> subOp, string asmstring>
 
   let Inst{25-0} = imm26;
 
-  let optype = 0;
   let opcode = subOp;
 }
 
@@ -293,15 +292,22 @@ def JAL : BRANCH<0x1, "l.jal">;
 def BNF : BRANCH<0x2, "l.bnf">;
 def BF  : BRANCH<0x3, "l.bf">;
 
+class BRANCH_R<bits<4> subOp, string asmstring>
+        : InstBR<subOp, (outs), (ins GPR:$rB),
+		!strconcat(asmstring, " $rB"),
+		[]>
+{
+  bits<5> rB;
 
+  let Inst{15-11} = rB;
+
+  let opcode = subOp;
+}
+
+def JR   : BRANCH_R<0x1, "l.jr">;
+def JALR : BRANCH_R<0x2, "l.jalr">;
 
 /*
-
-
-
-def JR   :
-def JALR :
-
 
 def MTSPR : 
 
