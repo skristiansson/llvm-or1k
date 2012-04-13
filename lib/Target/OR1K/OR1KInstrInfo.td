@@ -260,13 +260,13 @@ class LOAD:<bits<4> subop, string asmstring>
 }
 	
 
-def LD : LOAD<0x0, "ld">;
-def LWZ : LOAD<0x1, "lwz">;
-def LWS : LOAD<0x2, "lws">;
-def LBZ : LOAD<0x3, "lbz">;
-def LBS : LOAD<0x4, "lbs">;
-def LHZ : LOAD<0x5, "lhz">;
-def LHS : LOAD<0x6, "lhs">;
+def LD : LOAD<0x0, "l.ld">;
+def LWZ : LOAD<0x1, "l.lwz">;
+def LWS : LOAD<0x2, "l.lws">;
+def LBZ : LOAD<0x3, "l.lbz">;
+def LBS : LOAD<0x4, "l.lbs">;
+def LHZ : LOAD<0x5, "l.lhz">;
+def LHS : LOAD<0x6, "l.lhs">;
 */
 
 
@@ -288,10 +288,10 @@ class BRANCH<bits<4> subOp, string asmstring>
   let opcode = subOp;
 }
 
-def J   : BRANCH<0x0, "j">;
-def JAL : BRANCH<0x1, "jal">;
-def BNF : BRANCH<0x2, "bnf">;
-def BF  : BRANCH<0x3, "bf">;
+def J   : BRANCH<0x0, "l.j">;
+def JAL : BRANCH<0x1, "l.jal">;
+def BNF : BRANCH<0x2, "l.bnf">;
+def BF  : BRANCH<0x3, "l.bf">;
 
 
 
