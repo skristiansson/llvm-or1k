@@ -39,3 +39,16 @@ class InstRI<bits<4> op, dag outs, dag ins, string asmstr,
   let opcode = op;
 }
 
+class InstBR<bits<4> op, dag outs, dag ins, string asmstr,
+		list<dag>pattern>
+	: InstOR1K<outs, ins, asmstr, pattern> {
+  let optype = 0b1;
+  let opcode = op;
+}
+
+class InstBI<bits<4> op, dag outs, dag ins, string asmstr,
+		list<dag>pattern>
+	: InstOR1K<outs, ins, asmstr, pattern> {
+  let optype = 0;
+  let opcode = op;
+}
