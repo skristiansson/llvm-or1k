@@ -37,6 +37,8 @@ def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                         SDTCisVT<1, i32> ]>;
 
+def retflag       : SDNode<"OR1KISD::Ret", SDTNone,
+                           [SDNPHasChain, SDNPOptInGlue]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
                            [SDNPHasChain, SDNPOutGlue]>;
 def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
@@ -324,6 +326,27 @@ def RFE :
 
 */
 
+class NOP_I<bits<2> op2Val, string asmstr>
+	: InstRI<0x5, (outs), (ins i16imm:$imm),
+		!strconcat(asmstr, " $imm"), []>
+{
+  bits<2> op2;
+  bits<16> imm16;
+
+  let Inst{25-24} = op2;
+  let Inst{15-0} = imm16;
+
+  let op2 = op2Val;
+}
+
+let neverHasSideEffects = 1 in
+  def NOP : NOP_I<0x1, "l.nop">;
+
+let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
+  def RET  : InstBR<0x1, (outs), (ins),
+                    "l.jr r9",
+                    [(retflag)]>;
+}
 
 
 // Pseudo instructions.
@@ -342,4 +365,3 @@ def ADJCALLSTACKUP   : Pseudo<(outs),
                                   "${:comment} ADJCALLSTACKUP $amt1",
                                   [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
-
