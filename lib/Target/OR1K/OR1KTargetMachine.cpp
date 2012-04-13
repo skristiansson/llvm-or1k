@@ -23,7 +23,6 @@ using namespace llvm;
 extern "C" void LLVMInitializeOR1KTarget() {
   // Register the target.
   RegisterTargetMachine<OR1KTargetMachine> X(TheOR1KTarget);
-  //RegisterAsmInfo<OR1KMCAsmInfo> A(TheOR1KTarget);
 }
 
 // DataLayout --> Big-endian, 32-bit pointer/ABI/alignment

@@ -1,4 +1,4 @@
-//===-- OR1K.h - Top-level interface for OR1K representation --*- C++ -*-===//
+//===-- OR1K.h - Top-level interface for OR1K representation ----*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
