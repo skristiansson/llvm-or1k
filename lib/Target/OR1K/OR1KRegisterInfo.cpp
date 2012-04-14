@@ -1,4 +1,4 @@
-//===- OR1KRegisterInfo.cpp - OR1K Register Information -------*- C++ -*-===//
+//===-- OR1KRegisterInfo.cpp - OR1K Register Information --------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //

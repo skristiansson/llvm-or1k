@@ -1,4 +1,4 @@
-//===- OR1KInstrInfo.cpp - OR1K Instruction Information -------*- C++ -*-===//
+//===-- OR1KInstrInfo.cpp - OR1K Instruction Information -------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //

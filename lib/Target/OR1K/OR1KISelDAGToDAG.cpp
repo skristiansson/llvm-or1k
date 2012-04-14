@@ -1,4 +1,4 @@
-//===-- OR1KISelDAGToDAG.cpp - A dag to dag inst selector for OR1K ----===//
+//===-- OR1KISelDAGToDAG.cpp - A dag to dag inst selector for OR1K --------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "mblaze-isel"
+#define DEBUG_TYPE "or1k-isel"
 #include "OR1K.h"
 #include "OR1KMachineFunctionInfo.h"
 #include "OR1KRegisterInfo.h"

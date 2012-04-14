@@ -1,4 +1,4 @@
-//===- OR1KInstrInfo.td - Target Description for OR1K Target ------------===//
+//===-- OR1KInstrInfo.td - Target Description for OR1K Target -------------===//
 // 
 //                     The LLVM Compiler Infrastructure
 //

@@ -1,4 +1,4 @@
-//===-- OR1KISelLowering.cpp - OR1K DAG Lowering Implementation -------===//
+//===-- OR1KISelLowering.cpp - OR1K DAG Lowering Implementation -----------===//
 //
 //                     The LLVM Compiler Infrastructure
 //

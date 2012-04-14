@@ -152,7 +152,7 @@ def GPR : RegisterClass<"OR1K", [i32], 32, (add R3, R4, R5, R6, R7,
                                      R1,  // stack ptr
                                      R2,  // frame ptr
                                      R9,  // link register
-                                     R0  // constant 0
+                                     R0   // constant 0
                                      )>;
 
 /*
