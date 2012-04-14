@@ -349,19 +349,16 @@ let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
 }
 
 
-// Pseudo instructions.
-class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
-   : InstOR1K<outs, ins, asmstr, pattern>;
-
-
-
-// As stack alignment is always done with addiu, we need a 16-bit immediate
+// ADJCALLSTACKDOWN/UP implicitly use/def R1 because they may be expanded into
+// a stack adjustment and the codegen must know that they may modify the stack
+// pointer before prolog-epilog rewriting occurs.
+// Pessimistically assume ADJCALLSTACKDOWN / ADJCALLSTACKUP will become
+// sub / add which can clobber R1.
 let Defs = [R1], Uses = [R1] in {
-def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
-                                  "${:comment} ADJCALLSTACKDOWN $amt",
-                                  [(callseq_start timm:$amt)]>;
-def ADJCALLSTACKUP   : Pseudo<(outs),
-                                  (ins i32imm:$amt1, i32imm:$amt2),
-                                  "${:comment} ADJCALLSTACKUP $amt1",
-                                  [(callseq_end timm:$amt1, timm:$amt2)]>;
+def ADJCALLSTACKDOWN : InstOR1K<(outs), (ins i32imm:$amt),
+                                    "#ADJCALLSTACKDOWN",
+                                    [(callseq_start timm:$amt)]>;
+def ADJCALLSTACKUP   : InstOR1K<(outs), (ins i32imm:$amt1, i32imm:$amt2),
+                                    "#ADJCALLSTACKUP",
+                                    [(callseq_end timm:$amt1, timm:$amt2)]>;
 }

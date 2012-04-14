@@ -1,4 +1,4 @@
-//===- OR1KMachineFunctionInfo.h - OR1K Machine Function Info -*- C++ -*-===//
+//===- OR1KMachineFuctionInfo.h - OR1K machine func info ---------*- C++ -*-==//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,36 +7,27 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares  OR1K specific per-machine-function information.
+// This file declares OR1K-specific per-machine-function information.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SPARCMACHINEFUNCTIONINFO_H
-#define SPARCMACHINEFUNCTIONINFO_H
+
+#ifndef OR1KMACHINEFUNCTIONINFO_H
+#define OR1KMACHINEFUNCTIONINFO_H
 
 #include "llvm/CodeGen/MachineFunction.h"
 
 namespace llvm {
 
-  class OR1KMachineFunctionInfo : public MachineFunctionInfo {
-  private:
-/*
-    unsigned GlobalBaseReg;
+/// OR1KMachineFunctionInfo - This class is derived from MachineFunction and
+/// contains private OR1K target-specific information for each MachineFunction.
+class OR1KMachineFunctionInfo : public MachineFunctionInfo {
+  virtual void anchor();
+public:
+  OR1KMachineFunctionInfo() {}
 
-    /// VarArgsFrameOffset - Frame offset to start of varargs area.
-    int VarArgsFrameOffset;
-*/
-  public:
-    OR1KMachineFunctionInfo() {}
-    explicit OR1KMachineFunctionInfo(MachineFunction &MF) {}
+  explicit OR1KMachineFunctionInfo(MachineFunction &MF) {}
+};
 
-/*
-    unsigned getGlobalBaseReg() const { return GlobalBaseReg; }
-    void setGlobalBaseReg(unsigned Reg) { GlobalBaseReg = Reg; }
-
-    int getVarArgsFrameOffset() const { return VarArgsFrameOffset; }
-    void setVarArgsFrameOffset(int Offset) { VarArgsFrameOffset = Offset; }
-*/
-  };
-}
+} // End llvm namespace
 
 #endif

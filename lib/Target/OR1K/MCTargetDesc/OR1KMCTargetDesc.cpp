@@ -13,6 +13,7 @@
 
 #include "OR1KMCTargetDesc.h"
 #include "OR1KMCAsmInfo.h"
+#include "InstPrinter/OR1KInstPrinter.h"
 #include "llvm/MC/MCCodeGenInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
@@ -58,6 +59,17 @@ static MCCodeGenInfo *createOR1KMCCodeGenInfo(StringRef TT, Reloc::Model RM,
   return X;
 }
 
+static MCInstPrinter *createOR1KMCInstPrinter(const Target &T,
+                                              unsigned SyntaxVariant,
+                                              const MCAsmInfo &MAI,
+                                              const MCInstrInfo &MII,
+                                              const MCRegisterInfo &MRI,
+                                              const MCSubtargetInfo &STI) {
+  if (SyntaxVariant == 0)
+    return new OR1KInstPrinter(MAI, MII, MRI);
+  return 0;
+}
+
 extern "C" void LLVMInitializeOR1KTargetMC() {
   // Register the MC asm info.
   RegisterMCAsmInfo<OR1KMCAsmInfo> X(TheOR1KTarget);
@@ -75,4 +87,8 @@ extern "C" void LLVMInitializeOR1KTargetMC() {
   // Register the MC subtarget info.
   TargetRegistry::RegisterMCSubtargetInfo(TheOR1KTarget,
                                           createOR1KMCSubtargetInfo);
+
+  // Register the MCInstPrinter.
+  TargetRegistry::RegisterMCInstPrinter(TheOR1KTarget,
+                                        createOR1KMCInstPrinter);
 }

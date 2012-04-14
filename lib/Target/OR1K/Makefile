@@ -16,6 +16,7 @@ BUILT_SOURCES = OR1KGenRegisterInfo.inc OR1KGenInstrInfo.inc \
 		OR1KGenAsmWriter.inc OR1KGenDAGISel.inc \
 		OR1KGenSubtargetInfo.inc OR1KGenCallingConv.inc
 
-DIRS = TargetInfo MCTargetDesc
+DIRS = InstPrinter TargetInfo MCTargetDesc
 
 include $(LEVEL)/Makefile.common
+

@@ -51,7 +51,10 @@ class Proc<string Name, list<SubtargetFeature> Features>
 
 def : Proc<"generic", []>;
 def : Proc<"or1200",  []>;
-
+def OpenRISCInstPrinter : AsmWriter {
+  string AsmWriterClassName  = "InstPrinter";
+  bit isMCAsmWriter = 1;
+}
 //===----------------------------------------------------------------------===//
 // Declare the target which we are implementing
 //===----------------------------------------------------------------------===//
@@ -59,4 +62,5 @@ def : Proc<"or1200",  []>;
 def OR1K : Target {
   // Pull in Instruction Info:
   let InstructionSet = OR1KInstrInfo;
+  let AssemblyWriters = [OpenRISCInstPrinter];
 }
