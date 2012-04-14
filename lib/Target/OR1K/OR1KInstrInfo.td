@@ -148,13 +148,16 @@ class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
   let op3 = subOp;
 }
 
+let isCommutable=1 in {
 def ADD  : ALU_RR<0x0, "l.add", add>;
 def ADDC : ALU_RR<0x1, "l.addc", add>;
-def SUB  : ALU_RR<0x2, "l.sub", sub>;
 def AND  : ALU_RR<0x3, "l.and", and>;
 def OR   : ALU_RR<0x4, "l.or", or>;
 def XOR  : ALU_RR<0x5, "l.xor", xor>;
 def MUL  : ALU_RR<0x6, "l.mul", mul>;
+}
+
+def SUB  : ALU_RR<0x2, "l.sub", sub>;
 
 
 // -------------------------------------------------- //
