@@ -19,10 +19,12 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineLocation.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Target/TargetFrameLowering.h"
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Type.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
+
 #define GET_REGINFO_TARGET_DESC
 #include "OR1KGenRegisterInfo.inc"
 using namespace llvm;
@@ -44,9 +46,12 @@ OR1KRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
 
 BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
+  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
+
   Reserved.set(OR1K::R0);
   Reserved.set(OR1K::R1);
-  Reserved.set(OR1K::R2);
+  if (TFI->hasFP(MF))
+    Reserved.set(OR1K::R2);
   Reserved.set(OR1K::R9);
   Reserved.set(OR1K::R10);
   Reserved.set(OR1K::R11);
@@ -84,7 +89,9 @@ unsigned OR1KRegisterInfo::getRARegister() const {
 }
 
 unsigned OR1KRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
-  return 0;
+  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
+
+  return TFI->hasFP(MF) ? OR1K::R2 : OR1K::R1;
 }
 
 unsigned OR1KRegisterInfo::getEHExceptionRegister() const {
