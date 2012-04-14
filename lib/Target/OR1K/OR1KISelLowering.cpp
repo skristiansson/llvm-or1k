@@ -567,15 +567,11 @@ LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
             const SmallVectorImpl<SDValue> &OutVals,
             DebugLoc dl, SelectionDAG &DAG) const {
 
-    return DAG.getNode(OR1KISD::Ret, dl, MVT::Other,
-                       Chain, DAG.getRegister(OR1K::R15, MVT::i32));
-#if 0
-  // CCValAssign - represent the assignment of
-  // the return value to a location
+  // CCValAssign - represent the assignment of the return value to a location
   SmallVector<CCValAssign, 16> RVLocs;
 
   // CCState - Info about the registers and stack slot.
-  CCState CCInfo(CallConv, isVarArg, getTargetMachine(),
+  CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(), getTargetMachine(),
                  RVLocs, *DAG.getContext());
 
   // Analize return values.
@@ -604,14 +600,10 @@ LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
     Flag = Chain.getValue(1);
   }
 
-  // Return on OR1K is always a "rtsd R15, 8"
   if (Flag.getNode())
-    return DAG.getNode(OR1KISD::Ret, dl, MVT::Other,
-                       Chain, DAG.getRegister(OR1K::R15, MVT::i32), Flag);
+    return DAG.getNode(OR1KISD::Ret, dl, MVT::Other, Chain, Flag);
   else // Return Void
-    return DAG.getNode(OR1KISD::Ret, dl, MVT::Other,
-                       Chain, DAG.getRegister(OR1K::R15, MVT::i32));
-#endif
+    return DAG.getNode(OR1KISD::Ret, dl, MVT::Other, Chain);
 }
 
 //===----------------------------------------------------------------------===//
