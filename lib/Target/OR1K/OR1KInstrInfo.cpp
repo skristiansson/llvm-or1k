@@ -82,24 +82,21 @@ OR1KInstrInfo::InsertBranch(MachineBasicBlock &MBB,MachineBasicBlock *TBB,
   BuildMI(&MBB, DL, get(SP::BA)).addMBB(TBB);
   return 1;
 }
+#endif
 
 void OR1KInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
-                                 MachineBasicBlock::iterator I, DebugLoc DL,
-                                 unsigned DestReg, unsigned SrcReg,
-                                 bool KillSrc) const {
-  if (SP::IntRegsRegClass.contains(DestReg, SrcReg))
-    BuildMI(MBB, I, DL, get(SP::ORrr), DestReg).addReg(SP::G0)
-      .addReg(SrcReg, getKillRegState(KillSrc));
-  else if (SP::FPRegsRegClass.contains(DestReg, SrcReg))
-    BuildMI(MBB, I, DL, get(SP::FMOVS), DestReg)
-      .addReg(SrcReg, getKillRegState(KillSrc));
-  else if (SP::DFPRegsRegClass.contains(DestReg, SrcReg))
-    BuildMI(MBB, I, DL, get(Subtarget.isV9() ? SP::FMOVD : SP::FpMOVD), DestReg)
+                                MachineBasicBlock::iterator I, DebugLoc DL,
+                                unsigned DestReg, unsigned SrcReg,
+                                bool KillSrc) const {
+  if (OR1K::GPRRegClass.contains(DestReg, SrcReg))
+    BuildMI(MBB, I, DL, get(OR1K::OR), DestReg)
+      .addReg(SrcReg, getKillRegState(KillSrc))
       .addReg(SrcReg, getKillRegState(KillSrc));
   else
     llvm_unreachable("Impossible reg-to-reg copy");
 }
 
+#if 0
 void OR1KInstrInfo::
 storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
                     unsigned SrcReg, bool isKill, int FI,
