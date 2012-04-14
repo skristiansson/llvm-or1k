@@ -21,7 +21,9 @@
 #==============================================================================#
 # Explicit files to ignore (only matches one).
 #==============================================================================#
+.cproject
 .gitusers
+.project
 autom4te.cache
 cscope.files
 cscope.out
@@ -40,3 +42,5 @@ projects/*
 tools/clang
 # LLDB, which is tracked independently.
 tools/lldb
+# build directory
+build
