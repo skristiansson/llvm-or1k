@@ -70,7 +70,7 @@ bool Filler::runOnMachineBasicBlock(MachineBasicBlock &MBB) {
     if (I->getDesc().hasDelaySlot()) {
       MachineBasicBlock::iterator J = I;
       ++J;
-      BuildMI(MBB, J, DebugLoc(), TII->get(OR1K::NOP));
+      BuildMI(MBB, J, DebugLoc(), TII->get(OR1K::NOP)).addImm(0);
       ++FilledSlots;
       Changed = true;
     }
