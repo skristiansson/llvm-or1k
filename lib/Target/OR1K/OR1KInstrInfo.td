@@ -51,7 +51,7 @@ def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
 
 class SF_RR<bits<5> op2Val, string asmstr>
 	: InstRR<0x9, (outs), (ins GPR:$rA, GPR:$rB),
-		!strconcat(asmstr, " $rA, $rB"), []>
+		!strconcat(asmstr, "\t$rA, $rB"), []>
 {
   bits<5> op2;
   bits<5> rA;
@@ -66,7 +66,7 @@ class SF_RR<bits<5> op2Val, string asmstr>
 
 class SF_RI<bits<5> op2Val, string asmstr>
 	: InstRI<0xf, (outs), (ins GPR:$rA, i16imm:$imm),
-		!strconcat(asmstr, "i $rA, $imm"), []>
+		!strconcat(asmstr, "i\t$rA, $imm"), []>
 {
   bits<5> op2;
   bits<5> rA;
@@ -105,7 +105,7 @@ defm SFLES : SF<0xd, "l.sfles">;
 
 class ALU_RI<bits<4> subOp, string asmstr, SDNode OpNode>
 	: InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm16),
-		!strconcat(asmstr, "$rD, $rA, $imm16"),
+		!strconcat(asmstr, "\t$rD, $rA, $imm16"),
 		[(set GPR:$rD, (OpNode GPR:$rA, imm_s16:$imm16))]>
 {
   bits<5> rD;
@@ -128,7 +128,7 @@ def MULI  : ALU_RI<0xc, "l.muli", mul>;
 
 class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
 	: InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
-		!strconcat(asmstr, "$rD, $rA, $rB"),
+		!strconcat(asmstr, "\t$rD, $rA, $rB"),
 		[(set GPR:$rD, (OpNode GPR:$rA, GPR:$rB))]>
 {
   bits<5> rD;
@@ -163,7 +163,7 @@ def MUL  : ALU_RR<0x6, "l.mul", mul>;
 
 class SHIFT_RR<bits<2> op2Val, string asmstr, SDNode OpNode>
 	: InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
-		!strconcat(asmstr, " $rD, $rA, $rB"),
+		!strconcat(asmstr, "\t$rD, $rA, $rB"),
 		[(set GPR:$rD, (OpNode GPR:$rA, GPR:$rB))]>
 {
   bits<5> rD;
@@ -188,7 +188,7 @@ class SHIFT_RR<bits<2> op2Val, string asmstr, SDNode OpNode>
 
 class SHIFT_RI<bits<2> op2Val, string asmstr, SDNode OpNode>
 	: InstRI<0xE, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm),
-		!strconcat(asmstr, "i $rD, $rA, $imm"),
+		!strconcat(asmstr, "i\t$rD, $rA, $imm"),
 		[(set GPR:$rD, (OpNode GPR:$rA, imm_z6:$imm))]>
 {
   bits<5> rD;
@@ -224,7 +224,7 @@ defm ROR : SHIFT<0x3, "l.ror", rotr>;
 
 /*class STORE<bits<4> subOp, string asmstring>
 	: InstRR<subOp, (outs), (ins GPR:$rD, GPR:$rB, i16imm:$offset),
-		!strconcat(asmstring, " ($offset)$rA, $rB"),
+		!strconcat(asmstring, "\t($offset)$rA, $rB"),
 		[(store ...)]>
 {
   bits<5> rD;
@@ -249,7 +249,7 @@ def SH : STORE<0x7, "l.sh">;
 
 class LOAD:<bits<4> subop, string asmstring>
 	: InstRI<subop, (outs GPR:$rD), (ins GPR:$rA, i16imm:$offset), 
-		!strconcat(asmstring, " $rA, ($offset)$rb")),
+		!strconcat(asmstring, "\t$rA, ($offset)$rb")),
 		[(load ...)]]>
 {
   bits<5> rD;
@@ -279,7 +279,7 @@ def LHS : LOAD<0x6, "l.lhs">;
 
 class BRANCH<bits<4> subOp, string asmstring>
         : InstBR<subOp, (outs), (ins i32imm:$imm),
-		!strconcat(asmstring, " $imm"),
+		!strconcat(asmstring, "\t$imm"),
 		[]>
 {
   bits<26> imm26;
@@ -296,7 +296,7 @@ def BF  : BRANCH<0x3, "l.bf">;
 
 class BRANCH_R<bits<4> subOp, string asmstring>
         : InstBR<subOp, (outs), (ins GPR:$rB),
-		!strconcat(asmstring, " $rB"),
+		!strconcat(asmstring, "\t$rB"),
 		[]>
 {
   bits<5> rB;
@@ -328,7 +328,7 @@ def RFE :
 
 class NOP_I<bits<2> op2Val, string asmstr>
 	: InstRI<0x5, (outs), (ins i16imm:$imm),
-		!strconcat(asmstr, " $imm"), []>
+		!strconcat(asmstr, "\t$imm"), []>
 {
   bits<2> op2;
   bits<16> imm16;
@@ -344,7 +344,7 @@ let neverHasSideEffects = 1 in
 
 let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
   def RET  : InstBR<0x1, (outs), (ins),
-                    "l.jr r9",
+                    "l.jr\tr9",
                     [(retflag)]>;
 }
 
