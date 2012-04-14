@@ -37,7 +37,7 @@ def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                         SDTCisVT<1, i32> ]>;
 
-def retflag       : SDNode<"OR1KISD::Ret", SDTNone,
+def retflag       : SDNode<"OR1KISD::RET_FLAG", SDTNone,
                            [SDNPHasChain, SDNPOptInGlue]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
                            [SDNPHasChain, SDNPOutGlue]>;
