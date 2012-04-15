@@ -1,10 +1,10 @@
 //===-- OR1KInstrInfo.td - Target Description for OR1K Target -------------===//
-// 
+//
 //                     The LLVM Compiler Infrastructure
 //
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
-// 
+//
 //===----------------------------------------------------------------------===//
 //
 // This file describes the OR1K instructions in TableGen format.
@@ -18,7 +18,7 @@
 include "OR1KInstrFormats.td"
 
 // -------------------------------------------------- //
-// Instruction Operands and Patterns 
+// Instruction Operands and Patterns
 // -------------------------------------------------- //
 
 //  These are target-independent nodes, but have target-specific formats.
@@ -55,7 +55,7 @@ def imm_z6   : PatLeaf<(imm),
 
 def immSExt16 : PatLeaf<(imm),
                 [{return isInt<16>(N->getSExtValue()); }]>;
-                
+
 def immZExt16 : PatLeaf<(imm),
                 [{return isUInt<16>(N->getZExtValue()); }], LO16>;
 
@@ -226,13 +226,13 @@ class SHIFT_RR<bits<2> op2Val, string asmstr, SDNode OpNode>
   let Inst{20-16} = rA;
   let Inst{15-11} = rB;
 
-  let Inst{9-8} = op2; 
-  let Inst{7-6} = op3; 
-  let Inst{3-0} = op4; 
+  let Inst{9-8} = op2;
+  let Inst{7-6} = op3;
+  let Inst{3-0} = op4;
 
-  let op2 = 0; 
+  let op2 = 0;
   let op3 = op2Val;
-  let op4 = 0x8; 
+  let op4 = 0x8;
 }
 
 class SHIFT_RI<bits<2> op2Val, string asmstr, SDNode OpNode>
@@ -297,7 +297,7 @@ def SH : STORE<0x7, "l.sh">;
 // -------------------------------------------------- //
 
 class LOAD:<bits<4> subop, string asmstring>
-	: InstRI<subop, (outs GPR:$rD), (ins GPR:$rA, i16imm:$offset), 
+	: InstRI<subop, (outs GPR:$rD), (ins GPR:$rA, i16imm:$offset),
 		!strconcat(asmstring, "\t$rA, ($offset)$rb")),
 		[(load ...)]]>
 {
@@ -309,7 +309,7 @@ class LOAD:<bits<4> subop, string asmstring>
   let Inst{20-16} = rA;
   let Inst{15-0} = imm16;
 }
-	
+
 
 def LD : LOAD<0x0, "l.ld">;
 def LWZ : LOAD<0x1, "l.lwz">;
@@ -360,7 +360,7 @@ def JALR : BRANCH_R<0x2, "l.jalr">;
 
 /*
 
-def MTSPR : 
+def MTSPR :
 
 def MFSPR :
 
