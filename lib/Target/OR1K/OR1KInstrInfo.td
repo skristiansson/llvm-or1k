@@ -427,3 +427,17 @@ class MOVHI_I
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
 def MOVHI : MOVHI_I;
 }
+
+//===----------------------------------------------------------------------===//
+// Non-Instruction Patterns
+//===----------------------------------------------------------------------===//
+
+// signed 16-bit immediate
+def : Pat<(i32 immSExt16:$imm), (ADDI R0, imm:$imm)>;
+
+// unsigned 16-bit immediate
+def : Pat<(i32 immZExt16:$imm), (ORI R0, imm:$imm)>;
+
+// arbitrary immediate
+def : Pat<(i32 imm:$imm), (ORI (MOVHI (HI16 imm:$imm)), (LO16 imm:$imm))>;
+
