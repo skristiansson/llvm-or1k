@@ -411,3 +411,19 @@ def ADJCALLSTACKUP   : InstOR1K<(outs), (ins i32imm:$amt1, i32imm:$amt2),
                                     "#ADJCALLSTACKUP",
                                     [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
+
+class MOVHI_I
+        : InstOR1K<(outs GPR:$rD), (ins i32imm:$imm),
+                   "l.movhi\t{$rD, $imm}",
+                   [(set GPR:$rD, i32hi16:$imm)]>
+{
+  bits<16> imm16;
+  let optype = 0;
+  let opcode = 0x6;
+  let Inst{16} = 0;
+  let Inst{15-0} = imm16;
+}
+
+let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
+def MOVHI : MOVHI_I;
+}
