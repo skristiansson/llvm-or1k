@@ -129,7 +129,7 @@ defm SFLES : SF<0xd, "l.sfles">;
 // ALU instructions
 // -------------------------------------------------- //
 
-class ALU_RI<bits<4> subOp, string asmstr, SDNode OpNode>
+class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
 	: InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm16),
 		!strconcat(asmstr, "\t$rD, $rA, $imm16"),
 		[(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]>
@@ -143,12 +143,28 @@ class ALU_RI<bits<4> subOp, string asmstr, SDNode OpNode>
   let Inst{15-0} = imm16;
 }
 
-def ADDI  : ALU_RI<0x7, "l.addi", add>;
-def ADDIC : ALU_RI<0x8, "l.addic", add>;
-def ANDI  : ALU_RI<0x9, "l.andi", and>;
-def ORI   : ALU_RI<0xa, "l.ori", or>;
-def XORI  : ALU_RI<0xb, "l.xori", xor>;
-def MULI  : ALU_RI<0xc, "l.muli", mul>;
+class ALU_RIz<bits<4> subOp, string asmstr, SDNode OpNode>
+        : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm16),
+                !strconcat(asmstr, "\t$rD, $rA, $imm16"),
+                [(set GPR:$rD, (OpNode GPR:$rA, immZExt16:$imm16))]>
+{
+  bits<5> rD;
+  bits<5> rA;
+  bits<16> imm16;
+
+  let Inst{25-21} = rD;
+  let Inst{20-16} = rA;
+  let Inst{15-0} = imm16;
+}
+
+let isAsCheapAsAMove = 1 in {
+def ADDI  : ALU_RIs<0x7, "l.addi", add>;
+def ADDIC : ALU_RIs<0x8, "l.addic", add>;
+def ANDI  : ALU_RIz<0x9, "l.andi", and>;
+def ORI   : ALU_RIz<0xa, "l.ori", or>;
+def XORI  : ALU_RIs<0xb, "l.xori", xor>;
+}
+def MULI  : ALU_RIs<0xc, "l.muli", mul>;
 
 
 
@@ -174,16 +190,20 @@ class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
   let op3 = subOp;
 }
 
-let isCommutable=1 in {
+let isCommutable=1, isAsCheapAsAMove = 1 in {
 def ADD  : ALU_RR<0x0, "l.add", add>;
 def ADDC : ALU_RR<0x1, "l.addc", add>;
+}
+let isAsCheapAsAMove = 1 in {
+def SUB  : ALU_RR<0x2, "l.sub", sub>;
+}
+let isCommutable=1, isAsCheapAsAMove = 1 in {
 def AND  : ALU_RR<0x3, "l.and", and>;
 def OR   : ALU_RR<0x4, "l.or", or>;
 def XOR  : ALU_RR<0x5, "l.xor", xor>;
 def MUL  : ALU_RR<0x6, "l.mul", mul>;
 }
 
-def SUB  : ALU_RR<0x2, "l.sub", sub>;
 
 
 // -------------------------------------------------- //
