@@ -44,6 +44,29 @@ def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
 def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
                            [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 
+// Extract bits 0-15 (low-end) of an immediate value.
+def LO16 : SDNodeXForm<imm, [{
+  return CurDAG->getTargetConstant((uint64_t)N->getZExtValue() & 0xffff,
+                                   MVT::i32);
+}]>;
+
+// Extract bits 16-31 (high-end) of an immediate value.
+// Transformation function: shift the immediate value down into the low bits.
+def HI16 : SDNodeXForm<imm, [{
+  return CurDAG->getTargetConstant((uint64_t)N->getZExtValue() >> 16, MVT::i32);
+}]>;
+
+def i32lo16 : PatLeaf<(i32 imm), [{
+  // i32lo16 predicate - true if the 32-bit immediate has only rightmost 16
+  // bits set.
+  return ((N->getZExtValue() & 0xFFFFULL) == N->getZExtValue());
+}], LO16>;
+
+def i32hi16 : PatLeaf<(i32 imm), [{
+  // i32hi16 predicate - true if the 32-bit immediate has only leftmost 16
+  // bits set.
+  return ((N->getZExtValue() & 0xFFFF0000ULL) == N->getZExtValue());
+}], HI16>;
 
 // -------------------------------------------------- //
 // Condition/SF instructions
