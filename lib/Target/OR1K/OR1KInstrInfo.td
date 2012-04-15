@@ -21,17 +21,6 @@ include "OR1KInstrFormats.td"
 // Instruction Operands and Patterns 
 // -------------------------------------------------- //
 
-def brtarget : Operand<OtherVT>;
-
-def simm6    : Operand<i32>;
-
-def imm_z6   : PatLeaf<(imm),
-		[{return isInt<6>(N->getZExtValue()); }]>;
-
-def imm_s16  : PatLeaf<(imm),
-		[{return isInt<16>(N->getSExtValue()); }]>;
-		
-
 //  These are target-independent nodes, but have target-specific formats.
 def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
@@ -55,6 +44,20 @@ def LO16 : SDNodeXForm<imm, [{
 def HI16 : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant((uint64_t)N->getZExtValue() >> 16, MVT::i32);
 }]>;
+
+
+def brtarget : Operand<OtherVT>;
+
+def simm6    : Operand<i32>;
+
+def imm_z6   : PatLeaf<(imm),
+                [{return isInt<6>(N->getZExtValue()); }]>;
+
+def immSExt16 : PatLeaf<(imm),
+                [{return isInt<16>(N->getSExtValue()); }]>;
+                
+def immZExt16 : PatLeaf<(imm),
+                [{return isUInt<16>(N->getZExtValue()); }], LO16>;
 
 def i32lo16 : PatLeaf<(i32 imm), [{
   // i32lo16 predicate - true if the 32-bit immediate has only rightmost 16
@@ -129,7 +132,7 @@ defm SFLES : SF<0xd, "l.sfles">;
 class ALU_RI<bits<4> subOp, string asmstr, SDNode OpNode>
 	: InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm16),
 		!strconcat(asmstr, "\t$rD, $rA, $imm16"),
-		[(set GPR:$rD, (OpNode GPR:$rA, imm_s16:$imm16))]>
+		[(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]>
 {
   bits<5> rD;
   bits<5> rA;
