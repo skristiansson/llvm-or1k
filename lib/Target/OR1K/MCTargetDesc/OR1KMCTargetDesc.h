@@ -1,4 +1,4 @@
-//===-- OR1KMCTargetDesc.h - OR1K Target Descriptions ---------*- C++ -*-===//
+//===-- OR1KMCTargetDesc.h - OR1K Target Descriptions -----------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,14 +11,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SPARCMCTARGETDESC_H
-#define SPARCMCTARGETDESC_H
+#ifndef OR1KMCTARGETDESC_H
+#define OR1KMCTARGETDESC_H
 
 namespace llvm {
 class Target;
 
 extern Target TheOR1KTarget;
-extern Target TheOR1KV9Target;
 
 } // End llvm namespace
 
