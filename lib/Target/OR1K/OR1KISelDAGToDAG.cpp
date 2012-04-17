@@ -80,10 +80,8 @@ private:
 
   SDNode *Select(SDNode *N);
 
-  // Complex Pattern.
-  bool SelectAddr(SDNode *Op, SDValue N,
-                  SDValue &Base, SDValue &Offset);
-
+  // Complex Pattern for address selection.
+  bool SelectAddr(SDValue Addr, SDValue &Base, SDValue &Offset);
 
   // getI32Imm - Return a target constant with the specified value, of type i32.
   inline SDValue getI32Imm(unsigned Imm) {
@@ -96,7 +94,7 @@ private:
 /// ComplexPattern used on OR1KInstrInfo
 /// Used on OR1K Load/Store instructions
 bool OR1KDAGToDAGISel::
-SelectAddr(SDNode *Op, SDValue Addr, SDValue &Offset, SDValue &Base) {
+SelectAddr(SDValue Addr, SDValue &Base, SDValue &Offset) {
   // if Address is FI, get the TargetFrameIndex.
   if (FrameIndexSDNode *FIN = dyn_cast<FrameIndexSDNode>(Addr)) {
     Base   = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
