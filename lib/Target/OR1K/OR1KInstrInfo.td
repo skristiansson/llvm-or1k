@@ -71,6 +71,15 @@ def i32hi16 : PatLeaf<(i32 imm), [{
   return ((N->getZExtValue() & 0xFFFF0000ULL) == N->getZExtValue());
 }], HI16>;
 
+// Addressing modes.
+def ADDRri : ComplexPattern<i32, 2, "SelectAddr", [frameindex], []>;
+
+// Address operands
+def MEMri : Operand<i32> {
+  let PrintMethod = "printMemOperand";
+  let MIOperandInfo = (ops GPR, i32imm);
+}
+
 // -------------------------------------------------- //
 // Condition/SF instructions
 // -------------------------------------------------- //
@@ -271,35 +280,35 @@ defm ROR : SHIFT<0x3, "l.ror", rotr>;
 // STORE instructions
 // -------------------------------------------------- //
 
-/*class STORE<bits<4> subOp, string asmstring>
-	: InstRR<subOp, (outs), (ins GPR:$rD, GPR:$rB, i16imm:$offset),
-		!strconcat(asmstring, "\t($offset)$rA, $rB"),
-		[(store ...)]>
+class STORE<bits<4> subOp, string asmstring, PatFrag opNode>
+	: InstRR<subOp, (outs), (ins GPR:$rB, MEMri:$dst),
+		!strconcat(asmstring, "\t$dst, $rB"),
+		[(opNode (i32 GPR:$rB), ADDRri:$dst)]>
 {
-  bits<5> rD;
+  bits<5> rA;
   bits<5> rB;
   bits<16> imm16;
 
   let Inst{25-21} = imm16{15-11};
-  let Inst{20-16} = rD;
+  let Inst{20-16} = rA;
   let Inst{15-11} = rB;
   let Inst{10-0} = imm16{10-0};
 }
 
 
-def SD : STORE<0x4, "l.sd">;
-def SW : STORE<0x5, "l.sw">;
-def SB : STORE<0x6, "l.sb">;
-def SH : STORE<0x7, "l.sh">;
+//def SD : STORE<0x4, "l.sd">;
+def SW : STORE<0x5, "l.sw", store>;
+def SB : STORE<0x6, "l.sb", truncstorei8>;
+def SH : STORE<0x7, "l.sh", truncstorei16>;
 
 // -------------------------------------------------- //
 // LOAD instructions
 // -------------------------------------------------- //
 
-class LOAD:<bits<4> subop, string asmstring>
-	: InstRI<subop, (outs GPR:$rD), (ins GPR:$rA, i16imm:$offset),
-		!strconcat(asmstring, "\t$rA, ($offset)$rb")),
-		[(load ...)]]>
+class LOAD<bits<4> subop, string asmstring, PatFrag opNode>
+	: InstRI<subop, (outs GPR:$rD), (ins MEMri:$src),
+		!strconcat(asmstring, "\t$rD, $src"),
+		[(set (i32 GPR:$rD), (opNode ADDRri:$src))]>
 {
   bits<5> rD;
   bits<5> rA;
@@ -311,14 +320,13 @@ class LOAD:<bits<4> subop, string asmstring>
 }
 
 
-def LD : LOAD<0x0, "l.ld">;
-def LWZ : LOAD<0x1, "l.lwz">;
-def LWS : LOAD<0x2, "l.lws">;
-def LBZ : LOAD<0x3, "l.lbz">;
-def LBS : LOAD<0x4, "l.lbs">;
-def LHZ : LOAD<0x5, "l.lhz">;
-def LHS : LOAD<0x6, "l.lhs">;
-*/
+//def LD : LOAD<0x0, "l.ld">;
+def LWZ : LOAD<0x1, "l.lwz", load>;
+//def LWS : LOAD<0x2, "l.lws", load>;
+def LBZ : LOAD<0x3, "l.lbz", zextloadi8>;
+def LBS : LOAD<0x4, "l.lbs", sextloadi8>;
+def LHZ : LOAD<0x5, "l.lhz", zextloadi16>;
+def LHS : LOAD<0x6, "l.lhs", sextloadi16>;
 
 
 // -------------------------------------------------- //
