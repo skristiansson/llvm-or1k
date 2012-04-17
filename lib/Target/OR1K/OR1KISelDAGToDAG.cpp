@@ -84,9 +84,6 @@ private:
   bool SelectAddr(SDNode *Op, SDValue N,
                   SDValue &Base, SDValue &Offset);
 
-  // Address Selection
-  bool SelectAddrRegReg(SDNode *Op, SDValue N, SDValue &Base, SDValue &Index);
-  bool SelectAddrRegImm(SDNode *Op, SDValue N, SDValue &Disp, SDValue &Base);
 
   // getI32Imm - Return a target constant with the specified value, of type i32.
   inline SDValue getI32Imm(unsigned Imm) {
@@ -94,92 +91,6 @@ private:
   }
 };
 
-}
-
-/// isIntS32Immediate - This method tests to see if the node is either a 32-bit
-/// or 64-bit immediate, and if the value can be accurately represented as a
-/// sign extension from a 32-bit value.  If so, this returns true and the
-/// immediate.
-static bool isIntS32Immediate(SDNode *N, int32_t &Imm) {
-  unsigned Opc = N->getOpcode();
-  if (Opc != ISD::Constant)
-    return false;
-
-  Imm = (int32_t)cast<ConstantSDNode>(N)->getZExtValue();
-  if (N->getValueType(0) == MVT::i32)
-    return Imm == (int32_t)cast<ConstantSDNode>(N)->getZExtValue();
-  else
-    return Imm == (int64_t)cast<ConstantSDNode>(N)->getZExtValue();
-}
-
-static bool isIntS32Immediate(SDValue Op, int32_t &Imm) {
-  return isIntS32Immediate(Op.getNode(), Imm);
-}
-
-
-/// SelectAddressRegReg - Given the specified addressed, check to see if it
-/// can be represented as an indexed [r+r] operation.  Returns false if it
-/// can be more efficiently represented with [r+imm].
-bool OR1KDAGToDAGISel::
-SelectAddrRegReg(SDNode *Op, SDValue N, SDValue &Base, SDValue &Index) {
-  if (N.getOpcode() == ISD::FrameIndex) return false;
-  if (N.getOpcode() == ISD::TargetExternalSymbol ||
-      N.getOpcode() == ISD::TargetGlobalAddress)
-    return false;  // direct calls.
-
-  int32_t imm = 0;
-  if (N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::OR) {
-    if (isIntS32Immediate(N.getOperand(1), imm))
-      return false;    // r+i
-
-    if (N.getOperand(0).getOpcode() == ISD::TargetJumpTable ||
-        N.getOperand(1).getOpcode() == ISD::TargetJumpTable)
-      return false; // jump tables.
-
-    Base = N.getOperand(1);
-    Index = N.getOperand(0);
-    return true;
-  }
-
-  return false;
-}
-
-/// Returns true if the address N can be represented by a base register plus
-/// a signed 32-bit displacement [r+imm], and if it is not better
-/// represented as reg+reg.
-bool OR1KDAGToDAGISel::
-SelectAddrRegImm(SDNode *Op, SDValue N, SDValue &Disp, SDValue &Base) {
-  // If this can be more profitably realized as r+r, fail.
-  if (SelectAddrRegReg(Op, N, Disp, Base))
-    return false;
-
-  if (N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::OR) {
-    int32_t imm = 0;
-    if (isIntS32Immediate(N.getOperand(1), imm)) {
-      Disp = CurDAG->getTargetConstant(imm, MVT::i32);
-      if (FrameIndexSDNode *FI = dyn_cast<FrameIndexSDNode>(N.getOperand(0))) {
-        Base = CurDAG->getTargetFrameIndex(FI->getIndex(), N.getValueType());
-      } else {
-        Base = N.getOperand(0);
-      }
-      DEBUG( errs() << "WESLEY: Using Operand Immediate\n" );
-      return true; // [r+i]
-    }
-  } else if (ConstantSDNode *CN = dyn_cast<ConstantSDNode>(N)) {
-    // Loading from a constant address.
-    uint32_t Imm = CN->getZExtValue();
-    Disp = CurDAG->getTargetConstant(Imm, CN->getValueType(0));
-    Base = CurDAG->getRegister(OR1K::R0, CN->getValueType(0));
-    DEBUG( errs() << "WESLEY: Using Constant Node\n" );
-    return true;
-  }
-
-  Disp = CurDAG->getTargetConstant(0, TM.getTargetLowering()->getPointerTy());
-  if (FrameIndexSDNode *FI = dyn_cast<FrameIndexSDNode>(N))
-    Base = CurDAG->getTargetFrameIndex(FI->getIndex(), N.getValueType());
-  else
-    Base = N;
-  return true;      // [r+0]
 }
 
 /// ComplexPattern used on OR1KInstrInfo
