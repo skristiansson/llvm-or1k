@@ -66,12 +66,42 @@ bool OR1KRegisterInfo::hasFP(const MachineFunction &MF) const {
 void OR1KRegisterInfo::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator I) const {
+  // Discard ADJCALLSTACKDOWN, ADJCALLSTACKUP instructions.
+  MBB.erase(I);
 }
 
 
 void
 OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                        int SPAdj, RegScavenger *RS) const {
+  assert(SPAdj == 0 && "Unexpected");
+
+  unsigned i = 0;
+  MachineInstr &MI = *II;
+  MachineFunction &MF = *MI.getParent()->getParent();
+  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
+  bool hasFP = TFI->hasFP(MF);
+
+  while (!MI.getOperand(i).isFI()) {
+    ++i;
+    assert(i < MI.getNumOperands() && "Instr doesn't have FrameIndex operand!");
+  }
+
+  int FrameIndex = MI.getOperand(i).getIndex();
+
+  // Addressable stack objects are accessed using neg. offsets from %fp
+  int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex) +
+               MI.getOperand(i+1).getImm();
+
+  // FIXME: implement a MOVHI - ORI sequence if imm does not fit
+  // Sparc has an example
+  assert(isInt<16>(Offset) && "Offset is not small enough to fit in imm field");
+
+  // Replace frame index with a frame pointer reference.
+  // If the offset is small enough to fit in the immediate field, directly
+  // encode it.
+  MI.getOperand(i).ChangeToRegister((hasFP ? OR1K::R2 : OR1K::R1), false);
+  MI.getOperand(i+1).ChangeToImmediate(Offset);
 }
 
 void OR1KRegisterInfo::
