@@ -27,7 +27,7 @@ protected:
 
 public:
   explicit OR1KFrameLowering(const OR1KSubtarget &sti)
-    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 2, -2),
+    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 4, 0),
       STI(sti) {
   }
 
