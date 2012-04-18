@@ -26,11 +26,10 @@ extern "C" void LLVMInitializeOR1KTarget() {
 }
 
 // DataLayout --> Big-endian, 32-bit pointer/ABI/alignment
-// The stack is always 8 byte aligned
+// The stack is always 4 byte aligned
 // On function prologue, the stack is created by decrementing
 // its pointer. Once decremented, all references are done with positive
-// offset from the stack/frame pointer, using StackGrowsUp enables
-// an easier handling.
+// offset from the stack/frame pointer.
 OR1KTargetMachine::
 OR1KTargetMachine(const Target &T, StringRef TT,
                     StringRef CPU, StringRef FS, const TargetOptions &Options,
