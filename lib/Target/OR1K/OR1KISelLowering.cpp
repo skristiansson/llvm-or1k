@@ -173,7 +173,8 @@ OR1KTargetLowering::LowerCCCArguments(SDValue Chain,
       assert(VA.isMemLoc());
       // Load the argument to a virtual register
       unsigned ObjSize = VA.getLocVT().getSizeInBits()/8;
-      if (ObjSize > 2) {
+      // Check that the argument fits in stack slot
+      if (ObjSize > 4) {
         errs() << "LowerFormalArguments Unhandled argument type: "
              << EVT(VA.getLocVT()).getEVTString()
              << "\n";
