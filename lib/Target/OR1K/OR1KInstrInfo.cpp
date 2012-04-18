@@ -89,9 +89,9 @@ void OR1KInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                 unsigned DestReg, unsigned SrcReg,
                                 bool KillSrc) const {
   if (OR1K::GPRRegClass.contains(DestReg, SrcReg))
-    BuildMI(MBB, I, DL, get(OR1K::OR), DestReg)
+    BuildMI(MBB, I, DL, get(OR1K::ORI), DestReg)
       .addReg(SrcReg, getKillRegState(KillSrc))
-      .addReg(SrcReg, getKillRegState(KillSrc));
+      .addImm(0);
   else
     llvm_unreachable("Impossible reg-to-reg copy");
 }
