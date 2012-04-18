@@ -75,7 +75,7 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineInstr &MI = *II;
   MachineFunction &MF = *MI.getParent()->getParent();
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
-  bool hasFP = TFI->hasFP(MF);
+  bool HasFP = TFI->hasFP(MF);
 
   while (!MI.getOperand(i).isFI()) {
     ++i;
@@ -95,7 +95,7 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // Replace frame index with a frame pointer reference.
   // If the offset is small enough to fit in the immediate field, directly
   // encode it.
-  MI.getOperand(i).ChangeToRegister((hasFP ? OR1K::R2 : OR1K::R1), false);
+  MI.getOperand(i).ChangeToRegister((HasFP ? OR1K::R2 : OR1K::R1), false);
   MI.getOperand(i+1).ChangeToImmediate(Offset);
 }
 
