@@ -107,13 +107,6 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 void OR1KRegisterInfo::
 processFunctionBeforeFrameFinalized(MachineFunction &MF) const {}
 
-void OR1KRegisterInfo::emitPrologue(MachineFunction &MF) const {
-}
-
-void OR1KRegisterInfo::emitEpilogue(MachineFunction &MF,
-                                     MachineBasicBlock &MBB) const {
-}
-
 unsigned OR1KRegisterInfo::getRARegister() const {
   return OR1K::R9;
 }
