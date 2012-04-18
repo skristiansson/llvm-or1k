@@ -101,7 +101,7 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // If the offset is small enough to fit in the immediate field, directly
   // encode it.
   MI.getOperand(i).ChangeToRegister((hasFP ? OR1K::R2 : OR1K::R1), false);
-  MI.getOperand(i+1).ChangeToImmediate(Offset);
+  MI.getOperand(i+1).ChangeToImmediate(-Offset);
 }
 
 void OR1KRegisterInfo::
