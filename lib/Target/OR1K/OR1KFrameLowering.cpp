@@ -20,6 +20,14 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 using namespace llvm;
 
+bool OR1KFrameLowering::hasFP(const MachineFunction &MF) const {
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+
+  return (MF.getTarget().Options.DisableFramePointerElim(MF) ||
+          MF.getFrameInfo()->hasVarSizedObjects() ||
+          MFI->isFrameAddressTaken());
+}
+
 void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   MachineBasicBlock &MBB   = MF.front();
   MachineFrameInfo *MFI    = MF.getFrameInfo();

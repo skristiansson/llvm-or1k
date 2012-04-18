@@ -36,7 +36,7 @@ public:
   void emitPrologue(MachineFunction &MF) const;
   void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const;
 
-  bool hasFP(const MachineFunction &MF) const { return false; }
+  bool hasFP(const MachineFunction &MF) const;
 };
 
 } // End llvm namespace
