@@ -1,4 +1,4 @@
-//===-- OR1KInstrInfo.cpp - OR1K Instruction Information -------*- C++ -*-===//
+//===-- OR1KInstrInfo.cpp - OR1K Instruction Information --------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -41,9 +41,7 @@ OR1KInstrInfo::OR1KInstrInfo()
 /// any side effects other than loading from the stack slot.
 unsigned OR1KInstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
                                              int &FrameIndex) const {
-  if (MI->getOpcode() == SP::LDri ||
-      MI->getOpcode() == SP::LDFri ||
-      MI->getOpcode() == SP::LDDFri) {
+  if (MI->getOpcode() == OR1K::LWZ) {
     if (MI->getOperand(1).isFI() && MI->getOperand(2).isImm() &&
         MI->getOperand(2).getImm() == 0) {
       FrameIndex = MI->getOperand(1).getIndex();
@@ -60,9 +58,7 @@ unsigned OR1KInstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
 /// any side effects other than storing to the stack slot.
 unsigned OR1KInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
                                             int &FrameIndex) const {
-  if (MI->getOpcode() == SP::STri ||
-      MI->getOpcode() == SP::STFri ||
-      MI->getOpcode() == SP::STDFri) {
+  if (MI->getOpcode() == OR1K::SW) {
     if (MI->getOperand(0).isFI() && MI->getOperand(1).isImm() &&
         MI->getOperand(1).getImm() == 0) {
       FrameIndex = MI->getOperand(0).getIndex();
@@ -96,7 +92,6 @@ void OR1KInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     llvm_unreachable("Impossible reg-to-reg copy");
 }
 
-#if 0
 void OR1KInstrInfo::
 storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
                     unsigned SrcReg, bool isKill, int FI,
@@ -105,16 +100,9 @@ storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
   DebugLoc DL;
   if (I != MBB.end()) DL = I->getDebugLoc();
 
-  // On the order of operands here: think "[FrameIdx + 0] = SrcReg".
-  if (RC == SP::IntRegsRegisterClass)
-    BuildMI(MBB, I, DL, get(SP::STri)).addFrameIndex(FI).addImm(0)
-      .addReg(SrcReg, getKillRegState(isKill));
-  else if (RC == SP::FPRegsRegisterClass)
-    BuildMI(MBB, I, DL, get(SP::STFri)).addFrameIndex(FI).addImm(0)
-      .addReg(SrcReg,  getKillRegState(isKill));
-  else if (RC == SP::DFPRegsRegisterClass)
-    BuildMI(MBB, I, DL, get(SP::STDFri)).addFrameIndex(FI).addImm(0)
-      .addReg(SrcReg,  getKillRegState(isKill));
+  if (RC == OR1K::GPRRegisterClass)
+    BuildMI(MBB, I, DL, get(OR1K::SW)).addReg(SrcReg, getKillRegState(isKill))
+      .addFrameIndex(FI).addImm(0);
   else
     llvm_unreachable("Can't store this register to stack slot");
 }
@@ -127,16 +115,13 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
   DebugLoc DL;
   if (I != MBB.end()) DL = I->getDebugLoc();
 
-  if (RC == SP::IntRegsRegisterClass)
-    BuildMI(MBB, I, DL, get(SP::LDri), DestReg).addFrameIndex(FI).addImm(0);
-  else if (RC == SP::FPRegsRegisterClass)
-    BuildMI(MBB, I, DL, get(SP::LDFri), DestReg).addFrameIndex(FI).addImm(0);
-  else if (RC == SP::DFPRegsRegisterClass)
-    BuildMI(MBB, I, DL, get(SP::LDDFri), DestReg).addFrameIndex(FI).addImm(0);
+  if (RC == OR1K::GPRRegisterClass)
+    BuildMI(MBB, I, DL, get(OR1K::LWZ), DestReg).addFrameIndex(FI).addImm(0);
   else
     llvm_unreachable("Can't load this register from stack slot");
 }
 
+#if 0
 unsigned OR1KInstrInfo::getGlobalBaseReg(MachineFunction *MF) const
 {
   OR1KMachineFunctionInfo *OR1KFI = MF->getInfo<OR1KMachineFunctionInfo>();
@@ -149,7 +134,7 @@ unsigned OR1KInstrInfo::getGlobalBaseReg(MachineFunction *MF) const
   MachineBasicBlock::iterator MBBI = FirstMBB.begin();
   MachineRegisterInfo &RegInfo = MF->getRegInfo();
 
-  GlobalBaseReg = RegInfo.createVirtualRegister(&SP::IntRegsRegClass);
+  GlobalBaseReg = RegInfo.createVirtualRegister(&OR1K::GPRRegClass);
 
 
   DebugLoc dl;
