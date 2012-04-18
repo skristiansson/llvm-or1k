@@ -48,9 +48,9 @@ def HI16 : SDNodeXForm<imm, [{
 
 def brtarget : Operand<OtherVT>;
 
-def simm6    : Operand<i32>;
+def s6imm    : Operand<i32>;
 
-def imm_z6   : PatLeaf<(imm),
+def immZExt6  : PatLeaf<(imm),
                 [{return isInt<6>(N->getZExtValue()); }]>;
 
 def immSExt16 : PatLeaf<(imm),
@@ -247,7 +247,7 @@ class SHIFT_RR<bits<2> op2Val, string asmstr, SDNode OpNode>
 class SHIFT_RI<bits<2> op2Val, string asmstr, SDNode OpNode>
 	: InstRI<0xE, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm),
 		!strconcat(asmstr, "i\t$rD, $rA, $imm"),
-		[(set GPR:$rD, (OpNode GPR:$rA, imm_z6:$imm))]>
+		[(set GPR:$rD, (OpNode GPR:$rA, immZExt6:$imm))]>
 {
   bits<5> rD;
   bits<5> rA;
