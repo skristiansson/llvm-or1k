@@ -27,8 +27,8 @@ def CC_OR1K32 : CallingConv<[
   CCIfType<[i8, i16], CCPromoteToType<i32>>,
 
   // All arguments get passed in integer registers if there is space.
-  CCIfType<[i32, f32], CCAssignToReg<[R3, R4, R5, R6, R7, R8]>>,
-  
+  CCIfNotVarArg<CCIfType<[i32, f32], CCAssignToReg<[R3, R4, R5, R6, R7, R8]>>>,
+
   // Alternatively, they are assigned to the stack in 4-byte aligned units.
   CCAssignToStack<4, 4>
 ]>;
