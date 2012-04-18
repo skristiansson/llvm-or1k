@@ -34,8 +34,6 @@ struct OR1KRegisterInfo : public OR1KGenRegisterInfo {
 
   BitVector getReservedRegs(const MachineFunction &MF) const;
 
-  bool hasFP(const MachineFunction &MF) const;
-
   void eliminateCallFramePseudoInstr(MachineFunction &MF,
                                      MachineBasicBlock &MBB,
                                      MachineBasicBlock::iterator I) const;

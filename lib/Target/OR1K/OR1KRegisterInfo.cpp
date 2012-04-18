@@ -58,11 +58,6 @@ BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   return Reserved;
 }
 
-bool OR1KRegisterInfo::hasFP(const MachineFunction &MF) const {
-  return false;
-}
-
-
 void OR1KRegisterInfo::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator I) const {
