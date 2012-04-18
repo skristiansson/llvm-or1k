@@ -85,7 +85,7 @@ void OR1KRegisterInfo::emitEpilogue(MachineFunction &MF,
 }
 
 unsigned OR1KRegisterInfo::getRARegister() const {
-  return 0;
+  return OR1K::R9;
 }
 
 unsigned OR1KRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
