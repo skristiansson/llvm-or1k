@@ -88,6 +88,9 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex) +
                MI.getOperand(i+1).getImm();
 
+  if (!HasFP)
+    Offset += MF.getFrameInfo()->getStackSize();
+
   // FIXME: implement a MOVHI - ORI sequence if imm does not fit
   // Sparc has an example
   assert(isInt<16>(Offset) && "Offset is not small enough to fit in imm field");
