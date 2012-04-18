@@ -50,6 +50,10 @@ def brtarget : Operand<OtherVT>;
 
 def s6imm    : Operand<i32>;
 
+def s16imm   : Operand<i32> {
+  let PrintMethod = "printS16ImmOperand";
+}
+
 def immZExt6  : PatLeaf<(imm),
                 [{return isInt<6>(N->getZExtValue()); }]>;
 
@@ -139,7 +143,7 @@ defm SFLES : SF<0xd, "l.sfles">;
 // -------------------------------------------------- //
 
 class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
-	: InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm16),
+	: InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, s16imm:$imm16),
 		!strconcat(asmstr, "\t$rD, $rA, $imm16"),
 		[(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]>
 {

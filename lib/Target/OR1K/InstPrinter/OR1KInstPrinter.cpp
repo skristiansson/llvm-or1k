@@ -54,3 +54,8 @@ void OR1KInstPrinter::printMemOperand(const MCInst *MI, int OpNo,
   assert(RegOp.isReg() && "Register operand not a register");
   O  << "(" << getRegisterName(RegOp.getReg()) << ")";
 }
+
+void OR1KInstPrinter::printS16ImmOperand(const MCInst *MI, unsigned OpNo,
+                                         raw_ostream &O) {
+  O << (int16_t)MI->getOperand(OpNo).getImm();
+}
