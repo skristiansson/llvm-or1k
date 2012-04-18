@@ -48,7 +48,7 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   int RAOffset = OR1KFI->getRAStackOffset();
 #endif
 
-  // Adjust stack : addi R1, R1, -imm
+  // Adjust stack : l.addi r1, r1, -imm
   if (StackSize) {
     BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), OR1K::R1)
       .addReg(OR1K::R1).addImm(-StackSize);
@@ -110,7 +110,7 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
   // Get the number of bytes from FrameInfo
   int StackSize = (int) MFI->getStackSize();
 
-  // addi R1, R1, imm
+  // l.addi r1, r1, imm
   if (StackSize) {
     BuildMI(MBB, MBBI, dl, TII.get(OR1K::ADDI), OR1K::R1)
       .addReg(OR1K::R1).addImm(StackSize);
