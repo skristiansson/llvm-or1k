@@ -38,7 +38,7 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
   llvm::CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
-  bool requiresRA = true;//CallConv == llvm::CallingConv::MBLAZE_INTR;
+  bool requiresRA = false;//CallConv == llvm::CallingConv::MBLAZE_INTR;
 
 #if 0
   // Determine the correct frame layout
@@ -91,7 +91,7 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
   DebugLoc dl = MBBI->getDebugLoc();
 
   llvm::CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
-  bool requiresRA = true; //CallConv == llvm::CallingConv::MBLAZE_INTR;
+  bool requiresRA = false; //CallConv == llvm::CallingConv::MBLAZE_INTR;
 
 #if 0
   // Get the FI's where RA and FP are saved.
