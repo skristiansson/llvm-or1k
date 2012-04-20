@@ -24,7 +24,7 @@ include "OR1KInstrFormats.td"
 //  These are target-independent nodes, but have target-specific formats.
 def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
-                                        SDTCisVT<1, i32> ]>;
+                                          SDTCisVT<1, i32> ]>;
 
 def retflag       : SDNode<"OR1KISD::RET_FLAG", SDTNone,
                            [SDNPHasChain, SDNPOptInGlue]>;
@@ -408,7 +408,6 @@ let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
                     "l.jr\tr9",
                     [(retflag)]>;
 }
-
 
 // ADJCALLSTACKDOWN/UP implicitly use/def R1 because they may be expanded into
 // a stack adjustment and the codegen must know that they may modify the stack
