@@ -38,9 +38,11 @@ void OR1KInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   if (Op.isReg()) {
     O << getRegisterName(Op.getReg());
   } else if (Op.isImm()) {
-    O << Op.getImm();
-  } else
-    assert(0 && "Unknown operand in printOperand");
+    O << (int32_t)Op.getImm();
+  } else {
+    assert(Op.isExpr() && "Unknown operand in printOperand");
+    O << *Op.getExpr();
+  }
 }
 
 void OR1KInstPrinter::printMemOperand(const MCInst *MI, int OpNo,

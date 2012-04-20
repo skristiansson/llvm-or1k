@@ -26,6 +26,10 @@ def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                           SDTCisVT<1, i32> ]>;
 
+def SDT_OR1KCall  : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
+def call          : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
+                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
+                            SDNPVariadic]>;
 def retflag       : SDNode<"OR1KISD::RET_FLAG", SDTNone,
                            [SDNPHasChain, SDNPOptInGlue]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
@@ -47,6 +51,7 @@ def HI16 : SDNodeXForm<imm, [{
 
 
 def brtarget : Operand<OtherVT>;
+def calltarget : Operand<i32>;
 
 def s6imm    : Operand<i32>;
 
@@ -350,10 +355,17 @@ class BRANCH<bits<4> subOp, string asmstring>
   let opcode = subOp;
 }
 
-def J   : BRANCH<0x0, "l.j">;
-def JAL : BRANCH<0x1, "l.jal">;
-def BNF : BRANCH<0x2, "l.bnf">;
-def BF  : BRANCH<0x3, "l.bf">;
+class BRANCHL<bits<4> subOp, string asmstring>
+        : InstBR<subOp, (outs), (ins calltarget:$imm, variable_ops),
+		!strconcat(asmstring, "\t$imm"),
+		[]>
+{
+  bits<26> imm26;
+
+  let Inst{25-0} = imm26;
+
+  let opcode = subOp;
+}
 
 class BRANCH_R<bits<4> subOp, string asmstring>
         : InstBR<subOp, (outs), (ins GPR:$rB),
@@ -367,8 +379,33 @@ class BRANCH_R<bits<4> subOp, string asmstring>
   let opcode = subOp;
 }
 
+class BRANCHL_R<bits<4> subOp, string asmstring>
+        : InstBR<subOp, (outs), (ins GPR:$rB, variable_ops),
+		!strconcat(asmstring, "\t$rB"),
+		[(call GPR:$rB)]>
+{
+  bits<26> imm26;
+
+  let Inst{25-0} = imm26;
+
+  let opcode = subOp;
+}
+
+// Jump/Branch
+def J    : BRANCH<0x0, "l.j">;
+def BNF  : BRANCH<0x2, "l.bnf">;
+def BF   : BRANCH<0x3, "l.bf">;
 def JR   : BRANCH_R<0x1, "l.jr">;
-def JALR : BRANCH_R<0x2, "l.jalr">;
+
+// Jump and link
+let isCall=1, hasDelaySlot=1,
+    Uses = [R1],
+    // Potentially clobbered registers
+    Defs = [R3, R4, R5, R6, R7, R8, R9, R11, R12, R13, R15, R17, R19, R21, R23,
+            R25, R27, R29, R31] in {
+def JAL  : BRANCHL<0x1, "l.jal">;
+def JALR : BRANCHL_R<0x2, "l.jalr">;
+}
 
 /*
 
@@ -452,3 +489,6 @@ def : Pat<(i32 immZExt16:$imm), (ORI R0, imm:$imm)>;
 // arbitrary immediate
 def : Pat<(i32 imm:$imm), (ORI (MOVHI (HI16 imm:$imm)), (LO16 imm:$imm))>;
 
+// Calls
+def : Pat<(call tglobaladdr:$dst), (JAL tglobaladdr:$dst)>;
+def : Pat<(call texternalsym:$dst), (JAL texternalsym:$dst)>;

@@ -34,6 +34,11 @@ public:
   OR1KMCInstLower(MCContext &ctx, Mangler &mang, AsmPrinter &printer)
     : Ctx(ctx), Mang(mang), Printer(printer) {}
   void Lower(const MachineInstr *MI, MCInst &OutMI) const;
+
+  MCOperand LowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym) const;
+
+  MCSymbol *GetGlobalAddressSymbol(const MachineOperand &MO) const;
+  MCSymbol *GetExternalSymbolSymbol(const MachineOperand &MO) const;
 };
 
 }
