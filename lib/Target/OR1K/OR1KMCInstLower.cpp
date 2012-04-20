@@ -47,7 +47,7 @@ void OR1KMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
       break;
     case MachineOperand::MO_MachineBasicBlock:
       MCOp = MCOperand::CreateExpr(MCSymbolRefExpr::Create(
-                                     MO.getMBB()->getSymbol(), Ctx));
+                                   MO.getMBB()->getSymbol(), Ctx));
       break;
     case MachineOperand::MO_RegisterMask:
       continue;
