@@ -18,6 +18,8 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
+
 using namespace llvm;
 
 bool OR1KFrameLowering::hasFP(const MachineFunction &MF) const {
@@ -38,7 +40,6 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
   llvm::CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
-  bool requiresRA = false;//CallConv == llvm::CallingConv::MBLAZE_INTR;
 
 #if 0
   // Determine the correct frame layout
@@ -49,35 +50,34 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   unsigned StackSize = MFI->getStackSize();
 
   // No need to allocate space on the stack.
-  if (StackSize == 0 && !MFI->adjustsStack() && !requiresRA) return;
+  if (StackSize == 0 && !MFI->adjustsStack()) return;
 
-#if 0
-  int FPOffset = OR1KFI->getFPStackOffset();
-  int RAOffset = OR1KFI->getRAStackOffset();
-#endif
+  int Offset = -4;
+
+  // l.sw  stack_lock(r1), r9
+  if (MFI->adjustsStack()) {
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::SW))
+        .addReg(OR1K::R9).addReg(OR1K::R1).addImm(Offset);
+    Offset -= 4;
+  }
+
+  if (hasFP(MF)) {
+    // Save frame pointer onto stack
+    // l.sw  stack_loc(r1), r2
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::SW))
+      .addReg(OR1K::R2).addReg(OR1K::R1).addImm(Offset);
+
+    // Set frame pointer to stack pointer
+    // l.addi r2, r1, 0
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), OR1K::R2)
+      .addReg(OR1K::R1).addImm(0);
+  }
 
   // Adjust stack : l.addi r1, r1, -imm
   if (StackSize) {
     BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), OR1K::R1)
       .addReg(OR1K::R1).addImm(-StackSize);
   }
-
-#if 0
-  // swi  R15, R1, stack_loc
-  if (MFI->adjustsStack() || requiresRA) {
-    BuildMI(MBB, MBBI, DL, TII.get(OR1K::SW))
-        .addReg(OR1K::R9).addReg(OR1K::R1).addImm(RAOffset);
-  }
-  if (hasFP(MF)) {
-    // swi  R19, R1, stack_loc
-    BuildMI(MBB, MBBI, DL, TII.get(MBlaze::SWI))
-      .addReg(MBlaze::R19).addReg(MBlaze::R1).addImm(FPOffset);
-
-    // add R19, R1, R0
-    BuildMI(MBB, MBBI, DL, TII.get(MBlaze::ADD), MBlaze::R19)
-      .addReg(MBlaze::R1).addReg(MBlaze::R0);
-  }
-#endif
 }
 
 void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
@@ -91,37 +91,52 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
   DebugLoc dl = MBBI->getDebugLoc();
 
   llvm::CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
-  bool requiresRA = false; //CallConv == llvm::CallingConv::MBLAZE_INTR;
 
-#if 0
-  // Get the FI's where RA and FP are saved.
-  int FPOffset = OR1KFI->getFPStackOffset();
-  int RAOffset = OR1KFI->getRAStackOffset();
-
-  if (hasFP(MF)) {
-    // add R1, R19, R0
-    BuildMI(MBB, MBBI, dl, TII.get(MBlaze::ADD), MBlaze::R1)
-      .addReg(MBlaze::R19).addReg(MBlaze::R0);
-
-    // lwi  R19, R1, stack_loc
-    BuildMI(MBB, MBBI, dl, TII.get(MBlaze::LWI), MBlaze::R19)
-      .addReg(MBlaze::R1).addImm(FPOffset);
-  }
-
-  // lwi R15, R1, stack_loc
-  if (MFI->adjustsStack() || requiresRA) {
-    BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), OR1K::R9)
-      .addReg(OR1K::R1).addImm(RAOffset);
-  }
-#endif
+  int FPOffset = MFI->adjustsStack() ? -8 : -4;
+  int RAOffset = -4;
 
   // Get the number of bytes from FrameInfo
   int StackSize = (int) MFI->getStackSize();
 
-  // l.addi r1, r1, imm
-  if (StackSize) {
+  if (hasFP(MF)) {
+    // Set stack pointer to frame pointer
+    // l.addi r1, r2, 0
     BuildMI(MBB, MBBI, dl, TII.get(OR1K::ADDI), OR1K::R1)
-      .addReg(OR1K::R1).addImm(StackSize);
+      .addReg(OR1K::R2).addImm(0);
+
+    // Load frame pointer from stack
+    // l.lwz  r2, stack_loc(r1)
+    BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), OR1K::R2)
+      .addReg(OR1K::R1).addImm(FPOffset);
+  } else {
+    // l.addi r1, r1, imm
+    if (StackSize) {
+      BuildMI(MBB, MBBI, dl, TII.get(OR1K::ADDI), OR1K::R1)
+        .addReg(OR1K::R1).addImm(StackSize);
+    }
   }
 
+  // l.lwz r9, stack_loc(r1)
+  if (MFI->adjustsStack()) {
+    BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), OR1K::R9)
+      .addReg(OR1K::R1).addImm(RAOffset);
+  }
+}
+
+void OR1KFrameLowering::
+processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
+                                     RegScavenger *RS) const {
+  MachineFrameInfo *MFI = MF.getFrameInfo();
+  MachineRegisterInfo& MRI = MF.getRegInfo();
+  int Offset = -4;
+
+  if (MFI->adjustsStack()) {
+    MFI->CreateFixedObject(4, Offset, true);
+    // Mark unused since we will save it manually in the prologue
+    MRI.setPhysRegUnused(OR1K::R9);
+    Offset -= 4;
+  }
+
+  if (hasFP(MF))
+    MFI->CreateFixedObject(4, Offset, true);
 }
