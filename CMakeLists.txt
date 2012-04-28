@@ -78,6 +78,7 @@ set(LLVM_ALL_TARGETS
   Mips
   MBlaze
   MSP430
+  OR1K
   PowerPC
   PTX
   Sparc
