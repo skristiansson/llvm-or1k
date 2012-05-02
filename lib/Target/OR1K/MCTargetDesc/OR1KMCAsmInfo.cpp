@@ -23,4 +23,5 @@ OR1KMCAsmInfo::OR1KMCAsmInfo(const Target &T, StringRef TT) {
   ZeroDirective               = "\t.space\t";
   GPRel32Directive            = "\t.gpword\t";
   HasSetDirective             = false;
+  PrivateGlobalPrefix         = ".L";
 }
