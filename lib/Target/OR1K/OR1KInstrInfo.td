@@ -452,12 +452,12 @@ let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
 // Pessimistically assume ADJCALLSTACKDOWN / ADJCALLSTACKUP will become
 // sub / add which can clobber R1.
 let Defs = [R1], Uses = [R1] in {
-def ADJCALLSTACKDOWN : InstOR1K<(outs), (ins i32imm:$amt),
-                                    "#ADJCALLSTACKDOWN",
-                                    [(callseq_start timm:$amt)]>;
-def ADJCALLSTACKUP   : InstOR1K<(outs), (ins i32imm:$amt1, i32imm:$amt2),
-                                    "#ADJCALLSTACKUP",
-                                    [(callseq_end timm:$amt1, timm:$amt2)]>;
+def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
+                              "#ADJCALLSTACKDOWN",
+                              [(callseq_start timm:$amt)]>;
+def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
+                              "#ADJCALLSTACKUP",
+                              [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
 class MOVHI_I

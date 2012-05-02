@@ -57,7 +57,7 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   // l.sw  stack_lock(r1), r9
   if (MFI->adjustsStack()) {
     BuildMI(MBB, MBBI, DL, TII.get(OR1K::SW))
-        .addReg(OR1K::R9).addReg(OR1K::R1).addImm(Offset);
+      .addReg(OR1K::R9).addReg(OR1K::R1).addImm(Offset);
     Offset -= 4;
   }
 
