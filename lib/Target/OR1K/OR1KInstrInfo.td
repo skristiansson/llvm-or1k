@@ -392,10 +392,12 @@ class BRANCHL_R<bits<4> subOp, string asmstring>
 }
 
 // Jump/Branch
+let hasDelaySlot=1 in {
 def J    : BRANCH<0x0, "l.j">;
 def BNF  : BRANCH<0x2, "l.bnf">;
 def BF   : BRANCH<0x3, "l.bf">;
 def JR   : BRANCH_R<0x1, "l.jr">;
+}
 
 // Jump and link
 let isCall=1, hasDelaySlot=1,
