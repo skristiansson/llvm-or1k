@@ -52,3 +52,9 @@ class InstBI<bits<4> op, dag outs, dag ins, string asmstr,
   let optype = 0;
   let opcode = op;
 }
+
+// Pseudo instructions
+class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
+  : InstOR1K<outs, ins, asmstr, pattern> {
+  let Inst{15-0} = 0;
+}
