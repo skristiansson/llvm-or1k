@@ -54,7 +54,6 @@ BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
     Reserved.set(OR1K::R2);
   Reserved.set(OR1K::R9);
   Reserved.set(OR1K::R10);
-  Reserved.set(OR1K::R11);
   return Reserved;
 }
 
