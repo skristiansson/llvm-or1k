@@ -29,7 +29,14 @@ namespace llvm {
 
       /// CALL - These operations represent an abstract call instruction, which
       /// includes a bunch of information.
-      CALL
+      CALL,
+
+      /// SELECT_CC - Operand 0 and operand 1 are selection variable, operand 3
+      /// is condition code and operand 4 is flag operand.
+      SELECT_CC,
+
+      // SET_FLAG - Set flag compare
+      SET_FLAG
     };
   }
 
@@ -46,6 +53,10 @@ namespace llvm {
     /// getTargetNodeName - This method returns the name of a target specific
     /// DAG node.
     virtual const char *getTargetNodeName(unsigned Opcode) const;
+
+    SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
+    MachineBasicBlock* EmitInstrWithCustomInserter(MachineInstr *MI,
+                                                   MachineBasicBlock *BB) const;
 
   private:
     const OR1KSubtarget &Subtarget;

@@ -50,6 +50,19 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   // Compute derived properties from the register classes
   computeRegisterProperties();
 
+  setOperationAction(ISD::SETCC,            MVT::i32, Expand);
+  setOperationAction(ISD::SETCC,            MVT::i64, Expand);
+  setOperationAction(ISD::SETCC,            MVT::f32, Expand);
+  setOperationAction(ISD::SETCC,            MVT::f64, Expand);
+  setOperationAction(ISD::SELECT,           MVT::i32, Expand);
+  setOperationAction(ISD::SELECT,           MVT::i64, Expand);
+  setOperationAction(ISD::SELECT,           MVT::f32, Expand);
+  setOperationAction(ISD::SELECT,           MVT::f64, Expand);
+  setOperationAction(ISD::SELECT_CC,        MVT::i32, Custom);
+  setOperationAction(ISD::SELECT_CC,        MVT::i64, Custom);
+  setOperationAction(ISD::SELECT_CC,        MVT::f32, Custom);
+  setOperationAction(ISD::SELECT_CC,        MVT::f64, Custom);
+
   setMinFunctionAlignment(4);
   setPrefFunctionAlignment(4);
 }
@@ -57,6 +70,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
 SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
                                            SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
+  case ISD::SELECT_CC:        return LowerSELECT_CC(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -396,10 +410,101 @@ OR1KTargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
   return Chain;
 }
 
+SDValue OR1KTargetLowering::LowerSELECT_CC(SDValue Op,
+                                           SelectionDAG &DAG) const {
+  SDValue LHS    = Op.getOperand(0);
+  SDValue RHS    = Op.getOperand(1);
+  SDValue TrueV  = Op.getOperand(2);
+  SDValue FalseV = Op.getOperand(3);
+  ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
+  DebugLoc dl    = Op.getDebugLoc();
+
+  SDValue TargetCC = DAG.getConstant(CC, MVT::i32);;
+  SDValue Flag = DAG.getNode(OR1KISD::SET_FLAG, dl, MVT::Glue,
+                             LHS, RHS, TargetCC);
+
+  SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
+  SmallVector<SDValue, 4> Ops;
+  Ops.push_back(TrueV);
+  Ops.push_back(FalseV);
+  Ops.push_back(TargetCC);
+  Ops.push_back(Flag);
+
+  return DAG.getNode(OR1KISD::SELECT_CC, dl, VTs, &Ops[0], Ops.size());
+}
+
 const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default: return NULL;
   case OR1KISD::RET_FLAG:           return "OR1KISD::RET_FLAG";
   case OR1KISD::CALL:               return "OR1KISD::CALL";
+  case OR1KISD::SELECT_CC:          return "OR1KISD::SELECT_CC";
+  case OR1KISD::SET_FLAG:           return "OR1KISD::SET_FLAG";
   }
+}
+
+MachineBasicBlock*
+OR1KTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
+                                                MachineBasicBlock *BB) const {
+  unsigned Opc = MI->getOpcode();
+
+  const TargetInstrInfo &TII = *getTargetMachine().getInstrInfo();
+  DebugLoc dl = MI->getDebugLoc();
+
+  assert((Opc == OR1K::Select) &&
+         "Unexpected instr type to insert");
+
+  // To "insert" a SELECT instruction, we actually have to insert the diamond
+  // control-flow pattern.  The incoming instruction knows the destination vreg
+  // to set, the condition code register to branch on, the true/false values to
+  // select between, and a branch opcode to use.
+  const BasicBlock *LLVM_BB = BB->getBasicBlock();
+  MachineFunction::iterator I = BB;
+  ++I;
+
+  //  thisMBB:
+  //  ...
+  //   TrueVal = ...
+  //   l.sfXX r1, r2
+  //   l.bf copy1MBB
+  //   fallthrough --> copy0MBB
+  MachineBasicBlock *thisMBB = BB;
+  MachineFunction *F = BB->getParent();
+  MachineBasicBlock *copy0MBB = F->CreateMachineBasicBlock(LLVM_BB);
+  MachineBasicBlock *copy1MBB = F->CreateMachineBasicBlock(LLVM_BB);
+
+  F->insert(I, copy0MBB);
+  F->insert(I, copy1MBB);
+  // Update machine-CFG edges by transferring all successors of the current
+  // block to the new block which will contain the Phi node for the select.
+  copy1MBB->splice(copy1MBB->begin(), BB,
+                   llvm::next(MachineBasicBlock::iterator(MI)),
+                   BB->end());
+  copy1MBB->transferSuccessorsAndUpdatePHIs(BB);
+  // Next, add the true and fallthrough blocks as its successors.
+  BB->addSuccessor(copy0MBB);
+  BB->addSuccessor(copy1MBB);
+
+  // Insert Branch if Flag
+  BuildMI(BB, dl, TII.get(OR1K::BF)).addMBB(copy1MBB);
+
+  //  copy0MBB:
+  //   %FalseValue = ...
+  //   # fallthrough to copy1MBB
+  BB = copy0MBB;
+
+  // Update machine-CFG edges
+  BB->addSuccessor(copy1MBB);
+
+  //  copy1MBB:
+  //   %Result = phi [ %FalseValue, copy0MBB ], [ %TrueValue, thisMBB ]
+  //  ...
+  BB = copy1MBB;
+  BuildMI(*BB, BB->begin(), dl, TII.get(OR1K::PHI),
+          MI->getOperand(0).getReg())
+    .addReg(MI->getOperand(2).getReg()).addMBB(copy0MBB)
+    .addReg(MI->getOperand(1).getReg()).addMBB(thisMBB);
+
+  MI->eraseFromParent();   // The pseudo instruction is gone now.
+  return BB;
 }

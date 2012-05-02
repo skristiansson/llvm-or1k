@@ -25,8 +25,12 @@ include "OR1KInstrFormats.td"
 def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                           SDTCisVT<1, i32> ]>;
+def SDT_OR1KCall         : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
+def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, []>;
+def SDT_OR1KSelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
+                                                SDTCisSameAs<1, 2>, 
+                                                SDTCisVT<3, i32>]>;
 
-def SDT_OR1KCall  : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
 def call          : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
                            [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                             SDNPVariadic]>;
@@ -36,6 +40,10 @@ def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
                            [SDNPHasChain, SDNPOutGlue]>;
 def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
                            [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
+def OR1Ksetflag   : SDNode<"OR1KISD::SET_FLAG", SDT_OR1KSetFlag,
+                           [SDNPOutGlue]>;
+def OR1Kselectcc  : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
+                            [SDNPInGlue]>;
 
 // Extract bits 0-15 (low-end) of an immediate value.
 def LO16 : SDNodeXForm<imm, [{
@@ -89,13 +97,37 @@ def MEMri : Operand<i32> {
   let MIOperandInfo = (ops GPR, i32imm);
 }
 
+// Conditional code predicates - used for pattern matching for SF instructions
+def OR1K_CC_EQ  : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETEQ);}]>;
+def OR1K_CC_NE  : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETNE);}]>;
+def OR1K_CC_LE  : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETLE);}]>;
+def OR1K_CC_LT  : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETLT);}]>;
+def OR1K_CC_GE  : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETGE);}]>;
+def OR1K_CC_GT  : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETGT);}]>;
+def OR1K_CC_GTU : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETUGT);}]>;
+def OR1K_CC_GEU : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETUGE);}]>;
+def OR1K_CC_LTU : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETULT);}]>;
+def OR1K_CC_LEU : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETULE);}]>;
+
+
 // -------------------------------------------------- //
 // Condition/SF instructions
 // -------------------------------------------------- //
 
-class SF_RR<bits<5> op2Val, string asmstr>
+class SF_RR<bits<5> op2Val, string asmstr, PatLeaf Cond>
 	: InstRR<0x9, (outs), (ins GPR:$rA, GPR:$rB),
-		!strconcat(asmstr, "\t$rA, $rB"), []>
+		!strconcat(asmstr, "\t$rA, $rB"),
+		[(OR1Ksetflag GPR:$rA, GPR:$rB, Cond)]>
 {
   bits<5> op2;
   bits<5> rA;
@@ -108,9 +140,10 @@ class SF_RR<bits<5> op2Val, string asmstr>
   let op2 = op2Val;
 }
 
-class SF_RI<bits<5> op2Val, string asmstr>
-	: InstRI<0xf, (outs), (ins GPR:$rA, i16imm:$imm),
-		!strconcat(asmstr, "i\t$rA, $imm"), []>
+class SF_RIS<bits<5> op2Val, string asmstr, PatLeaf Cond>
+	: InstRI<0xf, (outs), (ins GPR:$rA, s16imm:$imm),
+		!strconcat(asmstr, "i\t$rA, $imm"),
+		[(OR1Ksetflag GPR:$rA, immSExt16:$imm, Cond)]>
 {
   bits<5> op2;
   bits<5> rA;
@@ -123,26 +156,47 @@ class SF_RI<bits<5> op2Val, string asmstr>
   let op2 = op2Val;
 }
 
-
-multiclass SF<bits<5> op2Val, string asmstr>
+class SF_RIU<bits<5> op2Val, string asmstr, PatLeaf Cond>
+        : InstRI<0xf, (outs), (ins GPR:$rA, i16imm:$imm),
+                !strconcat(asmstr, "i\t$rA, $imm"),
+                [(OR1Ksetflag GPR:$rA, immZExt16:$imm, Cond)]>
 {
-  def _rr : SF_RR<op2Val, asmstr>;
-  def _ri : SF_RI<op2Val, asmstr>;
+  bits<5> op2;
+  bits<5> rA;
+  bits<16> imm16;
+
+  let Inst{25-21} = op2;
+  let Inst{20-16} = rA;
+  let Inst{15-0} = imm16;
+
+  let op2 = op2Val;
+}
+
+multiclass SFU<bits<5> op2Val, string asmstr, PatLeaf Cond>
+{
+  def _rr : SF_RR <op2Val, asmstr, Cond>;
+  def _ri : SF_RIU<op2Val, asmstr, Cond>;
+}
+
+multiclass SFS<bits<5> op2Val, string asmstr, PatLeaf Cond>
+{
+  def _rr : SF_RR <op2Val, asmstr, Cond>;
+  def _ri : SF_RIS<op2Val, asmstr, Cond>;
 }
 
 // l.sfxx instructions
-
-defm SFEQ : SF<0x0, "l.sfeq">;
-defm SFNE : SF<0x1, "l.sfne">;
-defm SFGTU : SF<0x2, "l.sfgtu">;
-defm SFGEU : SF<0x3, "l.sfgeu">;
-defm SFLTU : SF<0x4, "l.sfltu">;
-defm SFLEU : SF<0x5, "l.sfleu">;
-defm SFGTS : SF<0xa, "l.sfgts">;
-defm SFGES : SF<0xb, "l.sfges">;
-defm SFLTS : SF<0xc, "l.sflts">;
-defm SFLES : SF<0xd, "l.sfles">;
-
+let hasSideEffects=1 in {
+defm SFEQ  : SFS<0x0, "l.sfeq",  OR1K_CC_EQ>;
+defm SFNE  : SFS<0x1, "l.sfne",  OR1K_CC_NE>;
+defm SFGTU : SFU<0x2, "l.sfgtu", OR1K_CC_GTU>;
+defm SFGEU : SFU<0x3, "l.sfgeu", OR1K_CC_GEU>;
+defm SFLTU : SFU<0x4, "l.sfltu", OR1K_CC_LTU>;
+defm SFLEU : SFU<0x5, "l.sfleu", OR1K_CC_LEU>;
+defm SFGTS : SFS<0xa, "l.sfgts", OR1K_CC_GT>;
+defm SFGES : SFS<0xb, "l.sfges", OR1K_CC_GE>;
+defm SFLTS : SFS<0xc, "l.sflts", OR1K_CC_LT>;
+defm SFLES : SFS<0xd, "l.sfles", OR1K_CC_LE>;
+}
 // -------------------------------------------------- //
 // ALU instructions
 // -------------------------------------------------- //
@@ -461,6 +515,14 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
                               "#ADJCALLSTACKUP",
                               [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
+
+let usesCustomInserter = 1 in {
+def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2, i32imm:$cc),
+                     "# Select PSEUDO",
+                     [(set GPR:$dst,
+                      (OR1Kselectcc GPR:$src, GPR:$src2, imm:$cc))]>;
+}
+
 
 class MOVHI_I
         : InstOR1K<(outs GPR:$rD), (ins i32imm:$imm),
