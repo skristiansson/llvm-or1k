@@ -23,20 +23,6 @@
 
 namespace llvm {
 
-#if 0
-/// OR1KII - This namespace holds all of the target specific flags that
-/// instruction info tracks.
-///
-namespace OR1KII {
-  enum {
-    Pseudo = (1<<0),
-    Load = (1<<1),
-    Store = (1<<2),
-    DelaySlot = (1<<3)
-  };
-}
-#endif
-
 class OR1KInstrInfo : public OR1KGenInstrInfo {
   const OR1KRegisterInfo RI;
 public:
@@ -47,29 +33,6 @@ public:
   /// always be able to get register info as well (through this method).
   ///
   virtual const OR1KRegisterInfo &getRegisterInfo() const { return RI; }
-
-#if 0
-  /// isLoadFromStackSlot - If the specified machine instruction is a direct
-  /// load from a stack slot, return the virtual or physical register number of
-  /// the destination along with the FrameIndex of the loaded stack slot.  If
-  /// not, return 0.  This predicate must return 0 if the instruction has
-  /// any side effects other than loading from the stack slot.
-  virtual unsigned isLoadFromStackSlot(const MachineInstr *MI,
-                                       int &FrameIndex) const;
-
-  /// isStoreToStackSlot - If the specified machine instruction is a direct
-  /// store to a stack slot, return the virtual or physical register number of
-  /// the source reg along with the FrameIndex of the loaded stack slot.  If
-  /// not, return 0.  This predicate must return 0 if the instruction has
-  /// any side effects other than storing to the stack slot.
-  virtual unsigned isStoreToStackSlot(const MachineInstr *MI,
-                                      int &FrameIndex) const;
-#endif
-/*  virtual unsigned InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
-                                MachineBasicBlock *FBB,
-                                const SmallVectorImpl<MachineOperand> &Cond,
-                                DebugLoc DL) const;
-*/
 
   virtual void copyPhysReg(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator I, DebugLoc DL,

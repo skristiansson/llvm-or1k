@@ -32,54 +32,6 @@ OR1KInstrInfo::OR1KInstrInfo()
     RI(*this) {
 }
 
-#if 0
-
-/// isLoadFromStackSlot - If the specified machine instruction is a direct
-/// load from a stack slot, return the virtual or physical register number of
-/// the destination along with the FrameIndex of the loaded stack slot.  If
-/// not, return 0.  This predicate must return 0 if the instruction has
-/// any side effects other than loading from the stack slot.
-unsigned OR1KInstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
-                                             int &FrameIndex) const {
-  if (MI->getOpcode() == OR1K::LWZ) {
-    if (MI->getOperand(1).isFI() && MI->getOperand(2).isImm() &&
-        MI->getOperand(2).getImm() == 0) {
-      FrameIndex = MI->getOperand(1).getIndex();
-      return MI->getOperand(0).getReg();
-    }
-  }
-  return 0;
-}
-
-/// isStoreToStackSlot - If the specified machine instruction is a direct
-/// store to a stack slot, return the virtual or physical register number of
-/// the source reg along with the FrameIndex of the loaded stack slot.  If
-/// not, return 0.  This predicate must return 0 if the instruction has
-/// any side effects other than storing to the stack slot.
-unsigned OR1KInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
-                                            int &FrameIndex) const {
-  if (MI->getOpcode() == OR1K::SW) {
-    if (MI->getOperand(0).isFI() && MI->getOperand(1).isImm() &&
-        MI->getOperand(1).getImm() == 0) {
-      FrameIndex = MI->getOperand(0).getIndex();
-      return MI->getOperand(2).getReg();
-    }
-  }
-  return 0;
-}
-
-unsigned
-OR1KInstrInfo::InsertBranch(MachineBasicBlock &MBB,MachineBasicBlock *TBB,
-                             MachineBasicBlock *FBB,
-                             const SmallVectorImpl<MachineOperand> &Cond,
-                             DebugLoc DL)const{
-  // Can only insert uncond branches so far.
-  assert(Cond.empty() && !FBB && TBB && "Can only handle uncond branches!");
-  BuildMI(&MBB, DL, get(SP::BA)).addMBB(TBB);
-  return 1;
-}
-#endif
-
 void OR1KInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator I, DebugLoc DL,
                                 unsigned DestReg, unsigned SrcReg,
@@ -120,27 +72,3 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
   else
     llvm_unreachable("Can't load this register from stack slot");
 }
-
-#if 0
-unsigned OR1KInstrInfo::getGlobalBaseReg(MachineFunction *MF) const
-{
-  OR1KMachineFunctionInfo *OR1KFI = MF->getInfo<OR1KMachineFunctionInfo>();
-  unsigned GlobalBaseReg = OR1KFI->getGlobalBaseReg();
-  if (GlobalBaseReg != 0)
-    return GlobalBaseReg;
-
-  // Insert the set of GlobalBaseReg into the first MBB of the function
-  MachineBasicBlock &FirstMBB = MF->front();
-  MachineBasicBlock::iterator MBBI = FirstMBB.begin();
-  MachineRegisterInfo &RegInfo = MF->getRegInfo();
-
-  GlobalBaseReg = RegInfo.createVirtualRegister(&OR1K::GPRRegClass);
-
-
-  DebugLoc dl;
-
-  BuildMI(FirstMBB, MBBI, dl, get(SP::GETPCX), GlobalBaseReg);
-  OR1KFI->setGlobalBaseReg(GlobalBaseReg);
-  return GlobalBaseReg;
-}
-#endif
