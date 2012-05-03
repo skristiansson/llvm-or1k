@@ -419,7 +419,7 @@ SDValue OR1KTargetLowering::LowerSELECT_CC(SDValue Op,
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
   DebugLoc dl    = Op.getDebugLoc();
 
-  SDValue TargetCC = DAG.getConstant(CC, MVT::i32);;
+  SDValue TargetCC = DAG.getConstant(CC, MVT::i32);
   SDValue Flag = DAG.getNode(OR1KISD::SET_FLAG, dl, MVT::Glue,
                              LHS, RHS, TargetCC);
 
