@@ -36,7 +36,10 @@ namespace llvm {
       SELECT_CC,
 
       // SET_FLAG - Set flag compare
-      SET_FLAG
+      SET_FLAG,
+
+      // BR_CC - Used to glue together a l.bf to a l.sfXX
+      BR_CC
     };
   }
 
@@ -54,6 +57,7 @@ namespace llvm {
     /// DAG node.
     virtual const char *getTargetNodeName(unsigned Opcode) const;
 
+    SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
     MachineBasicBlock* EmitInstrWithCustomInserter(MachineInstr *MI,
                                                    MachineBasicBlock *BB) const;

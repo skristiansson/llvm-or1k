@@ -30,6 +30,7 @@ def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, []>;
 def SDT_OR1KSelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
                                                 SDTCisSameAs<1, 2>,
                                                 SDTCisVT<3, i32>]>;
+def SDT_OR1KBrCC         : SDTypeProfile<0, 1, [SDTCisVT<0, OtherVT>]>;
 
 def call          : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
                            [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -42,6 +43,8 @@ def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
                            [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 def OR1Ksetflag   : SDNode<"OR1KISD::SET_FLAG", SDT_OR1KSetFlag,
                            [SDNPOutGlue]>;
+def OR1Kbrcc      : SDNode<"OR1KISD::BR_CC", SDT_OR1KBrCC,
+                            [SDNPHasChain, SDNPInGlue]>;
 def OR1Kselectcc  : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
                             [SDNPInGlue]>;
 
@@ -395,10 +398,9 @@ def LHS : LOAD<0x6, "l.lhs", sextloadi16>;
 // -------------------------------------------------- //
 
 
-class BRANCH<bits<4> subOp, string asmstring>
-        : InstBR<subOp, (outs), (ins i32imm:$imm),
-		!strconcat(asmstring, "\t$imm"),
-		[]>
+class BRANCH<bits<4> subOp, string asmstring, list<dag> pattern>
+        : InstBR<subOp, (outs), (ins brtarget:$imm),
+		!strconcat(asmstring, "\t$imm"), pattern>
 {
   bits<26> imm26;
 
@@ -444,11 +446,11 @@ class BRANCHL_R<bits<4> subOp, string asmstring>
 }
 
 // Jump/Branch
-let hasDelaySlot=1 in {
-def J    : BRANCH<0x0, "l.j">;
-def BNF  : BRANCH<0x2, "l.bnf">;
-def BF   : BRANCH<0x3, "l.bf">;
-def JR   : BRANCH_R<0x1, "l.jr">;
+let isBranch = 1, isTerminator = 1, hasDelaySlot=1 in {
+  def J    : BRANCH<0x0, "l.j",   []>;
+  def BNF  : BRANCH<0x2, "l.bnf", []>;
+  def BF   : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$imm)]>;
+  def JR   : BRANCH_R<0x1, "l.jr">;
 }
 
 // Jump and link

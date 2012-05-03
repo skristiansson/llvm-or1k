@@ -50,6 +50,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   // Compute derived properties from the register classes
   computeRegisterProperties();
 
+  setOperationAction(ISD::BR_CC,            MVT::i32, Custom);
   setOperationAction(ISD::SETCC,            MVT::i32, Expand);
   setOperationAction(ISD::SETCC,            MVT::i64, Expand);
   setOperationAction(ISD::SETCC,            MVT::f32, Expand);
@@ -70,6 +71,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
 SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
                                            SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
+  case ISD::BR_CC:            return LowerBR_CC(Op, DAG);
   case ISD::SELECT_CC:        return LowerSELECT_CC(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
@@ -410,6 +412,22 @@ OR1KTargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
   return Chain;
 }
 
+SDValue OR1KTargetLowering::LowerBR_CC(SDValue Op,
+                                       SelectionDAG &DAG) const {
+  SDValue Chain  = Op.getOperand(0);
+  ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(1))->get();
+  SDValue LHS   = Op.getOperand(2);
+  SDValue RHS   = Op.getOperand(3);
+  SDValue Dest  = Op.getOperand(4);
+  DebugLoc dl   = Op.getDebugLoc();
+
+  SDValue Flag = DAG.getNode(OR1KISD::SET_FLAG, dl, MVT::Glue,
+                             LHS, RHS, DAG.getConstant(CC, MVT::i32));
+
+  return DAG.getNode(OR1KISD::BR_CC, dl, Op.getValueType(),
+                     Chain, Dest, Flag);
+}
+
 SDValue OR1KTargetLowering::LowerSELECT_CC(SDValue Op,
                                            SelectionDAG &DAG) const {
   SDValue LHS    = Op.getOperand(0);
@@ -440,6 +458,7 @@ const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   case OR1KISD::CALL:               return "OR1KISD::CALL";
   case OR1KISD::SELECT_CC:          return "OR1KISD::SELECT_CC";
   case OR1KISD::SET_FLAG:           return "OR1KISD::SET_FLAG";
+  case OR1KISD::BR_CC:              return "OR1KISD::BR_CC";
   }
 }
 
