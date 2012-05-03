@@ -399,8 +399,8 @@ def LHS : LOAD<0x6, "l.lhs", sextloadi16>;
 
 
 class BRANCH<bits<4> subOp, string asmstring, list<dag> pattern>
-        : InstBR<subOp, (outs), (ins brtarget:$imm),
-		!strconcat(asmstring, "\t$imm"), pattern>
+        : InstBR<subOp, (outs), (ins brtarget:$dst),
+		!strconcat(asmstring, "\t$dst"), pattern>
 {
   bits<26> imm26;
 
@@ -449,7 +449,7 @@ class BRANCHL_R<bits<4> subOp, string asmstring>
 let isBranch = 1, isTerminator = 1, hasDelaySlot=1 in {
   def J    : BRANCH<0x0, "l.j",   []>;
   def BNF  : BRANCH<0x2, "l.bnf", []>;
-  def BF   : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$imm)]>;
+  def BF   : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst)]>;
   def JR   : BRANCH_R<0x1, "l.jr">;
 }
 
