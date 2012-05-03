@@ -1,0 +1,19 @@
+LLVM backend for OpenRISC 1000
+==============================
+
+Installation
+------------
+mkdir build && cd build
+
+with autotools:
+../configure CC=gcc CXX=g++ --enable-debug-runtime --prefix=/path/to/instdir
+
+with cmake:
+cmake .. -DCMAKE_BUILD_TYPE=Debug+Asserts -DCMAKE_INSTALL_PREFIX=/path/to/instdir
+
+make install
+
+Run tests
+---------
+make check
+make TESTSUITE=CodeGen/OR1K check
