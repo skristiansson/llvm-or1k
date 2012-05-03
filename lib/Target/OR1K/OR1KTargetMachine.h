@@ -31,9 +31,9 @@ namespace llvm {
     OR1KSubtarget       Subtarget;
     const TargetData    DataLayout; // Calculates type size & alignment
     OR1KInstrInfo       InstrInfo;
-    OR1KFrameLowering   FrameLowering;
     OR1KTargetLowering  TLInfo;
     OR1KSelectionDAGInfo TSInfo;
+    OR1KFrameLowering   FrameLowering;
 /*    OR1KIntrinsicInfo IntrinsicInfo;*/
   public:
     OR1KTargetMachine(const Target &T, StringRef TT,
