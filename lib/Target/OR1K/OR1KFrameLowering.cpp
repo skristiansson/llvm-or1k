@@ -35,11 +35,8 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   MachineFrameInfo *MFI    = MF.getFrameInfo();
   const OR1KInstrInfo &TII =
     *static_cast<const OR1KInstrInfo*>(MF.getTarget().getInstrInfo());
-  OR1KMachineFunctionInfo *OR1KFI = MF.getInfo<OR1KMachineFunctionInfo>();
   MachineBasicBlock::iterator MBBI = MBB.begin();
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
-
-  llvm::CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
 
 #if 0
   // Determine the correct frame layout
@@ -84,13 +81,10 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
   MachineFrameInfo *MFI            = MF.getFrameInfo();
-  OR1KMachineFunctionInfo *OR1KFI  = MF.getInfo<OR1KMachineFunctionInfo>();
   const OR1KInstrInfo &TII =
     *static_cast<const OR1KInstrInfo*>(MF.getTarget().getInstrInfo());
 
   DebugLoc dl = MBBI->getDebugLoc();
-
-  llvm::CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
 
   int FPOffset = MFI->adjustsStack() ? -8 : -4;
   int RAOffset = -4;
