@@ -554,3 +554,6 @@ def : Pat<(i32 imm:$imm), (ORI (MOVHI (HI16 imm:$imm)), (LO16 imm:$imm))>;
 // Calls
 def : Pat<(call tglobaladdr:$dst), (JAL tglobaladdr:$dst)>;
 def : Pat<(call texternalsym:$dst), (JAL texternalsym:$dst)>;
+
+// Branches
+def : Pat<(br bb:$dst), (J bb:$dst)>;
