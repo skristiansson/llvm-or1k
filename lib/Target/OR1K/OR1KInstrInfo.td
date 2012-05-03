@@ -28,7 +28,7 @@ def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
 def SDT_OR1KCall         : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
 def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, []>;
 def SDT_OR1KSelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
-                                                SDTCisSameAs<1, 2>, 
+                                                SDTCisSameAs<1, 2>,
                                                 SDTCisVT<3, i32>]>;
 
 def call          : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
@@ -230,11 +230,11 @@ class ALU_RIz<bits<4> subOp, string asmstr, SDNode OpNode>
 }
 
 let isAsCheapAsAMove = 1 in {
-def ADDI  : ALU_RIs<0x7, "l.addi", add>;
-def ADDIC : ALU_RIs<0x8, "l.addic", add>;
-def ANDI  : ALU_RIz<0x9, "l.andi", and>;
-def ORI   : ALU_RIz<0xa, "l.ori", or>;
-def XORI  : ALU_RIs<0xb, "l.xori", xor>;
+  def ADDI  : ALU_RIs<0x7, "l.addi", add>;
+  def ADDIC : ALU_RIs<0x8, "l.addic", add>;
+  def ANDI  : ALU_RIz<0x9, "l.andi", and>;
+  def ORI   : ALU_RIz<0xa, "l.ori", or>;
+  def XORI  : ALU_RIs<0xb, "l.xori", xor>;
 }
 def MULI  : ALU_RIs<0xc, "l.muli", mul>;
 
@@ -261,21 +261,19 @@ class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
   let op2 = 0;
   let op3 = subOp;
 }
-
-let isCommutable=1, isAsCheapAsAMove = 1 in {
-def ADD  : ALU_RR<0x0, "l.add", add>;
-def ADDC : ALU_RR<0x1, "l.addc", add>;
-}
 let isAsCheapAsAMove = 1 in {
-def SUB  : ALU_RR<0x2, "l.sub", sub>;
+  let isCommutable=1 in {
+    def ADD  : ALU_RR<0x0, "l.add", add>;
+    def ADDC : ALU_RR<0x1, "l.addc", add>;
+  }
+  def SUB  : ALU_RR<0x2, "l.sub", sub>;
+  let isCommutable=1 in {
+    def AND  : ALU_RR<0x3, "l.and", and>;
+    def OR   : ALU_RR<0x4, "l.or", or>;
+    def XOR  : ALU_RR<0x5, "l.xor", xor>;
+    def MUL  : ALU_RR<0x6, "l.mul", mul>;
+ }
 }
-let isCommutable=1, isAsCheapAsAMove = 1 in {
-def AND  : ALU_RR<0x3, "l.and", and>;
-def OR   : ALU_RR<0x4, "l.or", or>;
-def XOR  : ALU_RR<0x5, "l.xor", xor>;
-def MUL  : ALU_RR<0x6, "l.mul", mul>;
-}
-
 
 
 // -------------------------------------------------- //
@@ -459,8 +457,8 @@ let isCall=1, hasDelaySlot=1,
     // Potentially clobbered registers
     Defs = [R3, R4, R5, R6, R7, R8, R9, R11, R12, R13, R15, R17, R19, R21, R23,
             R25, R27, R29, R31] in {
-def JAL  : BRANCHL<0x1, "l.jal">;
-def JALR : BRANCHL_R<0x2, "l.jalr">;
+  def JAL  : BRANCHL<0x1, "l.jal">;
+  def JALR : BRANCHL_R<0x2, "l.jalr">;
 }
 
 /*
