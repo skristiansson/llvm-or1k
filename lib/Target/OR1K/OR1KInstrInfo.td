@@ -447,6 +447,7 @@ class BRANCHL_R<bits<4> subOp, string asmstring>
 
 // Jump/Branch
 let isBranch = 1, isTerminator = 1, hasDelaySlot=1 in {
+  let isBarrier = 1 in
   def J    : BRANCH<0x0, "l.j",   [(br bb:$dst)]>;
   def BNF  : BRANCH<0x2, "l.bnf", []>;
   def BF   : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst)]>;
