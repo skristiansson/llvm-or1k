@@ -72,3 +72,102 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
   else
     llvm_unreachable("Can't load this register from stack slot");
 }
+
+bool OR1KInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
+                                  MachineBasicBlock *&TBB,
+                                  MachineBasicBlock *&FBB,
+                                  SmallVectorImpl<MachineOperand> &Cond,
+                                  bool AllowModify) const {
+  // Start from the bottom of the block and work up, examining the
+  // terminator instructions.
+  MachineBasicBlock::iterator I = MBB.end();
+  while (I != MBB.begin()) {
+    --I;
+    if (I->isDebugValue())
+      continue;
+
+    // Working from the bottom, when we see a non-terminator
+    // instruction, we're done.
+    if (!isUnpredicatedTerminator(I))
+      break;
+
+    // A terminator that isn't a branch can't easily be handled
+    // by this analysis.
+    if (!I->isBranch())
+      return true;
+
+    // Cannot handle indirect branches.
+    if (I->getOpcode() == OR1K::JR)
+      return true;
+
+    // Handle unconditional branches.
+    if (I->getOpcode() == OR1K::J) {
+      if (!AllowModify) {
+        TBB = I->getOperand(0).getMBB();
+        continue;
+      }
+
+      // If the block has any instructions after a J, delete them.
+      while (llvm::next(I) != MBB.end())
+        llvm::next(I)->eraseFromParent();
+      Cond.clear();
+      FBB = 0;
+
+      // Delete the J if it's equivalent to a fall-through.
+      if (MBB.isLayoutSuccessor(I->getOperand(0).getMBB())) {
+        TBB = 0;
+        I->eraseFromParent();
+        I = MBB.end();
+        continue;
+      }
+
+      // TBB is used to indicate the unconditinal destination.
+      TBB = I->getOperand(0).getMBB();
+      continue;
+    }
+    // Cannot handle conditional branches
+    return true;
+  }
+
+  return false;
+}
+
+unsigned
+OR1KInstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
+                            MachineBasicBlock *FBB,
+                            const SmallVectorImpl<MachineOperand> &Cond,
+                            DebugLoc DL) const {
+  // Shouldn't be a fall through.
+  assert(TBB && "InsertBranch must not be told to insert a fallthrough");
+
+  if (Cond.empty()) {
+    // Unconditional branch?
+    assert(!FBB && "Unconditional branch with multiple successors!");
+    BuildMI(&MBB, DL, get(OR1K::J)).addMBB(TBB);
+    return 1;
+  }
+
+  llvm_unreachable("Unexpected conditional branch");
+  return 0;
+}
+
+unsigned OR1KInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
+  MachineBasicBlock::iterator I = MBB.end();
+  unsigned Count = 0;
+
+  while (I != MBB.begin()) {
+    --I;
+    if (I->isDebugValue())
+      continue;
+    if (I->getOpcode() != OR1K::J &&
+        I->getOpcode() != OR1K::JR)
+      break;
+    // Remove the branch.
+    I->eraseFromParent();
+    I = MBB.end();
+    ++Count;
+  }
+
+  return Count;
+}
+
