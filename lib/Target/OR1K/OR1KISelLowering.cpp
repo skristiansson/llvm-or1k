@@ -63,6 +63,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SELECT_CC,        MVT::i64, Custom);
   setOperationAction(ISD::SELECT_CC,        MVT::f32, Custom);
   setOperationAction(ISD::SELECT_CC,        MVT::f64, Custom);
+  setOperationAction(ISD::GlobalAddress,    MVT::i32, Custom);
 
   setMinFunctionAlignment(4);
   setPrefFunctionAlignment(4);
@@ -72,6 +73,7 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
                                            SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
   case ISD::BR_CC:            return LowerBR_CC(Op, DAG);
+  case ISD::GlobalAddress:    return LowerGlobalAddress(Op, DAG);
   case ISD::SELECT_CC:        return LowerSELECT_CC(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
@@ -460,6 +462,18 @@ const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   case OR1KISD::SET_FLAG:           return "OR1KISD::SET_FLAG";
   case OR1KISD::BR_CC:              return "OR1KISD::BR_CC";
   }
+}
+
+SDValue OR1KTargetLowering::LowerGlobalAddress(SDValue Op,
+                                               SelectionDAG &DAG) const {
+  const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
+  int64_t Offset = cast<GlobalAddressSDNode>(Op)->getOffset();
+
+  // Create the TargetGlobalAddress node, folding in the constant offset.
+  SDValue Result = DAG.getTargetGlobalAddress(GV, Op.getDebugLoc(),
+                                              getPointerTy(), Offset);
+  return DAG.getNode(OR1KISD::Wrapper, Op.getDebugLoc(),
+                     getPointerTy(), Result);
 }
 
 MachineBasicBlock*

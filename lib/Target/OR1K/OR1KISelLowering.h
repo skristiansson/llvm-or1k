@@ -39,7 +39,11 @@ namespace llvm {
       SET_FLAG,
 
       // BR_CC - Used to glue together a l.bf to a l.sfXX
-      BR_CC
+      BR_CC,
+
+      /// Wrapper - A wrapper node for TargetConstantPool, TargetExternalSymbol,
+      /// and TargetGlobalAddress.
+      Wrapper
     };
   }
 
@@ -59,6 +63,7 @@ namespace llvm {
 
     SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
     MachineBasicBlock* EmitInstrWithCustomInserter(MachineInstr *MI,
                                                    MachineBasicBlock *BB) const;
 

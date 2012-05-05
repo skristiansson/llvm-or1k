@@ -31,6 +31,8 @@ def SDT_OR1KSelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
                                                 SDTCisSameAs<1, 2>,
                                                 SDTCisVT<3, i32>]>;
 def SDT_OR1KBrCC         : SDTypeProfile<0, 1, [SDTCisVT<0, OtherVT>]>;
+def SDT_OR1KWrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
+                                                SDTCisPtrTy<0>]>;
 
 def call          : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
                            [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -47,6 +49,7 @@ def OR1Kbrcc      : SDNode<"OR1KISD::BR_CC", SDT_OR1KBrCC,
                             [SDNPHasChain, SDNPInGlue]>;
 def OR1Kselectcc  : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
                             [SDNPInGlue]>;
+def OR1KWrapper   : SDNode<"OR1KISD::Wrapper", SDT_OR1KWrapper>;
 
 // Extract bits 0-15 (low-end) of an immediate value.
 def LO16 : SDNodeXForm<imm, [{
@@ -98,6 +101,13 @@ def ADDRri : ComplexPattern<i32, 2, "SelectAddr", [frameindex], []>;
 def MEMri : Operand<i32> {
   let PrintMethod = "printMemOperand";
   let MIOperandInfo = (ops GPR, i32imm);
+}
+
+def symbolHi: Operand<i32> {
+  let PrintMethod = "printSymbolHi";
+}
+def symbolLo: Operand<i32> {
+  let PrintMethod = "printSymbolLo";
 }
 
 // Conditional code predicates - used for pattern matching for SF instructions
@@ -219,7 +229,7 @@ class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
 }
 
 class ALU_RIz<bits<4> subOp, string asmstr, SDNode OpNode>
-        : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm16),
+        : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, symbolLo:$imm16),
                 !strconcat(asmstr, "\t$rD, $rA, $imm16"),
                 [(set GPR:$rD, (OpNode GPR:$rA, immZExt16:$imm16))]>
 {
@@ -525,7 +535,7 @@ def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2, i32imm:$cc),
 }
 
 
-class MOVHI_I : InstOR1K<(outs GPR:$rD), (ins i32imm:$imm),
+class MOVHI_I : InstOR1K<(outs GPR:$rD), (ins symbolHi:$imm),
                          "l.movhi\t{$rD, $imm}",
                          [(set GPR:$rD, i32hi16:$imm)]>
 {
@@ -556,3 +566,11 @@ def : Pat<(i32 imm:$imm), (ORI (MOVHI (HI16 imm:$imm)), (LO16 imm:$imm))>;
 // Calls
 def : Pat<(call tglobaladdr:$dst), (JAL tglobaladdr:$dst)>;
 def : Pat<(call texternalsym:$dst), (JAL texternalsym:$dst)>;
+
+// GlobalAddress, ExternalSymbol
+def : Pat<(OR1KWrapper tglobaladdr:$dst),
+          (ORI (MOVHI (tglobaladdr:$dst)), (tglobaladdr:$dst))>;
+def : Pat<(OR1KWrapper texternalsym:$dst),
+          (ORI (MOVHI (texternalsym:$dst)), (texternalsym:$dst))>;
+def : Pat<(OR1KWrapper tblockaddress:$dst),
+          (ORI (MOVHI (tblockaddress:$dst)), (tblockaddress:$dst))>;

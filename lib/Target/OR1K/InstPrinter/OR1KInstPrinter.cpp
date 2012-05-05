@@ -61,3 +61,25 @@ void OR1KInstPrinter::printS16ImmOperand(const MCInst *MI, unsigned OpNo,
                                          raw_ostream &O) {
   O << (int16_t)MI->getOperand(OpNo).getImm();
 }
+
+void OR1KInstPrinter::printSymbolLo(const MCInst *MI, unsigned OpNo,
+                                    raw_ostream &O) {
+  if (MI->getOperand(OpNo).isExpr()) {
+    O << "lo(";
+    printOperand(MI, OpNo, O);
+    O << ')';
+  } else {
+    printOperand(MI, OpNo, O);
+  }
+}
+
+void OR1KInstPrinter::printSymbolHi(const MCInst *MI, unsigned OpNo,
+                                   raw_ostream &O) {
+  if (MI->getOperand(OpNo).isExpr()) {
+    O << "hi(";
+    printOperand(MI, OpNo, O);
+    O << ')';
+  } else {
+    printOperand(MI, OpNo, O);
+  }
+}
