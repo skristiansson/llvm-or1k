@@ -525,10 +525,9 @@ def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2, i32imm:$cc),
 }
 
 
-class MOVHI_I
-        : InstOR1K<(outs GPR:$rD), (ins i32imm:$imm),
-                   "l.movhi\t{$rD, $imm}",
-                   [(set GPR:$rD, i32hi16:$imm)]>
+class MOVHI_I : InstOR1K<(outs GPR:$rD), (ins i32imm:$imm),
+                         "l.movhi\t{$rD, $imm}",
+                         [(set GPR:$rD, i32hi16:$imm)]>
 {
   bits<16> imm16;
   let optype = 0;
@@ -538,7 +537,7 @@ class MOVHI_I
 }
 
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
-def MOVHI : MOVHI_I;
+  def MOVHI    : MOVHI_I;
 }
 
 //===----------------------------------------------------------------------===//
