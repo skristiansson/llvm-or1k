@@ -17,3 +17,12 @@ Run tests
 ---------
 make check
 make TESTSUITE=CodeGen/OR1K check
+
+or
+
+bin/llvm-lit -sv -j1 test/CodeGen/OR1K/
+
+TODO (not a complete list)
+--------------------------
+- Improve delay slot filler
+- Handle unconditional branches in AnalyzeBranch
