@@ -310,16 +310,16 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
                  getTargetMachine(), ArgLocs, *DAG.getContext());
   GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee);
 
-  if (isVarArg) {
+  NumFixedArgs = 0;
+  if (isVarArg && G) {
     const Function* CalleeFn = dyn_cast<Function>(G->getGlobal());
     if (CalleeFn)
       NumFixedArgs = CalleeFn->getFunctionType()->getNumParams();
-
-    CCInfo.AnalyzeCallOperands(Outs, CC_OR1K32_VarArg);
-  } else {
-    CCInfo.AnalyzeCallOperands(Outs, CC_OR1K32);
   }
-
+  if (NumFixedArgs)
+    CCInfo.AnalyzeCallOperands(Outs, CC_OR1K32_VarArg);
+  else
+    CCInfo.AnalyzeCallOperands(Outs, CC_OR1K32);
 
   // Get a count of how many bytes are to be pushed on the stack.
   unsigned NumBytes = CCInfo.getNextStackOffset();
