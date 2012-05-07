@@ -284,10 +284,16 @@ let isAsCheapAsAMove = 1 in {
     def AND  : ALU_RR<0x3, "l.and", and>;
     def OR   : ALU_RR<0x4, "l.or", or>;
     def XOR  : ALU_RR<0x5, "l.xor", xor>;
-    def MUL  : ALU_RR<0x6, "l.mul", mul>;
  }
 }
 
+let isCommutable=1 in {
+  def MUL  : ALU_RR<0x6, "l.mul", mul>;
+  def MULU : ALU_RR<0xb, "l.mulu", mul>;
+}
+
+def DIV  : ALU_RR<0x9, "l.div", sdiv>;
+def DIVU : ALU_RR<0xa, "l.divu", udiv>;
 
 // -------------------------------------------------- //
 // SHIFT instructions

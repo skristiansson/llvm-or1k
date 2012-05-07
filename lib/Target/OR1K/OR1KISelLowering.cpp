@@ -65,6 +65,23 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SELECT_CC,        MVT::f64, Custom);
   setOperationAction(ISD::GlobalAddress,    MVT::i32, Custom);
 
+  setOperationAction(ISD::MULHU,            MVT::i32, Expand);
+  setOperationAction(ISD::MULHU,            MVT::i64, Expand);
+  setOperationAction(ISD::MULHU,            MVT::f32, Expand);
+  setOperationAction(ISD::MULHU,            MVT::f64, Expand);
+  setOperationAction(ISD::MULHS,            MVT::i32, Expand);
+  setOperationAction(ISD::MULHS,            MVT::i64, Expand);
+  setOperationAction(ISD::MULHS,            MVT::f32, Expand);
+  setOperationAction(ISD::MULHS,            MVT::f64, Expand);
+  setOperationAction(ISD::UMUL_LOHI,        MVT::i32, Expand);
+  setOperationAction(ISD::UMUL_LOHI,        MVT::i64, Expand);
+  setOperationAction(ISD::UMUL_LOHI,        MVT::f32, Expand);
+  setOperationAction(ISD::UMUL_LOHI,        MVT::f64, Expand);
+  setOperationAction(ISD::SMUL_LOHI,        MVT::i32, Expand);
+  setOperationAction(ISD::SMUL_LOHI,        MVT::i64, Expand);
+  setOperationAction(ISD::SMUL_LOHI,        MVT::f32, Expand);
+  setOperationAction(ISD::SMUL_LOHI,        MVT::f64, Expand);
+
   setMinFunctionAlignment(4);
   setPrefFunctionAlignment(4);
 }
