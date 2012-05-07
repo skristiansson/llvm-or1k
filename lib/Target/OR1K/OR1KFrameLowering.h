@@ -22,6 +22,9 @@ namespace llvm {
   class OR1KSubtarget;
 
 class OR1KFrameLowering : public TargetFrameLowering {
+private:
+  void determineFrameLayout(MachineFunction &MF) const;
+
 protected:
   const OR1KSubtarget &STI;
 

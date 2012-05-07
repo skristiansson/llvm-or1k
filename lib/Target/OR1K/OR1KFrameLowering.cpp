@@ -30,6 +30,37 @@ bool OR1KFrameLowering::hasFP(const MachineFunction &MF) const {
           MFI->isFrameAddressTaken());
 }
 
+// determineFrameLayout - Determine the size of the frame and maximum call
+/// frame size.
+void OR1KFrameLowering::determineFrameLayout(MachineFunction &MF) const {
+  MachineFrameInfo *MFI = MF.getFrameInfo();
+
+  // Get the number of bytes to allocate from the FrameInfo.
+  unsigned FrameSize = MFI->getStackSize();
+
+  // Get the alignments provided by the target.
+  unsigned TargetAlign = MF.getTarget().getFrameLowering()->getStackAlignment();
+  // Get the maximum call frame size of all the calls.
+  unsigned maxCallFrameSize = MFI->getMaxCallFrameSize();
+
+  // If we have dynamic alloca then maxCallFrameSize needs to be aligned so
+  // that allocations will be aligned.
+  if (MFI->hasVarSizedObjects())
+    maxCallFrameSize = RoundUpToAlignment(maxCallFrameSize, TargetAlign);
+
+  // Update maximum call frame size.
+  MFI->setMaxCallFrameSize(maxCallFrameSize);
+
+  // Include call frame size in total.
+  FrameSize += maxCallFrameSize;
+
+  // Make sure the frame is aligned.
+  FrameSize = RoundUpToAlignment(FrameSize, TargetAlign);
+
+  // Update frame info.
+  MFI->setStackSize(FrameSize);
+}
+
 void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   MachineBasicBlock &MBB   = MF.front();
   MachineFrameInfo *MFI    = MF.getFrameInfo();
@@ -38,10 +69,8 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   MachineBasicBlock::iterator MBBI = MBB.begin();
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
-#if 0
   // Determine the correct frame layout
   determineFrameLayout(MF);
-#endif
 
   // Get the number of bytes to allocate from the FrameInfo.
   unsigned StackSize = MFI->getStackSize();
