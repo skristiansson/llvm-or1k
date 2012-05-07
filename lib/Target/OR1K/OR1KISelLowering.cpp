@@ -103,6 +103,20 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
 
 #include "OR1KGenCallingConv.inc"
 
+static unsigned NumFixedArgs;
+static bool CC_OR1K32_VarArg(unsigned ValNo, MVT ValVT,
+                             MVT LocVT, CCValAssign::LocInfo LocInfo,
+                             ISD::ArgFlagsTy ArgFlags, CCState &State) {
+  // Handle fixed arguments with default CC
+  if (ValNo < NumFixedArgs)
+    return CC_OR1K32(ValNo, ValVT, LocVT, LocInfo, ArgFlags, State);
+
+  // VarArgs get passed on stack
+  unsigned Offset = State.AllocateStack(4, 4);
+  State.addLoc(CCValAssign::getMem(ValNo, ValVT, Offset, LocVT, LocInfo));
+  return false;
+}
+
 SDValue
 OR1KTargetLowering::LowerFormalArguments(SDValue Chain,
                                          CallingConv::ID CallConv,
@@ -294,8 +308,18 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
                  getTargetMachine(), ArgLocs, *DAG.getContext());
+  GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee);
 
-  CCInfo.AnalyzeCallOperands(Outs, CC_OR1K32);
+  if (isVarArg) {
+    const Function* CalleeFn = dyn_cast<Function>(G->getGlobal());
+    if (CalleeFn)
+      NumFixedArgs = CalleeFn->getFunctionType()->getNumParams();
+
+    CCInfo.AnalyzeCallOperands(Outs, CC_OR1K32_VarArg);
+  } else {
+    CCInfo.AnalyzeCallOperands(Outs, CC_OR1K32);
+  }
+
 
   // Get a count of how many bytes are to be pushed on the stack.
   unsigned NumBytes = CCInfo.getNextStackOffset();
@@ -367,7 +391,7 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
   // If the callee is a GlobalAddress node (quite common, every direct call is)
   // turn it into a TargetGlobalAddress node so that legalize doesn't hack it.
   // Likewise ExternalSymbol -> TargetExternalSymbol.
-  if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee))
+  if (G)
     Callee = DAG.getTargetGlobalAddress(G->getGlobal(), dl, MVT::i32);
   else if (ExternalSymbolSDNode *E = dyn_cast<ExternalSymbolSDNode>(Callee))
     Callee = DAG.getTargetExternalSymbol(E->getSymbol(), MVT::i32);
