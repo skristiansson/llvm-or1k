@@ -111,6 +111,18 @@ static bool CC_OR1K32_VarArg(unsigned ValNo, MVT ValVT,
   if (ValNo < NumFixedArgs)
     return CC_OR1K32(ValNo, ValVT, LocVT, LocInfo, ArgFlags, State);
 
+  // Promote i8/i16 args to i32
+  if (LocVT == MVT::i8 ||
+      LocVT == MVT::i16) {
+    LocVT = MVT::i32;
+    if (ArgFlags.isSExt())
+        LocInfo = CCValAssign::SExt;
+    else if (ArgFlags.isZExt())
+        LocInfo = CCValAssign::ZExt;
+    else
+        LocInfo = CCValAssign::AExt;
+  }
+
   // VarArgs get passed on stack
   unsigned Offset = State.AllocateStack(4, 4);
   State.addLoc(CCValAssign::getMem(ValNo, ValVT, Offset, LocVT, LocInfo));
