@@ -573,6 +573,10 @@ def : Pat<(i32 imm:$imm), (ORI (MOVHI (HI16 imm:$imm)), (LO16 imm:$imm))>;
 def : Pat<(call tglobaladdr:$dst), (JAL tglobaladdr:$dst)>;
 def : Pat<(call texternalsym:$dst), (JAL texternalsym:$dst)>;
 
+// Loads
+def : Pat<(extloadi8  ADDRri:$src), (i32 (LBZ ADDRri:$src))>;
+def : Pat<(extloadi16 ADDRri:$src), (i32 (LHZ ADDRri:$src))>;
+
 // GlobalAddress, ExternalSymbol
 def : Pat<(OR1KWrapper tglobaladdr:$dst),
           (ORI (MOVHI (tglobaladdr:$dst)), (tglobaladdr:$dst))>;
