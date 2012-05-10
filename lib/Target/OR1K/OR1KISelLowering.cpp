@@ -82,6 +82,10 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SMUL_LOHI,         MVT::f32, Expand);
   setOperationAction(ISD::SMUL_LOHI,         MVT::f64, Expand);
 
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1,   Expand);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8,   Expand);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16,  Expand);
+
   setMinFunctionAlignment(4);
   setPrefFunctionAlignment(4);
 }
