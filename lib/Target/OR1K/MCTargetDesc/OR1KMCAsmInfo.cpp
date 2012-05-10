@@ -24,4 +24,7 @@ OR1KMCAsmInfo::OR1KMCAsmInfo(const Target &T, StringRef TT) {
   GPRel32Directive            = "\t.gpword\t";
   HasSetDirective             = false;
   PrivateGlobalPrefix         = ".L";
+
+  // OR1K assembly requires ".section" before ".bss"
+  UsesELFSectionDirectiveForBSS = true;
 }
