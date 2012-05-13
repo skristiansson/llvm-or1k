@@ -15,4 +15,3 @@ entry:
 ; check that fixed arg get passed in register r3
 ; CHECK: l.movhi r3, 0
 ; CHECK-NOT: l.sw
-; CHECK: l.jal vararg
