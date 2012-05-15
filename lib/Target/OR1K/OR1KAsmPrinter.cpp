@@ -47,6 +47,8 @@ namespace {
     }
 
     void EmitInstruction(const MachineInstr *MI);
+    virtual bool isBlockOnlyReachableByFallthrough(const MachineBasicBlock*
+                                                   MBB) const;
   };
 } // end of anonymous namespace
 
@@ -58,6 +60,33 @@ void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
   MCInst TmpInst;
   MCInstLowering.Lower(MI, TmpInst);
   OutStreamer.EmitInstruction(TmpInst);
+}
+
+/// isBlockOnlyReachableByFallthough - Return true if the basic block has
+/// exactly one predecessor and the control transfer mechanism between
+/// the predecessor and this block is a fall-through.
+// FIXME: could the overridden cases be handled in AnalyzeBranch?
+bool OR1KAsmPrinter::isBlockOnlyReachableByFallthrough(const MachineBasicBlock*
+                                                       MBB) const {
+  // The predecessor has to be immediately before this block.
+  const MachineBasicBlock *Pred = *MBB->pred_begin();
+
+  // If the predecessor is a switch statement, assume a jump table
+  // implementation, so it is not a fall through.
+  if (const BasicBlock *bb = Pred->getBasicBlock())
+    if (isa<SwitchInst>(bb->getTerminator()))
+      return false;
+
+  // Check default implementation
+  if (!AsmPrinter::isBlockOnlyReachableByFallthrough(MBB))
+    return false;
+
+  // Otherwise, check the last instruction.
+  // Check if the last terminator is an unconditional branch.
+  MachineBasicBlock::const_iterator I = Pred->end();
+  while (I != Pred->begin() && !(--I)->isTerminator()) ;
+
+  return !I->isBarrier();
 }
 
 // Force static initialization.
