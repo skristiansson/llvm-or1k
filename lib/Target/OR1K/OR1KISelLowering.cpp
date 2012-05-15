@@ -51,6 +51,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   computeRegisterProperties();
 
   setOperationAction(ISD::BR_CC,             MVT::i32, Custom);
+  setOperationAction(ISD::BR_JT,             MVT::Other, Expand);
   setOperationAction(ISD::SETCC,             MVT::i32, Expand);
   setOperationAction(ISD::SETCC,             MVT::i64, Expand);
   setOperationAction(ISD::SETCC,             MVT::f32, Expand);
@@ -64,6 +65,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SELECT_CC,         MVT::f32, Custom);
   setOperationAction(ISD::SELECT_CC,         MVT::f64, Custom);
   setOperationAction(ISD::GlobalAddress,     MVT::i32, Custom);
+  setOperationAction(ISD::JumpTable,         MVT::i32, Custom);
 
   setOperationAction(ISD::MULHU,             MVT::i32, Expand);
   setOperationAction(ISD::MULHU,             MVT::i64, Expand);
@@ -95,6 +97,7 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
   switch (Op.getOpcode()) {
   case ISD::BR_CC:            return LowerBR_CC(Op, DAG);
   case ISD::GlobalAddress:    return LowerGlobalAddress(Op, DAG);
+  case ISD::JumpTable:        return LowerJumpTable(Op, DAG);
   case ISD::SELECT_CC:        return LowerSELECT_CC(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
@@ -529,6 +532,17 @@ SDValue OR1KTargetLowering::LowerGlobalAddress(SDValue Op,
   // Create the TargetGlobalAddress node, folding in the constant offset.
   SDValue Result = DAG.getTargetGlobalAddress(GV, Op.getDebugLoc(),
                                               getPointerTy(), Offset);
+  return DAG.getNode(OR1KISD::Wrapper, Op.getDebugLoc(),
+                     getPointerTy(), Result);
+}
+
+SDValue OR1KTargetLowering::LowerJumpTable(SDValue Op,
+                                           SelectionDAG &DAG) const {
+  JumpTableSDNode *JT = cast<JumpTableSDNode>(Op);
+  unsigned char OpFlag = 0;
+
+  SDValue Result = DAG.getTargetJumpTable(JT->getIndex(), getPointerTy(),
+                                          OpFlag);
   return DAG.getNode(OR1KISD::Wrapper, Op.getDebugLoc(),
                      getPointerTy(), Result);
 }

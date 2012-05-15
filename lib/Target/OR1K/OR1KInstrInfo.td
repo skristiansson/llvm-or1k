@@ -437,10 +437,9 @@ class BRANCHL<bits<4> subOp, string asmstring>
   let opcode = subOp;
 }
 
-class BRANCH_R<bits<4> subOp, string asmstring>
+class BRANCH_R<bits<4> subOp, string asmstring, list<dag> pattern>
         : InstBR<subOp, (outs), (ins GPR:$rB),
-		!strconcat(asmstring, "\t$rB"),
-		[]>
+		!strconcat(asmstring, "\t$rB"), pattern>
 {
   bits<5> rB;
 
@@ -463,11 +462,14 @@ class BRANCHL_R<bits<4> subOp, string asmstring>
 
 // Jump/Branch
 let isBranch = 1, isTerminator = 1, hasDelaySlot=1 in {
-  let isBarrier = 1 in
-  def J    : BRANCH<0x0, "l.j",   [(br bb:$dst)]>;
-  def BNF  : BRANCH<0x2, "l.bnf", []>;
-  def BF   : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst)]>;
-  def JR   : BRANCH_R<0x1, "l.jr">;
+  let isBarrier = 1 in {
+    def J : BRANCH<0x0, "l.j", [(br bb:$dst)]>;
+    let isIndirectBranch = 1 in {
+      def JR : BRANCH_R<0x1, "l.jr", [(brind GPR:$rB)]>;
+    }
+  }
+  def BNF : BRANCH<0x2, "l.bnf", []>;
+  def BF  : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst)]>;
 }
 
 // Jump and link
@@ -584,3 +586,6 @@ def : Pat<(OR1KWrapper texternalsym:$dst),
           (ORI (MOVHI (texternalsym:$dst)), (texternalsym:$dst))>;
 def : Pat<(OR1KWrapper tblockaddress:$dst),
           (ORI (MOVHI (tblockaddress:$dst)), (tblockaddress:$dst))>;
+
+def : Pat<(OR1KWrapper tjumptable:$dst),
+          (ORI (MOVHI (tjumptable:$dst)), (tjumptable:$dst))>;
