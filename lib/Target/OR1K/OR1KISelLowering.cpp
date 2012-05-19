@@ -67,6 +67,17 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::GlobalAddress,     MVT::i32, Custom);
   setOperationAction(ISD::JumpTable,         MVT::i32, Custom);
 
+
+  if (!Subtarget.hasDiv()) {
+    setOperationAction(ISD::SDIV,            MVT::i32, Expand);
+    setOperationAction(ISD::UDIV,            MVT::i32, Expand);
+  }
+  setOperationAction(ISD::SDIVREM,           MVT::i32, Expand);
+  setOperationAction(ISD::UDIVREM,           MVT::i32, Expand);
+
+  if (!Subtarget.hasMul()) {
+    setOperationAction(ISD::MUL,             MVT::i32, Expand);
+  }
   setOperationAction(ISD::MULHU,             MVT::i32, Expand);
   setOperationAction(ISD::MULHU,             MVT::i64, Expand);
   setOperationAction(ISD::MULHU,             MVT::f32, Expand);
@@ -83,6 +94,12 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SMUL_LOHI,         MVT::i64, Expand);
   setOperationAction(ISD::SMUL_LOHI,         MVT::f32, Expand);
   setOperationAction(ISD::SMUL_LOHI,         MVT::f64, Expand);
+
+  if (!Subtarget.hasRor()) {
+    setOperationAction(ISD::ROTR,            MVT::i32, Expand);
+  }
+  // FIXME: use l.ror (rotate right) to do rotate left
+  setOperationAction(ISD::ROTL,              MVT::i32, Expand);
 
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1,   Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8,   Expand);

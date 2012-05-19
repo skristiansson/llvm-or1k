@@ -132,6 +132,12 @@ def OR1K_CC_LTU : PatLeaf<(imm),
 def OR1K_CC_LEU : PatLeaf<(imm),
                   [{return (N->getZExtValue() == ISD::SETULE);}]>;
 
+// Feature support predicates
+def HasDiv       : Predicate<"Subtarget.hasDiv()">;
+def HasMul       : Predicate<"Subtarget.hasMul()">;
+def HasRor       : Predicate<"Subtarget.hasRor()">;
+def HasCmov      : Predicate<"Subtarget.hasCmov()">;
+
 
 // -------------------------------------------------- //
 // Condition/SF instructions
@@ -249,7 +255,9 @@ let isAsCheapAsAMove = 1 in {
   def ORI   : ALU_RIz<0xa, "l.ori", or>;
   def XORI  : ALU_RIs<0xb, "l.xori", xor>;
 }
-def MULI  : ALU_RIs<0xc, "l.muli", mul>;
+
+let Predicates=[HasMul] in
+  def MULI  : ALU_RIs<0xc, "l.muli", mul>;
 
 
 
@@ -287,14 +295,14 @@ let isAsCheapAsAMove = 1 in {
  }
 }
 
-let isCommutable=1 in {
+let isCommutable=1, Predicates=[HasMul] in {
   def MUL  : ALU_RR<0x6, "l.mul", mul>;
   def MULU : ALU_RR<0xb, "l.mulu", mul>;
 }
-
-def DIV  : ALU_RR<0x9, "l.div", sdiv>;
-def DIVU : ALU_RR<0xa, "l.divu", udiv>;
-
+let Predicates=[HasDiv] in {
+  def DIV  : ALU_RR<0x9, "l.div", sdiv>;
+  def DIVU : ALU_RR<0xa, "l.divu", udiv>;
+}
 // -------------------------------------------------- //
 // SHIFT instructions
 // -------------------------------------------------- //
@@ -352,7 +360,8 @@ multiclass SHIFT<bits<2> op2Val, string asmstr, SDNode OpNode>
 defm SLL : SHIFT<0x0, "l.sll", shl>;
 defm SRL : SHIFT<0x1, "l.srl", srl>;
 defm SRA : SHIFT<0x2, "l.sra", sra>;
-defm ROR : SHIFT<0x3, "l.ror", rotr>;
+let Predicates=[HasRor] in
+  defm ROR : SHIFT<0x3, "l.ror", rotr>;
 
 
 
