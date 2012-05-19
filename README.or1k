@@ -24,5 +24,6 @@ bin/llvm-lit -sv -j1 test/CodeGen/OR1K/
 
 TODO (not a complete list)
 --------------------------
-- Improve delay slot filler
 - Handle unconditional branches in AnalyzeBranch
+- Floating point support
+- Add support for (creating) vararg functions
