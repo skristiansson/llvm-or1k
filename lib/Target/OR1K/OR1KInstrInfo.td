@@ -27,9 +27,8 @@ def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                           SDTCisVT<1, i32> ]>;
 def SDT_OR1KCall         : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
 def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, []>;
-def SDT_OR1KSelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
-                                                SDTCisSameAs<1, 2>,
-                                                SDTCisVT<3, i32>]>;
+def SDT_OR1KSelectCC     : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
+                                                SDTCisSameAs<1, 2>]>;
 def SDT_OR1KBrCC         : SDTypeProfile<0, 1, [SDTCisVT<0, OtherVT>]>;
 def SDT_OR1KWrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                 SDTCisPtrTy<0>]>;
@@ -137,6 +136,7 @@ def HasDiv       : Predicate<"Subtarget.hasDiv()">;
 def HasMul       : Predicate<"Subtarget.hasMul()">;
 def HasRor       : Predicate<"Subtarget.hasRor()">;
 def HasCmov      : Predicate<"Subtarget.hasCmov()">;
+def NoCmov       : Predicate<"!Subtarget.hasCmov()">;
 
 
 // -------------------------------------------------- //
@@ -282,6 +282,7 @@ class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
   let op2 = 0;
   let op3 = subOp;
 }
+
 let isAsCheapAsAMove = 1 in {
   let isCommutable=1 in {
     def ADD  : ALU_RR<0x0, "l.add", add>;
@@ -294,6 +295,9 @@ let isAsCheapAsAMove = 1 in {
     def XOR  : ALU_RR<0x5, "l.xor", xor>;
  }
 }
+
+let Predicates=[HasCmov] in
+  def CMOV : ALU_RR<0xe, "l.cmov", OR1Kselectcc>;
 
 let isCommutable=1, Predicates=[HasMul] in {
   def MUL  : ALU_RR<0x6, "l.mul", mul>;
@@ -544,11 +548,11 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
                               [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
-let usesCustomInserter = 1 in {
-def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2, i32imm:$cc),
-                     "# Select PSEUDO",
-                     [(set GPR:$dst,
-                      (OR1Kselectcc GPR:$src, GPR:$src2, imm:$cc))]>;
+let usesCustomInserter = 1, Predicates=[NoCmov] in {
+  def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2),
+                       "# Select PSEUDO",
+                       [(set GPR:$dst,
+                        (OR1Kselectcc GPR:$src, GPR:$src2))]>;
 }
 
 
