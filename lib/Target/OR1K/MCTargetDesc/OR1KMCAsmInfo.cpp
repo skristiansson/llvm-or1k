@@ -15,7 +15,6 @@
 using namespace llvm;
 
 OR1KMCAsmInfo::OR1KMCAsmInfo(const Target &T, StringRef TT) {
-  AlignmentIsInBytes          = false;
   HasSetDirective             = false;
   PrivateGlobalPrefix         = ".L";
 
