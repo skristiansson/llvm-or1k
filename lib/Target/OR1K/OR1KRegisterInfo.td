@@ -31,23 +31,6 @@ class Ri<bits<5> num, string n> : OR1KReg<n> {
   let Num = num;
 }
 
-/*
-// Rf - 32-bit floating-point registers
-class Rf<bits<5> num, string n> : SparcReg<n> {
-  let Num = num;
-}
-// Rd - Slots in the FP register file for 64-bit floating-point values.
-class Rd<bits<5> num, string n, list<Register> subregs> : SparcReg<n> {
-  let Num = num;
-  let SubRegs = subregs;
-  let SubRegIndices = [sub_even, sub_odd];
-}
-
-// Control Registers
-def ICC : SparcCtrlReg<"ICC">;
-def FCC : SparcCtrlReg<"FCC">;
-*/
-
 // Integer registers
 def R0 : Ri< 0, "r0">, DwarfRegNum<[0]>;
 def R1 : Ri< 1, "r1">, DwarfRegNum<[1]>;
@@ -82,61 +65,6 @@ def R29 : Ri<29, "r29">, DwarfRegNum<[29]>;
 def R30 : Ri<30, "r30">, DwarfRegNum<[30]>;
 def R31 : Ri<31, "r31">, DwarfRegNum<[31]>;
 
-
-/*
-// Floating-point registers
-def F0  : Rf< 0,  "F0">, DwarfRegNum<[32]>;
-def F1  : Rf< 1,  "F1">, DwarfRegNum<[33]>;
-def F2  : Rf< 2,  "F2">, DwarfRegNum<[34]>;
-def F3  : Rf< 3,  "F3">, DwarfRegNum<[35]>;
-def F4  : Rf< 4,  "F4">, DwarfRegNum<[36]>;
-def F5  : Rf< 5,  "F5">, DwarfRegNum<[37]>;
-def F6  : Rf< 6,  "F6">, DwarfRegNum<[38]>;
-def F7  : Rf< 7,  "F7">, DwarfRegNum<[39]>;
-def F8  : Rf< 8,  "F8">, DwarfRegNum<[40]>;
-def F9  : Rf< 9,  "F9">, DwarfRegNum<[41]>;
-def F10 : Rf<10, "F10">, DwarfRegNum<[42]>;
-def F11 : Rf<11, "F11">, DwarfRegNum<[43]>;
-def F12 : Rf<12, "F12">, DwarfRegNum<[44]>;
-def F13 : Rf<13, "F13">, DwarfRegNum<[45]>;
-def F14 : Rf<14, "F14">, DwarfRegNum<[46]>;
-def F15 : Rf<15, "F15">, DwarfRegNum<[47]>;
-def F16 : Rf<16, "F16">, DwarfRegNum<[48]>;
-def F17 : Rf<17, "F17">, DwarfRegNum<[49]>;
-def F18 : Rf<18, "F18">, DwarfRegNum<[50]>;
-def F19 : Rf<19, "F19">, DwarfRegNum<[51]>;
-def F20 : Rf<20, "F20">, DwarfRegNum<[52]>;
-def F21 : Rf<21, "F21">, DwarfRegNum<[53]>;
-def F22 : Rf<22, "F22">, DwarfRegNum<[54]>;
-def F23 : Rf<23, "F23">, DwarfRegNum<[55]>;
-def F24 : Rf<24, "F24">, DwarfRegNum<[56]>;
-def F25 : Rf<25, "F25">, DwarfRegNum<[57]>;
-def F26 : Rf<26, "F26">, DwarfRegNum<[58]>;
-def F27 : Rf<27, "F27">, DwarfRegNum<[59]>;
-def F28 : Rf<28, "F28">, DwarfRegNum<[60]>;
-def F29 : Rf<29, "F29">, DwarfRegNum<[61]>;
-def F30 : Rf<30, "F30">, DwarfRegNum<[62]>;
-def F31 : Rf<31, "F31">, DwarfRegNum<[63]>;
-
-// Aliases of the F* registers used to hold 64-bit fp values (doubles)
-def D0  : Rd< 0,  "F0", [F0,   F1]>, DwarfRegNum<[32]>;
-def D1  : Rd< 2,  "F2", [F2,   F3]>, DwarfRegNum<[34]>;
-def D2  : Rd< 4,  "F4", [F4,   F5]>, DwarfRegNum<[36]>;
-def D3  : Rd< 6,  "F6", [F6,   F7]>, DwarfRegNum<[38]>;
-def D4  : Rd< 8,  "F8", [F8,   F9]>, DwarfRegNum<[40]>;
-def D5  : Rd<10, "F10", [F10, F11]>, DwarfRegNum<[42]>;
-def D6  : Rd<12, "F12", [F12, F13]>, DwarfRegNum<[44]>;
-def D7  : Rd<14, "F14", [F14, F15]>, DwarfRegNum<[46]>;
-def D8  : Rd<16, "F16", [F16, F17]>, DwarfRegNum<[48]>;
-def D9  : Rd<18, "F18", [F18, F19]>, DwarfRegNum<[50]>;
-def D10 : Rd<20, "F20", [F20, F21]>, DwarfRegNum<[52]>;
-def D11 : Rd<22, "F22", [F22, F23]>, DwarfRegNum<[54]>;
-def D12 : Rd<24, "F24", [F24, F25]>, DwarfRegNum<[56]>;
-def D13 : Rd<26, "F26", [F26, F27]>, DwarfRegNum<[58]>;
-def D14 : Rd<28, "F28", [F28, F29]>, DwarfRegNum<[60]>;
-def D15 : Rd<30, "F30", [F30, F31]>, DwarfRegNum<[62]>;
-*/
-
 // Register classes.
 //
 // FIXME: the register order should be defined in terms of the preferred
@@ -154,12 +82,3 @@ def GPR : RegisterClass<"OR1K", [i32], 32, (add R3, R4, R5, R6, R7,
                                      R9,  // link register
                                      R0   // constant 0
                                      )>;
-
-/*
-def FPRegs : RegisterClass<"SP", [f32], 32, [F0, F1, F2, F3, F4, F5, F6, F7, F8,
-  F9, F10, F11, F12, F13, F14, F15, F16, F17, F18, F19, F20, F21, F22,
-  F23, F24, F25, F26, F27, F28, F29, F30, F31]>;
-
-def DFPRegs : RegisterClass<"SP", [f64], 64, [D0, D1, D2, D3, D4, D5, D6, D7,
-  D8, D9, D10, D11, D12, D13, D14, D15]>;
-*/
