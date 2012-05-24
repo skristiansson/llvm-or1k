@@ -16,10 +16,6 @@ class OR1KReg<string n> : Register<n> {
   let Namespace = "OR1K";
 }
 
-class OR1KCtrlReg<string n>: Register<n> {
-  let Namespace = "OR1K";
-}
-
 let Namespace = "OR1K" in {
 def sub_even : SubRegIndex;
 def sub_odd  : SubRegIndex;
