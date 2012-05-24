@@ -61,6 +61,10 @@ def R29 : Ri<29, "r29">, DwarfRegNum<[29]>;
 def R30 : Ri<30, "r30">, DwarfRegNum<[30]>;
 def R31 : Ri<31, "r31">, DwarfRegNum<[31]>;
 
+// Special purpose registers
+let Namespace = "OR1K" in {
+def SR : Register<"SR">;        // Supervisor Registor (contains flags)
+}
 // Register classes.
 //
 // FIXME: the register order should be defined in terms of the preferred
@@ -78,3 +82,8 @@ def GPR : RegisterClass<"OR1K", [i32], 32, (add R3, R4, R5, R6, R7,
                                      R9,  // link register
                                      R0   // constant 0
                                      )>;
+
+def SPR : RegisterClass<"OR1K", [i32], 32, (add SR)> {
+  let CopyCost = -1;  // Don't allow copying of special purpose registers.
+  let isAllocatable = 0;
+}
