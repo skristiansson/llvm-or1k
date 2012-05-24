@@ -204,7 +204,7 @@ multiclass SFS<bits<5> op2Val, string asmstr, PatLeaf Cond>
 }
 
 // l.sfxx instructions
-let hasSideEffects=1 in {
+let Defs = [SR], hasSideEffects = 1 in {
 defm SFEQ  : SFS<0x0, "l.sfeq",  OR1K_CC_EQ>;
 defm SFNE  : SFS<0x1, "l.sfne",  OR1K_CC_NE>;
 defm SFGTU : SFU<0x2, "l.sfgtu", OR1K_CC_GTU>;
@@ -296,7 +296,7 @@ let isAsCheapAsAMove = 1 in {
  }
 }
 
-let Predicates=[HasCmov] in
+let Uses = [SR], Predicates = [HasCmov] in
   def CMOV : ALU_RR<0xe, "l.cmov", OR1Kselectcc>;
 
 let isCommutable=1, Predicates=[HasMul] in {
@@ -481,8 +481,10 @@ let isBranch = 1, isTerminator = 1, hasDelaySlot=1 in {
       def JR : BRANCH_R<0x1, "l.jr", [(brind GPR:$rB)]>;
     }
   }
-  def BNF : BRANCH<0x2, "l.bnf", []>;
-  def BF  : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst)]>;
+  let Uses = [SR] in {
+    def BNF : BRANCH<0x2, "l.bnf", []>;
+    def BF  : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst)]>;
+  }
 }
 
 // Jump and link
@@ -549,7 +551,7 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
                               [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
-let usesCustomInserter = 1, Predicates=[NoCmov] in {
+let Uses = [SR], usesCustomInserter = 1, Predicates = [NoCmov] in {
   def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2),
                        "# Select PSEUDO",
                        [(set GPR:$dst,
