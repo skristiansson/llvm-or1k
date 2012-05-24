@@ -530,8 +530,7 @@ class NOP_I<bits<2> op2Val, string asmstr>
 let neverHasSideEffects = 1 in
   def NOP : NOP_I<0x1, "l.nop">;
 
-let Defs = [R9], isReturn = 1, isTerminator = 1,
-    hasDelaySlot=1, isBarrier = 1 in {
+let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
   def RET  : InstBR<0x1, (outs), (ins),
                     "l.jr\tr9",
                     [(retflag)]>;
