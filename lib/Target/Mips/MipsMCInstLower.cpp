@@ -117,56 +117,6 @@ static void CreateMCInst(MCInst& Inst, unsigned Opc, const MCOperand& Opnd0,
     Inst.addOperand(Opnd2);
 }
 
-// Lower ".cpload $reg" to
-//  "lui   $gp, %hi(_gp_disp)"
-//  "addiu $gp, $gp, %lo(_gp_disp)"
-//  "addu  $gp, $gp, $t9"
-void MipsMCInstLower::LowerCPLOAD(SmallVector<MCInst, 4>& MCInsts) {
-  MCOperand GPReg = MCOperand::CreateReg(Mips::GP);
-  MCOperand T9Reg = MCOperand::CreateReg(Mips::T9);
-  StringRef SymName("_gp_disp");
-  const MCSymbol *Sym = Ctx->GetOrCreateSymbol(SymName);
-  const MCSymbolRefExpr *MCSym;
-
-  MCSym = MCSymbolRefExpr::Create(Sym, MCSymbolRefExpr::VK_Mips_ABS_HI, *Ctx);
-  MCOperand SymHi = MCOperand::CreateExpr(MCSym);
-  MCSym = MCSymbolRefExpr::Create(Sym, MCSymbolRefExpr::VK_Mips_ABS_LO, *Ctx);
-  MCOperand SymLo = MCOperand::CreateExpr(MCSym);
-
-  MCInsts.resize(3);
-
-  CreateMCInst(MCInsts[0], Mips::LUi, GPReg, SymHi);
-  CreateMCInst(MCInsts[1], Mips::ADDiu, GPReg, GPReg, SymLo);
-  CreateMCInst(MCInsts[2], Mips::ADDu, GPReg, GPReg, T9Reg);
-}
-
-// Lower ".cprestore offset" to "sw $gp, offset($sp)".
-void MipsMCInstLower::LowerCPRESTORE(int64_t Offset,
-                                     SmallVector<MCInst, 4>& MCInsts) {
-  assert(isInt<32>(Offset) && (Offset >= 0) &&
-         "Imm operand of .cprestore must be a non-negative 32-bit value.");
-
-  MCOperand SPReg = MCOperand::CreateReg(Mips::SP), BaseReg = SPReg;
-  MCOperand GPReg = MCOperand::CreateReg(Mips::GP);
-
-  if (!isInt<16>(Offset)) {
-    unsigned Hi = ((Offset + 0x8000) >> 16) & 0xffff;
-    Offset &= 0xffff;
-    MCOperand ATReg = MCOperand::CreateReg(Mips::AT);
-    BaseReg = ATReg;
-
-    // lui   at,hi
-    // addu  at,at,sp
-    MCInsts.resize(2);
-    CreateMCInst(MCInsts[0], Mips::LUi, ATReg, MCOperand::CreateImm(Hi));
-    CreateMCInst(MCInsts[1], Mips::ADDu, ATReg, ATReg, SPReg);
-  }
-
-  MCInst Sw;
-  CreateMCInst(Sw, Mips::SW, GPReg, BaseReg, MCOperand::CreateImm(Offset));
-  MCInsts.push_back(Sw);
-}
-
 MCOperand MipsMCInstLower::LowerOperand(const MachineOperand& MO,
                                         unsigned offset) const {
   MachineOperandType MOTy = MO.getType();
@@ -317,16 +267,11 @@ void MipsMCInstLower::LowerUnalignedLoadStore(const MachineInstr *MI,
   if (!TwoInstructions) MCInsts.push_back(Instr3);
 }
 
-// Convert
-//  "setgp01 $reg"
-// to
-//  "lui   $reg, %hi(_gp_disp)"
-//  "addiu $reg, $reg, %lo(_gp_disp)"
-void MipsMCInstLower::LowerSETGP01(const MachineInstr *MI,
-                                   SmallVector<MCInst, 4>& MCInsts) {
-  const MachineOperand &MO = MI->getOperand(0);
-  assert(MO.isReg());
-  MCOperand RegOpnd = MCOperand::CreateReg(MO.getReg());
+// Create the following two instructions:
+//  "lui   $2, %hi(_gp_disp)"
+//  "addiu $2, $2, %lo(_gp_disp)"
+void MipsMCInstLower::LowerSETGP01(SmallVector<MCInst, 4>& MCInsts) {
+  MCOperand RegOpnd = MCOperand::CreateReg(Mips::V0);
   StringRef SymName("_gp_disp");
   const MCSymbol *Sym = Ctx->GetOrCreateSymbol(SymName);
   const MCSymbolRefExpr *MCSym;

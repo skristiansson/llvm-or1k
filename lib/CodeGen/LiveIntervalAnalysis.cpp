@@ -654,9 +654,8 @@ bool LiveIntervals::shrinkToUses(LiveInterval *li,
     if (UseMI->isDebugValue() || !UseMI->readsVirtualRegister(li->reg))
       continue;
     SlotIndex Idx = getInstructionIndex(UseMI).getRegSlot();
-    // Note: This intentionally picks up the wrong VNI in case of an EC redef.
-    // See below.
-    VNInfo *VNI = li->getVNInfoBefore(Idx);
+    LiveRangeQuery LRQ(*li, Idx);
+    VNInfo *VNI = LRQ.valueIn();
     if (!VNI) {
       // This shouldn't happen: readsVirtualRegister returns true, but there is
       // no live value. It is likely caused by a target getting <undef> flags
@@ -667,13 +666,10 @@ bool LiveIntervals::shrinkToUses(LiveInterval *li,
       continue;
     }
     // Special case: An early-clobber tied operand reads and writes the
-    // register one slot early.  The getVNInfoBefore call above would have
-    // picked up the value defined by UseMI.  Adjust the kill slot and value.
-    if (SlotIndex::isSameInstr(VNI->def, Idx)) {
-      Idx = VNI->def;
-      VNI = li->getVNInfoBefore(Idx);
-      assert(VNI && "Early-clobber tied value not available");
-    }
+    // register one slot early.
+    if (VNInfo *DefVNI = LRQ.valueDefined())
+      Idx = DefVNI->def;
+
     WorkList.push_back(std::make_pair(Idx, VNI));
   }
 
@@ -1068,9 +1064,9 @@ public:
 
 #ifndef NDEBUG
     LIValidator validator;
-    std::for_each(Entering.begin(), Entering.end(), validator);
-    std::for_each(Internal.begin(), Internal.end(), validator);
-    std::for_each(Exiting.begin(), Exiting.end(), validator);
+    validator = std::for_each(Entering.begin(), Entering.end(), validator);
+    validator = std::for_each(Internal.begin(), Internal.end(), validator);
+    validator = std::for_each(Exiting.begin(), Exiting.end(), validator);
     assert(validator.rangesOk() && "moveAllOperandsFrom broke liveness.");
 #endif
 
@@ -1115,9 +1111,9 @@ public:
 
 #ifndef NDEBUG
     LIValidator validator;
-    std::for_each(Entering.begin(), Entering.end(), validator);
-    std::for_each(Internal.begin(), Internal.end(), validator);
-    std::for_each(Exiting.begin(), Exiting.end(), validator);
+    validator = std::for_each(Entering.begin(), Entering.end(), validator);
+    validator = std::for_each(Internal.begin(), Internal.end(), validator);
+    validator = std::for_each(Exiting.begin(), Exiting.end(), validator);
     assert(validator.rangesOk() && "moveAllOperandsInto broke liveness.");
 #endif
   }

@@ -112,6 +112,8 @@ HOST_OS=@HOST_OS@
 # Target operating system for which LLVM will compile for.
 TARGET_OS=@TARGET_OS@
 
+# Host hardware architecture
+HOST_ARCH=@HOST_ARCH@
 # Target hardware architecture
 ARCH=@ARCH@
 TARGET_NATIVE_ARCH := $(ARCH)
@@ -351,3 +353,10 @@ INTEL_JITEVENTS_LIBDIR := @INTEL_JITEVENTS_LIBDIR@
 
 # Flags to control building support for OProfile JIT API
 USE_OPROFILE := @USE_OPROFILE@
+
+ifeq ($(USE_INTEL_JITEVENTS), 1)
+  OPTIONAL_COMPONENTS += IntelJITEvents
+endif
+ifeq ($(USE_OPROFILE), 1)
+  OPTIONAL_COMPONENTS += OProfileJIT
+endif

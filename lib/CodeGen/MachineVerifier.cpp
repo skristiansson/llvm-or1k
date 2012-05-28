@@ -672,7 +672,8 @@ MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
           report("Illegal subregister index for physical register", MO, MONum);
           return;
         }
-        if (const TargetRegisterClass *DRC = TII->getRegClass(MCID,MONum,TRI)) {
+        if (const TargetRegisterClass *DRC =
+              TII->getRegClass(MCID, MONum, TRI, *MF)) {
           if (!DRC->contains(Reg)) {
             report("Illegal physical register for instruction", MO, MONum);
             *OS << TRI->getName(Reg) << " is not a "
@@ -698,7 +699,8 @@ MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
             return;
           }
         }
-        if (const TargetRegisterClass *DRC = TII->getRegClass(MCID,MONum,TRI)) {
+        if (const TargetRegisterClass *DRC =
+              TII->getRegClass(MCID, MONum, TRI, *MF)) {
           if (SubIdx) {
             const TargetRegisterClass *SuperRC =
               TRI->getLargestLegalSuperClass(RC);
@@ -1074,7 +1076,7 @@ void MachineVerifier::verifyLiveIntervals() {
     const LiveInterval &LI = *LVI->second;
 
     // Spilling and splitting may leave unused registers around. Skip them.
-    if (MRI->use_empty(LI.reg))
+    if (MRI->reg_nodbg_empty(LI.reg))
       continue;
 
     // Physical registers have much weirdness going on, mostly from coalescing.
@@ -1357,4 +1359,3 @@ void MachineVerifier::verifyLiveIntervals() {
     }
   }
 }
-

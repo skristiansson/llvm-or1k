@@ -303,7 +303,8 @@ public:
 
   /// findUsedStructTypes - Walk the entire module and find all of the
   /// struct types that are in use, returning them in a vector.
-  void findUsedStructTypes(std::vector<StructType*> &StructTypes) const;
+  void findUsedStructTypes(std::vector<StructType*> &StructTypes,
+                           bool OnlyNamed = false) const;
   
   /// getTypeByName - Return the type with the specified name, or null if there
   /// is none by that name.
@@ -496,6 +497,13 @@ public:
   AliasListType          &getAliasList()              { return AliasList; }
   static iplist<GlobalAlias> Module::*getSublistAccess(GlobalAlias*) {
     return &Module::AliasList;
+  }
+  /// Get the Module's list of named metadata (constant).
+  const NamedMDListType  &getNamedMDList() const      { return NamedMDList; }
+  /// Get the Module's list of named metadata.
+  NamedMDListType        &getNamedMDList()            { return NamedMDList; }
+  static ilist<NamedMDNode> Module::*getSublistAccess(NamedMDNode*) {
+    return &Module::NamedMDList;
   }
   /// Get the symbol table of global variable and function identifiers
   const ValueSymbolTable &getValueSymbolTable() const { return *ValSymTab; }

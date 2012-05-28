@@ -821,8 +821,11 @@ FastISel::SelectInstruction(const Instruction *I) {
 /// the CFG.
 void
 FastISel::FastEmitBranch(MachineBasicBlock *MSucc, DebugLoc DL) {
-  if (FuncInfo.MBB->isLayoutSuccessor(MSucc)) {
-    // The unconditional fall-through case, which needs no instructions.
+
+  if (FuncInfo.MBB->getBasicBlock()->size() > 1 && FuncInfo.MBB->isLayoutSuccessor(MSucc)) {
+    // For more accurate line information if this is the only instruction
+    // in the block then emit it, otherwise we have the unconditional
+    // fall-through case, which needs no instructions.
   } else {
     // The unconditional branch case.
     TII.InsertBranch(*FuncInfo.MBB, MSucc, NULL,
@@ -1342,6 +1345,8 @@ unsigned FastISel::FastEmitInst_extractsubreg(MVT RetVT,
   unsigned ResultReg = createResultReg(TLI.getRegClassFor(RetVT));
   assert(TargetRegisterInfo::isVirtualRegister(Op0) &&
          "Cannot yet extract from physregs");
+  const TargetRegisterClass *RC = MRI.getRegClass(Op0);
+  MRI.constrainRegClass(Op0, TRI.getSubClassWithSubReg(RC, Idx));
   BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt,
           DL, TII.get(TargetOpcode::COPY), ResultReg)
     .addReg(Op0, getKillRegState(Op0IsKill), Idx);

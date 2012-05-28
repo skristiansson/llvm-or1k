@@ -57,7 +57,8 @@ public:
   /// class constraint for OpNum, or NULL.
   const TargetRegisterClass *getRegClass(const MCInstrDesc &TID,
                                          unsigned OpNum,
-                                         const TargetRegisterInfo *TRI) const;
+                                         const TargetRegisterInfo *TRI,
+                                         const MachineFunction &MF) const;
 
   /// isTriviallyReMaterializable - Return true if the instruction is trivially
   /// rematerializable, meaning it has no side effects and requires no operands
@@ -608,6 +609,13 @@ public:
   CreateTargetHazardRecognizer(const TargetMachine *TM,
                                const ScheduleDAG *DAG) const = 0;
 
+  /// CreateTargetMIHazardRecognizer - Allocate and return a hazard recognizer
+  /// to use for this target when scheduling the machine instructions before
+  /// register allocation.
+  virtual ScheduleHazardRecognizer*
+  CreateTargetMIHazardRecognizer(const InstrItineraryData*,
+                                 const ScheduleDAG *DAG) const = 0;
+
   /// CreateTargetPostRAHazardRecognizer - Allocate and return a hazard
   /// recognizer to use for this target when scheduling the machine instructions
   /// after register allocation.
@@ -874,6 +882,10 @@ public:
 
   virtual ScheduleHazardRecognizer *
   CreateTargetHazardRecognizer(const TargetMachine*, const ScheduleDAG*) const;
+
+  virtual ScheduleHazardRecognizer *
+  CreateTargetMIHazardRecognizer(const InstrItineraryData*,
+                                 const ScheduleDAG*) const;
 
   virtual ScheduleHazardRecognizer *
   CreateTargetPostRAHazardRecognizer(const InstrItineraryData*,

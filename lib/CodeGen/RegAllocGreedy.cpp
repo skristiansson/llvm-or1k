@@ -286,6 +286,8 @@ private:
                           SmallVectorImpl<LiveInterval*>&);
   unsigned tryBlockSplit(LiveInterval&, AllocationOrder&,
                          SmallVectorImpl<LiveInterval*>&);
+  unsigned tryInstructionSplit(LiveInterval&, AllocationOrder&,
+                               SmallVectorImpl<LiveInterval*>&);
   unsigned tryLocalSplit(LiveInterval&, AllocationOrder&,
     SmallVectorImpl<LiveInterval*>&);
   unsigned trySplit(LiveInterval&, AllocationOrder&,
@@ -1183,7 +1185,7 @@ unsigned RAGreedy::tryRegionSplit(LiveInterval &VirtReg, AllocationOrder &Order,
     return 0;
 
   // Prepare split editor.
-  LiveRangeEdit LREdit(VirtReg, NewVRegs, *MF, *LIS, VRM, this);
+  LiveRangeEdit LREdit(&VirtReg, NewVRegs, *MF, *LIS, VRM, this);
   SE->reset(LREdit, SplitSpillMode);
 
   // Assign all edge bundles to the preferred candidate, or NoCand.
@@ -1231,7 +1233,7 @@ unsigned RAGreedy::tryBlockSplit(LiveInterval &VirtReg, AllocationOrder &Order,
   assert(&SA->getParent() == &VirtReg && "Live range wasn't analyzed");
   unsigned Reg = VirtReg.reg;
   bool SingleInstrs = RegClassInfo.isProperSubClass(MRI->getRegClass(Reg));
-  LiveRangeEdit LREdit(VirtReg, NewVRegs, *MF, *LIS, VRM, this);
+  LiveRangeEdit LREdit(&VirtReg, NewVRegs, *MF, *LIS, VRM, this);
   SE->reset(LREdit, SplitSpillMode);
   ArrayRef<SplitAnalysis::BlockInfo> UseBlocks = SA->getUseBlocks();
   for (unsigned i = 0; i != UseBlocks.size(); ++i) {
@@ -1264,6 +1266,65 @@ unsigned RAGreedy::tryBlockSplit(LiveInterval &VirtReg, AllocationOrder &Order,
     MF->verify(this, "After splitting live range around basic blocks");
   return 0;
 }
+
+
+//===----------------------------------------------------------------------===//
+//                         Per-Instruction Splitting
+//===----------------------------------------------------------------------===//
+
+/// tryInstructionSplit - Split a live range around individual instructions.
+/// This is normally not worthwhile since the spiller is doing essentially the
+/// same thing. However, when the live range is in a constrained register
+/// class, it may help to insert copies such that parts of the live range can
+/// be moved to a larger register class.
+///
+/// This is similar to spilling to a larger register class.
+unsigned
+RAGreedy::tryInstructionSplit(LiveInterval &VirtReg, AllocationOrder &Order,
+                              SmallVectorImpl<LiveInterval*> &NewVRegs) {
+  // There is no point to this if there are no larger sub-classes.
+  if (!RegClassInfo.isProperSubClass(MRI->getRegClass(VirtReg.reg)))
+    return 0;
+
+  // Always enable split spill mode, since we're effectively spilling to a
+  // register.
+  LiveRangeEdit LREdit(&VirtReg, NewVRegs, *MF, *LIS, VRM, this);
+  SE->reset(LREdit, SplitEditor::SM_Size);
+
+  ArrayRef<SlotIndex> Uses = SA->getUseSlots();
+  if (Uses.size() <= 1)
+    return 0;
+
+  DEBUG(dbgs() << "Split around " << Uses.size() << " individual instrs.\n");
+
+  // Split around every non-copy instruction.
+  for (unsigned i = 0; i != Uses.size(); ++i) {
+    if (const MachineInstr *MI = Indexes->getInstructionFromIndex(Uses[i]))
+      if (MI->isFullCopy()) {
+        DEBUG(dbgs() << "    skip:\t" << Uses[i] << '\t' << *MI);
+        continue;
+      }
+    SE->openIntv();
+    SlotIndex SegStart = SE->enterIntvBefore(Uses[i]);
+    SlotIndex SegStop  = SE->leaveIntvAfter(Uses[i]);
+    SE->useIntv(SegStart, SegStop);
+  }
+
+  if (LREdit.empty()) {
+    DEBUG(dbgs() << "All uses were copies.\n");
+    return 0;
+  }
+
+  SmallVector<unsigned, 8> IntvMap;
+  SE->finish(&IntvMap);
+  DebugVars->splitRegister(VirtReg.reg, LREdit.regs());
+  ExtraRegInfo.resize(MRI->getNumVirtRegs());
+
+  // Assign all new registers to RS_Spill. This was the last chance.
+  setStage(LREdit.begin(), LREdit.end(), RS_Spill);
+  return 0;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                             Local Splitting
@@ -1512,7 +1573,7 @@ unsigned RAGreedy::tryLocalSplit(LiveInterval &VirtReg, AllocationOrder &Order,
                << '-' << Uses[BestAfter] << ", " << BestDiff
                << ", " << (BestAfter - BestBefore + 1) << " instrs\n");
 
-  LiveRangeEdit LREdit(VirtReg, NewVRegs, *MF, *LIS, VRM, this);
+  LiveRangeEdit LREdit(&VirtReg, NewVRegs, *MF, *LIS, VRM, this);
   SE->reset(LREdit);
 
   SE->openIntv();
@@ -1561,7 +1622,10 @@ unsigned RAGreedy::trySplit(LiveInterval &VirtReg, AllocationOrder &Order,
   if (LIS->intervalIsInOneMBB(VirtReg)) {
     NamedRegionTimer T("Local Splitting", TimerGroupName, TimePassesIsEnabled);
     SA->analyze(&VirtReg);
-    return tryLocalSplit(VirtReg, Order, NewVRegs);
+    unsigned PhysReg = tryLocalSplit(VirtReg, Order, NewVRegs);
+    if (PhysReg || !NewVRegs.empty())
+      return PhysReg;
+    return tryInstructionSplit(VirtReg, Order, NewVRegs);
   }
 
   NamedRegionTimer T("Global Splitting", TimerGroupName, TimePassesIsEnabled);
@@ -1644,7 +1708,7 @@ unsigned RAGreedy::selectOrSplit(LiveInterval &VirtReg,
 
   // Finally spill VirtReg itself.
   NamedRegionTimer T("Spiller", TimerGroupName, TimePassesIsEnabled);
-  LiveRangeEdit LRE(VirtReg, NewVRegs, *MF, *LIS, VRM, this);
+  LiveRangeEdit LRE(&VirtReg, NewVRegs, *MF, *LIS, VRM, this);
   spiller().spill(LRE);
   setStage(NewVRegs.begin(), NewVRegs.end(), RS_Done);
 

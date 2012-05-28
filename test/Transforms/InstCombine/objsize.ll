@@ -158,3 +158,13 @@ define i32 @test7() {
   ret i32 %objsize
 }
 
+declare noalias i8* @calloc(i32, i32) nounwind
+
+define i32 @test8() {
+; CHECK: @test8
+  %alloc = call noalias i8* @calloc(i32 5, i32 7) nounwind
+  %gep = getelementptr inbounds i8* %alloc, i32 5
+  %objsize = call i32 @llvm.objectsize.i32(i8* %gep, i1 false) nounwind readonly
+; CHECK-NEXT: ret i32 30
+  ret i32 %objsize
+}

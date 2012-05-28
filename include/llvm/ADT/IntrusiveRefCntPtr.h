@@ -21,9 +21,9 @@
 #ifndef LLVM_ADT_INTRUSIVE_REF_CNT_PTR
 #define LLVM_ADT_INTRUSIVE_REF_CNT_PTR
 
-#include <cassert>
-
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Compiler.h"
+#include <memory>
 
 namespace llvm {
 
@@ -123,6 +123,17 @@ namespace llvm {
       retain();
     }
 
+#if LLVM_USE_RVALUE_REFERENCES
+    IntrusiveRefCntPtr(IntrusiveRefCntPtr&& S) : Obj(S.Obj) {
+      S.Obj = 0;
+    }
+
+    template <class X>
+    IntrusiveRefCntPtr(IntrusiveRefCntPtr<X>&& S) : Obj(S.getPtr()) {
+      S.Obj = 0;
+    }
+#endif
+
     template <class X>
     IntrusiveRefCntPtr(const IntrusiveRefCntPtr<X>& S)
       : Obj(S.getPtr()) {
@@ -133,6 +144,19 @@ namespace llvm {
       replace(S.getPtr());
       return *this;
     }
+
+#if LLVM_USE_RVALUE_REFERENCES
+    IntrusiveRefCntPtr& operator=(IntrusiveRefCntPtr&& S) {
+      this_type(std::move(S)).swap(*this);
+      return *this;
+    }
+
+    template <class X>
+    IntrusiveRefCntPtr& operator=(IntrusiveRefCntPtr<X>&& S) {
+      this_type(std::move(S)).swap(*this);
+      return *this;
+    }
+#endif
 
     template <class X>
     IntrusiveRefCntPtr& operator=(const IntrusiveRefCntPtr<X>& S) {

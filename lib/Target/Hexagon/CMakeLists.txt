@@ -16,6 +16,7 @@ add_llvm_target(HexagonCodeGen
   HexagonExpandPredSpillCode.cpp
   HexagonFrameLowering.cpp
   HexagonHardwareLoops.cpp
+  HexagonMCInstLower.cpp
   HexagonInstrInfo.cpp
   HexagonISelDAGToDAG.cpp
   HexagonISelLowering.cpp
@@ -27,8 +28,11 @@ add_llvm_target(HexagonCodeGen
   HexagonSubtarget.cpp
   HexagonTargetMachine.cpp
   HexagonTargetObjectFile.cpp
-  )
+  HexagonVLIWPacketizer.cpp
+  HexagonNewValueJump.cpp
+)
 
 add_subdirectory(TargetInfo)
+add_subdirectory(InstPrinter)
 add_subdirectory(MCTargetDesc)
 

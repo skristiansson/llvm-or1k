@@ -36,6 +36,11 @@ STATISTIC(NumCallsDeleted, "Number of call sites deleted, not inlined");
 STATISTIC(NumDeleted, "Number of functions deleted because all callers found");
 STATISTIC(NumMergedAllocas, "Number of allocas merged together");
 
+// This weirdly named statistic tracks the number of times that, when attemting
+// to inline a function A into B, we analyze the callers of B in order to see
+// if those would be more profitable and blocked inline steps.
+STATISTIC(NumCallerCallersAnalyzed, "Number of caller-callers analyzed");
+
 static cl::opt<int>
 InlineLimit("inline-threshold", cl::Hidden, cl::init(225), cl::ZeroOrMore,
         cl::desc("Control the amount of inlining to perform (default = 225)"));
@@ -196,19 +201,22 @@ static bool InlineCallIfPossible(CallSite CS, InlineFunctionInfo &IFI,
 }
 
 unsigned Inliner::getInlineThreshold(CallSite CS) const {
-  int thres = InlineThreshold;
+  int thres = InlineThreshold; // -inline-threshold or else selected by
+                               // overall opt level
 
-  // Listen to optsize when -inline-limit is not given.
+  // If -inline-threshold is not given, listen to the optsize attribute when it
+  // would decrease the threshold.
   Function *Caller = CS.getCaller();
-  if (Caller && !Caller->isDeclaration() &&
-      Caller->hasFnAttr(Attribute::OptimizeForSize) &&
-      InlineLimit.getNumOccurrences() == 0)
+  bool OptSize = Caller && !Caller->isDeclaration() &&
+    Caller->hasFnAttr(Attribute::OptimizeForSize);
+  if (!(InlineLimit.getNumOccurrences() > 0) && OptSize && OptSizeThreshold < thres)
     thres = OptSizeThreshold;
 
-  // Listen to inlinehint when it would increase the threshold.
+  // Listen to the inlinehint attribute when it would increase the threshold.
   Function *Callee = CS.getCalledFunction();
-  if (HintThreshold > thres && Callee && !Callee->isDeclaration() &&
-      Callee->hasFnAttr(Attribute::InlineHint))
+  bool InlineHint = Callee && !Callee->isDeclaration() &&
+    Callee->hasFnAttr(Attribute::InlineHint);
+  if (InlineHint && HintThreshold > thres)
     thres = HintThreshold;
 
   return thres;
@@ -277,6 +285,7 @@ bool Inliner::shouldInline(CallSite CS) {
       }
 
       InlineCost IC2 = getInlineCost(CS2);
+      ++NumCallerCallersAnalyzed;
       if (!IC2) {
         callerWillBeRemoved = false;
         continue;

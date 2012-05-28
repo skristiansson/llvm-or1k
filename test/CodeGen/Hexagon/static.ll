@@ -4,9 +4,9 @@
 @acc = external global i32
 @val = external global i32
 
-; CHECK: CONST32(#num)
-; CHECK: CONST32(#acc)
-; CHECK: CONST32(#val)
+; CHECK: memw(##num)
+; CHECK: memw(##acc)
+; CHECK: memw(##val)
 
 define void @foo() nounwind {
 entry:

@@ -404,6 +404,8 @@ def brind      : SDNode<"ISD::BRIND"      , SDTBrind,  [SDNPHasChain]>;
 def br         : SDNode<"ISD::BR"         , SDTBr,     [SDNPHasChain]>;
 def trap       : SDNode<"ISD::TRAP"       , SDTNone,
                         [SDNPHasChain, SDNPSideEffect]>;
+def debugtrap  : SDNode<"ISD::DEBUGTRAP"  , SDTNone,
+                        [SDNPHasChain, SDNPSideEffect]>;
 
 def prefetch   : SDNode<"ISD::PREFETCH"   , SDTPrefetch,
                         [SDNPHasChain, SDNPMayLoad, SDNPMayStore,

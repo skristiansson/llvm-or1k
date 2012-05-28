@@ -59,6 +59,11 @@ static cl::opt<bool> EnablePRE("enable-pre",
                                cl::init(true), cl::Hidden);
 static cl::opt<bool> EnableLoadPRE("enable-load-pre", cl::init(true));
 
+// Maximum allowed recursion depth.
+static cl::opt<uint32_t>
+MaxRecurseDepth("max-recurse-depth", cl::Hidden, cl::init(1000), cl::ZeroOrMore,
+                cl::desc("Max recurse depth (default = 1000)"));
+
 //===----------------------------------------------------------------------===//
 //                         ValueTable Class
 //===----------------------------------------------------------------------===//
@@ -552,12 +557,12 @@ namespace {
     }
     
     /// removeFromLeaderTable - Scan the list of values corresponding to a given
-    /// value number, and remove the given value if encountered.
-    void removeFromLeaderTable(uint32_t N, Value *V, BasicBlock *BB) {
+    /// value number, and remove the given instruction if encountered.
+    void removeFromLeaderTable(uint32_t N, Instruction *I, BasicBlock *BB) {
       LeaderTableEntry* Prev = 0;
       LeaderTableEntry* Curr = &LeaderTable[N];
 
-      while (Curr->Val != V || Curr->BB != BB) {
+      while (Curr->Val != I || Curr->BB != BB) {
         Prev = Curr;
         Curr = Curr->Next;
       }
@@ -647,7 +652,11 @@ void GVN::dump(DenseMap<uint32_t, Value*>& d) {
 ///   3) we are speculating for this block and have used that to speculate for
 ///      other blocks.
 static bool IsValueFullyAvailableInBlock(BasicBlock *BB,
-                            DenseMap<BasicBlock*, char> &FullyAvailableBlocks) {
+                            DenseMap<BasicBlock*, char> &FullyAvailableBlocks,
+                            uint32_t RecurseDepth) {
+  if (RecurseDepth > MaxRecurseDepth)
+    return false;
+
   // Optimistically assume that the block is fully available and check to see
   // if we already know about this block in one lookup.
   std::pair<DenseMap<BasicBlock*, char>::iterator, char> IV =
@@ -673,7 +682,7 @@ static bool IsValueFullyAvailableInBlock(BasicBlock *BB,
     // If the value isn't fully available in one of our predecessors, then it
     // isn't fully available in this block either.  Undo our previous
     // optimistic assumption and bail out.
-    if (!IsValueFullyAvailableInBlock(*PI, FullyAvailableBlocks))
+    if (!IsValueFullyAvailableInBlock(*PI, FullyAvailableBlocks,RecurseDepth+1))
       goto SpeculationFailure;
 
   return true;
@@ -1570,7 +1579,7 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
   for (pred_iterator PI = pred_begin(LoadBB), E = pred_end(LoadBB);
        PI != E; ++PI) {
     BasicBlock *Pred = *PI;
-    if (IsValueFullyAvailableInBlock(Pred, FullyAvailableBlocks)) {
+    if (IsValueFullyAvailableInBlock(Pred, FullyAvailableBlocks, 0)) {
       continue;
     }
     PredLoads[Pred] = 0;
@@ -2012,9 +2021,15 @@ bool GVN::propagateEquality(Value *LHS, Value *RHS, BasicBlock *Root) {
             DT->properlyDominates(cast<Instruction>(RHS)->getParent(), Root)) &&
            "Instruction doesn't dominate scope!");
 
-    // If value numbering later deduces that an instruction in the scope is equal
-    // to 'LHS' then ensure it will be turned into 'RHS'.
-    addToLeaderTable(LVN, RHS, Root);
+    // If value numbering later sees that an instruction in the scope is equal
+    // to 'LHS' then ensure it will be turned into 'RHS'.  In order to preserve
+    // the invariant that instructions only occur in the leader table for their
+    // own value number (this is used by removeFromLeaderTable), do not do this
+    // if RHS is an instruction (if an instruction in the scope is morphed into
+    // LHS then it will be turned into RHS by the next GVN iteration anyway, so
+    // using the leader table is about compiling faster, not optimizing better).
+    if (!isa<Instruction>(RHS))
+      addToLeaderTable(LVN, RHS, Root);
 
     // Replace all occurrences of 'LHS' with 'RHS' everywhere in the scope.  As
     // LHS always has at least one use that is not dominated by Root, this will

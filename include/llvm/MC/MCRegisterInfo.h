@@ -106,10 +106,10 @@ public:
 /// of AX.
 ///
 struct MCRegisterDesc {
-  const char *Name;         // Printable name for the reg (for debugging)
-  uint32_t   Overlaps;      // Overlapping registers, described above
-  uint32_t   SubRegs;       // Sub-register set, described above
-  uint32_t   SuperRegs;     // Super-register set, described above
+  uint32_t Name;      // Printable name for the reg (for debugging)
+  uint32_t Overlaps;  // Overlapping registers, described above
+  uint32_t SubRegs;   // Sub-register set, described above
+  uint32_t SuperRegs; // Super-register set, described above
 };
 
 /// MCRegisterInfo base class - We assume that the target defines a static
@@ -143,9 +143,12 @@ private:
   const MCRegisterClass *Classes;             // Pointer to the regclass array
   unsigned NumClasses;                        // Number of entries in the array
   const uint16_t *RegLists;                   // Pointer to the reglists array
+  const char *RegStrings;                     // Pointer to the string table.
   const uint16_t *SubRegIndices;              // Pointer to the subreg lookup
                                               // array.
   unsigned NumSubRegIndices;                  // Number of subreg indices.
+  const uint16_t *RegEncodingTable;           // Pointer to array of register
+                                              // encodings.
 
   unsigned L2DwarfRegsSize;
   unsigned EHL2DwarfRegsSize;
@@ -163,16 +166,20 @@ public:
   void InitMCRegisterInfo(const MCRegisterDesc *D, unsigned NR, unsigned RA,
                           const MCRegisterClass *C, unsigned NC,
                           const uint16_t *RL,
+                          const char *Strings,
                           const uint16_t *SubIndices,
-                          unsigned NumIndices) {
+                          unsigned NumIndices,
+                          const uint16_t *RET) {
     Desc = D;
     NumRegs = NR;
     RAReg = RA;
     Classes = C;
     RegLists = RL;
+    RegStrings = Strings;
     NumClasses = NC;
     SubRegIndices = SubIndices;
     NumSubRegIndices = NumIndices;
+    RegEncodingTable = RET;
   }
 
   /// mapLLVMRegsToDwarfRegs - Used to initialize LLVM register to Dwarf
@@ -297,7 +304,7 @@ public:
   /// getName - Return the human-readable symbolic target-specific name for the
   /// specified physical register.
   const char *getName(unsigned RegNo) const {
-    return get(RegNo).Name;
+    return RegStrings + get(RegNo).Name;
   }
 
   /// getNumRegs - Return the number of registers this target has (useful for
@@ -354,6 +361,14 @@ public:
     assert(i < getNumRegClasses() && "Register Class ID out of range");
     return Classes[i];
   }
+
+   /// getEncodingValue - Returns the encoding for RegNo
+  uint16_t getEncodingValue(unsigned RegNo) const {
+    assert(RegNo < NumRegs &&
+           "Attempting to get encoding for invalid register number!");
+    return RegEncodingTable[RegNo];
+  }
+
 };
 
 } // End llvm namespace

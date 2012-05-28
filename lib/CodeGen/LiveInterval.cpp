@@ -353,18 +353,6 @@ void LiveInterval::removeValNo(VNInfo *ValNo) {
   markValNoForDeletion(ValNo);
 }
 
-/// findDefinedVNInfo - Find the VNInfo defined by the specified
-/// index (register interval).
-VNInfo *LiveInterval::findDefinedVNInfoForRegInt(SlotIndex Idx) const {
-  for (LiveInterval::const_vni_iterator i = vni_begin(), e = vni_end();
-       i != e; ++i) {
-    if ((*i)->def == Idx)
-      return *i;
-  }
-
-  return 0;
-}
-
 /// join - Join two live intervals (this, and other) together.  This applies
 /// mappings to the value numbers in the LHS/RHS intervals as specified.  If
 /// the intervals are not joinable, this aborts.
@@ -448,8 +436,6 @@ void LiveInterval::join(LiveInterval &Other,
     assert(I->valno && "Adding a dead range?");
     InsertPos = addRangeFrom(*I, InsertPos);
   }
-
-  ComputeJoinedWeight(Other);
 }
 
 /// MergeRangesInAsValue - Merge all of the intervals in RHS into this live
@@ -578,29 +564,6 @@ unsigned LiveInterval::getSize() const {
   return Sum;
 }
 
-/// ComputeJoinedWeight - Set the weight of a live interval Joined
-/// after Other has been merged into it.
-void LiveInterval::ComputeJoinedWeight(const LiveInterval &Other) {
-  // If either of these intervals was spilled, the weight is the
-  // weight of the non-spilled interval.  This can only happen with
-  // iterative coalescers.
-
-  if (Other.weight != HUGE_VALF) {
-    weight += Other.weight;
-  }
-  else if (weight == HUGE_VALF &&
-      !TargetRegisterInfo::isPhysicalRegister(reg)) {
-    // Remove this assert if you have an iterative coalescer
-    assert(0 && "Joining to spilled interval");
-    weight = Other.weight;
-  }
-  else {
-    // Otherwise the weight stays the same
-    // Remove this assert if you have an iterative coalescer
-    assert(0 && "Joining from spilled interval");
-  }
-}
-
 raw_ostream& llvm::operator<<(raw_ostream& os, const LiveRange &LR) {
   return os << '[' << LR.start << ',' << LR.end << ':' << LR.valno->id << ")";
 }
@@ -718,7 +681,10 @@ void ConnectedVNInfoEqClasses::Distribute(LiveInterval *LIV[],
     SlotIndex Idx = LIS.getInstructionIndex(MI);
     Idx = Idx.getRegSlot(MO.isUse());
     const VNInfo *VNI = LI.getVNInfoAt(Idx);
-    assert(VNI && "Interval not live at use.");
+    // FIXME: We should be able to assert(VNI) here, but the coalescer leaves
+    // dangling defs around.
+    if (!VNI)
+      continue;
     MO.setReg(LIV[getEqClass(VNI)]->reg);
   }
 

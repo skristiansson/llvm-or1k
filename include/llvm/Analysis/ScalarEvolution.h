@@ -30,7 +30,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ConstantRange.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include <map>
 
 namespace llvm {
@@ -140,7 +140,7 @@ namespace llvm {
       ID = X.FastID;
     }
     static bool Equals(const SCEV &X, const FoldingSetNodeID &ID,
-                       FoldingSetNodeID &TempID) {
+                       unsigned IDHash, FoldingSetNodeID &TempID) {
       return ID == X.FastID;
     }
     static unsigned ComputeHash(const SCEV &X, FoldingSetNodeID &TempID) {
@@ -249,6 +249,9 @@ namespace llvm {
     /// ValueExprMap - This is a cache of the values we have analyzed so far.
     ///
     ValueExprMapType ValueExprMap;
+
+    /// Mark predicate values currently being processed by isImpliedCond.
+    DenseSet<Value*> PendingLoopPredicates;
 
     /// ExitLimit - Information about the number of loop iterations for
     /// which a loop exit's branch condition evaluates to the not-taken path.

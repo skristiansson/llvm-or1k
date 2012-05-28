@@ -175,8 +175,13 @@ namespace llvm {
       /// PSIGN - Copy integer sign.
       PSIGN,
 
-      /// BLEND family of opcodes
+      /// BLENDV - Blend where the selector is an XMM.
       BLENDV,
+
+      /// BLENDxx - Blend where the selector is an immediate.
+      BLENDPW,
+      BLENDPS,
+      BLENDPD,
 
       /// HADD - Integer horizontal add.
       HADD,
@@ -280,6 +285,8 @@ namespace llvm {
       UNPCKL,
       UNPCKH,
       VPERMILP,
+      VPERMV,
+      VPERMI,
       VPERM2X128,
       VBROADCAST,
 
@@ -307,6 +314,12 @@ namespace llvm {
       MFENCE,
       SFENCE,
       LFENCE,
+
+      // FNSTSW16r - Store FP status word into i16 register.
+      FNSTSW16r,
+
+      // SAHF - Store contents of %ah into %eflags.
+      SAHF,
 
       // ATOMADD64_DAG, ATOMSUB64_DAG, ATOMOR64_DAG, ATOMAND64_DAG,
       // ATOMXOR64_DAG, ATOMNAND64_DAG, ATOMSWAP64_DAG -
@@ -790,12 +803,7 @@ namespace llvm {
                            DebugLoc dl, SelectionDAG &DAG,
                            SmallVectorImpl<SDValue> &InVals) const;
     virtual SDValue
-      LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
-                bool isVarArg, bool doesNotRet, bool &isTailCall,
-                const SmallVectorImpl<ISD::OutputArg> &Outs,
-                const SmallVectorImpl<SDValue> &OutVals,
-                const SmallVectorImpl<ISD::InputArg> &Ins,
-                DebugLoc dl, SelectionDAG &DAG,
+      LowerCall(CallLoweringInfo &CLI,
                 SmallVectorImpl<SDValue> &InVals) const;
 
     virtual SDValue
@@ -805,7 +813,7 @@ namespace llvm {
                   const SmallVectorImpl<SDValue> &OutVals,
                   DebugLoc dl, SelectionDAG &DAG) const;
 
-    virtual bool isUsedByReturnOnly(SDNode *N) const;
+    virtual bool isUsedByReturnOnly(SDNode *N, SDValue &Chain) const;
 
     virtual bool mayBeEmittedAsTailCall(CallInst *CI) const;
 
@@ -850,7 +858,7 @@ namespace llvm {
                                                     unsigned notOpc,
                                                     unsigned EAXreg,
                                               const TargetRegisterClass *RC,
-                                                    bool invSrc = false) const;
+                                                    bool Invert = false) const;
 
     MachineBasicBlock *EmitAtomicBit6432WithCustomInserter(
                                                     MachineInstr *BInstr,
@@ -859,7 +867,7 @@ namespace llvm {
                                                     unsigned regOpcH,
                                                     unsigned immOpcL,
                                                     unsigned immOpcH,
-                                                    bool invSrc = false) const;
+                                                    bool Invert = false) const;
 
     /// Utility function to emit atomic min and max.  It takes the min/max
     /// instruction to expand, the associated basic block, and the associated
@@ -902,6 +910,9 @@ namespace llvm {
     /// equivalent, for use with the given x86 condition code.
     SDValue EmitCmp(SDValue Op0, SDValue Op1, unsigned X86CC,
                     SelectionDAG &DAG) const;
+
+    /// Convert a comparison if required by the subtarget.
+    SDValue ConvertCmpIfNecessary(SDValue Cmp, SelectionDAG &DAG) const;
   };
 
   namespace X86 {

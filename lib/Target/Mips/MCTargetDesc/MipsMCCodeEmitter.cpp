@@ -91,6 +91,7 @@ public:
 }  // namespace
 
 MCCodeEmitter *llvm::createMipsMCCodeEmitterEB(const MCInstrInfo &MCII,
+                                               const MCRegisterInfo &MRI,
                                                const MCSubtargetInfo &STI,
                                                MCContext &Ctx)
 {
@@ -98,6 +99,7 @@ MCCodeEmitter *llvm::createMipsMCCodeEmitterEB(const MCInstrInfo &MCII,
 }
 
 MCCodeEmitter *llvm::createMipsMCCodeEmitterEL(const MCInstrInfo &MCII,
+                                               const MCRegisterInfo &MRI,
                                                const MCSubtargetInfo &STI,
                                                MCContext &Ctx)
 {
@@ -194,7 +196,7 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
 
   assert (Kind == MCExpr::SymbolRef);
     
-  Mips::Fixups FixupKind;
+  Mips::Fixups FixupKind = Mips::Fixups(0);
 
   switch(cast<MCSymbolRefExpr>(Expr)->getKind()) {
   case MCSymbolRefExpr::VK_Mips_GPREL:

@@ -47,11 +47,6 @@
 #include "llvm/Target/TargetOptions.h"
 using namespace llvm;
 
-static cl::opt<bool>
-DisableARMFastISel("disable-arm-fast-isel",
-                    cl::desc("Turn off experimental ARM fast-isel support"),
-                    cl::init(false), cl::Hidden);
-
 extern cl::opt<bool> EnableARMLongCalls;
 
 namespace {
@@ -719,7 +714,7 @@ unsigned ARMFastISel::TargetMaterializeAlloca(const AllocaInst *AI) {
   if (!FuncInfo.StaticAllocaMap.count(AI)) return 0;
 
   MVT VT;
-  if (!isLoadTypeLegal(AI->getType(), VT)) return false;
+  if (!isLoadTypeLegal(AI->getType(), VT)) return 0;
 
   DenseMap<const AllocaInst*, int>::iterator SI =
     FuncInfo.StaticAllocaMap.find(AI);
@@ -910,8 +905,9 @@ void ARMFastISel::ARMSimplifyAddress(Address &Addr, EVT VT, bool useAM3) {
   // put the alloca address into a register, set the base type back to
   // register and continue. This should almost never happen.
   if (needsLowering && Addr.BaseType == Address::FrameIndexBase) {
-    const TargetRegisterClass *RC = isThumb2 ? ARM::tGPRRegisterClass
-                                             : ARM::GPRRegisterClass;
+    const TargetRegisterClass *RC = isThumb2 ?
+      (const TargetRegisterClass*)&ARM::tGPRRegClass :
+      (const TargetRegisterClass*)&ARM::GPRRegClass;
     unsigned ResultReg = createResultReg(RC);
     unsigned Opc = isThumb2 ? ARM::t2ADDri : ARM::ADDri;
     AddOptionalDefs(BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL,
@@ -1005,7 +1001,7 @@ bool ARMFastISel::ARMEmitLoad(EVT VT, unsigned &ResultReg, Address &Addr,
           useAM3 = true;
         }
       }
-      RC = ARM::GPRRegisterClass;
+      RC = &ARM::GPRRegClass;
       break;
     case MVT::i16:
       if (isThumb2) {
@@ -1017,7 +1013,7 @@ bool ARMFastISel::ARMEmitLoad(EVT VT, unsigned &ResultReg, Address &Addr,
         Opc = isZExt ? ARM::LDRH : ARM::LDRSH;
         useAM3 = true;
       }
-      RC = ARM::GPRRegisterClass;
+      RC = &ARM::GPRRegClass;
       break;
     case MVT::i32:
       if (isThumb2) {
@@ -1028,7 +1024,7 @@ bool ARMFastISel::ARMEmitLoad(EVT VT, unsigned &ResultReg, Address &Addr,
       } else {
         Opc = ARM::LDRi12;
       }
-      RC = ARM::GPRRegisterClass;
+      RC = &ARM::GPRRegClass;
       break;
     case MVT::f32:
       if (!Subtarget->hasVFP2()) return false;
@@ -1037,7 +1033,7 @@ bool ARMFastISel::ARMEmitLoad(EVT VT, unsigned &ResultReg, Address &Addr,
         needVMOV = true;
         VT = MVT::i32;
         Opc = isThumb2 ? ARM::t2LDRi12 : ARM::LDRi12;
-        RC = ARM::GPRRegisterClass;
+        RC = &ARM::GPRRegClass;
       } else {
         Opc = ARM::VLDRS;
         RC = TLI.getRegClassFor(VT);
@@ -1106,8 +1102,9 @@ bool ARMFastISel::ARMEmitStore(EVT VT, unsigned SrcReg, Address &Addr,
     // This is mostly going to be Neon/vector support.
     default: return false;
     case MVT::i1: {
-      unsigned Res = createResultReg(isThumb2 ? ARM::tGPRRegisterClass :
-                                               ARM::GPRRegisterClass);
+      unsigned Res = createResultReg(isThumb2 ?
+        (const TargetRegisterClass*)&ARM::tGPRRegClass :
+        (const TargetRegisterClass*)&ARM::GPRRegClass);
       unsigned Opc = isThumb2 ? ARM::t2ANDri : ARM::ANDri;
       AddOptionalDefs(BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL,
                               TII.get(Opc), Res)
@@ -1491,8 +1488,9 @@ bool ARMFastISel::SelectCmp(const Instruction *I) {
   // Now set a register based on the comparison. Explicitly set the predicates
   // here.
   unsigned MovCCOpc = isThumb2 ? ARM::t2MOVCCi : ARM::MOVCCi;
-  const TargetRegisterClass *RC = isThumb2 ? ARM::rGPRRegisterClass
-                                           : ARM::GPRRegisterClass;
+  const TargetRegisterClass *RC = isThumb2 ?
+    (const TargetRegisterClass*)&ARM::rGPRRegClass :
+    (const TargetRegisterClass*)&ARM::GPRRegClass;
   unsigned DestReg = createResultReg(RC);
   Constant *Zero = ConstantInt::get(Type::getInt32Ty(*Context), 0);
   unsigned ZeroReg = TargetMaterializeConstant(Zero);
@@ -1516,7 +1514,7 @@ bool ARMFastISel::SelectFPExt(const Instruction *I) {
   unsigned Op = getRegForValue(V);
   if (Op == 0) return false;
 
-  unsigned Result = createResultReg(ARM::DPRRegisterClass);
+  unsigned Result = createResultReg(&ARM::DPRRegClass);
   AddOptionalDefs(BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL,
                           TII.get(ARM::VCVTDS), Result)
                   .addReg(Op));
@@ -1535,7 +1533,7 @@ bool ARMFastISel::SelectFPTrunc(const Instruction *I) {
   unsigned Op = getRegForValue(V);
   if (Op == 0) return false;
 
-  unsigned Result = createResultReg(ARM::SPRRegisterClass);
+  unsigned Result = createResultReg(&ARM::SPRRegClass);
   AddOptionalDefs(BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL,
                           TII.get(ARM::VCVTSD), Result)
                   .addReg(Op));
@@ -2111,11 +2109,7 @@ bool ARMFastISel::SelectRet(const Instruction *I) {
 }
 
 unsigned ARMFastISel::ARMSelectCallOp(const GlobalValue *GV) {
-  if (isThumb2) {
-    return ARM::tBL;
-  } else  {
-    return ARM::BL;
-  }
+  return isThumb2 ? ARM::tBL : ARM::BL;
 }
 
 // A quick function that will emit a call for a named libcall in F with the
@@ -2138,6 +2132,15 @@ bool ARMFastISel::ARMEmitLibcall(const Instruction *I, RTLIB::Libcall Call) {
 
   // TODO: For now if we have long calls specified we don't handle the call.
   if (EnableARMLongCalls) return false;
+
+  // Can't handle non-double multi-reg retvals.
+  if (RetVT != MVT::isVoid && RetVT != MVT::i32) {  
+    SmallVector<CCValAssign, 16> RVLocs;
+    CCState CCInfo(CC, false, *FuncInfo.MF, TM, RVLocs, *Context);
+    CCInfo.AnalyzeCallResult(RetVT, CCAssignFnForCall(CC, true));
+    if (RVLocs.size() >= 2 && RetVT != MVT::f64)
+      return false;
+  }
 
   // Set up the argument vectors.
   SmallVector<Value*, 8> Args;
@@ -2213,11 +2216,6 @@ bool ARMFastISel::SelectCall(const Instruction *I,
   // Can't handle inline asm.
   if (isa<InlineAsm>(Callee)) return false;
 
-  // Only handle global variable Callees.
-  const GlobalValue *GV = dyn_cast<GlobalValue>(Callee);
-  if (!GV)
-    return false;
-
   // Check the calling convention.
   ImmutableCallSite CS(CI);
   CallingConv::ID CC = CS.getCallingConv();
@@ -2241,6 +2239,16 @@ bool ARMFastISel::SelectCall(const Instruction *I,
 
   // TODO: For now if we have long calls specified we don't handle the call.
   if (EnableARMLongCalls) return false;
+
+  // Can't handle non-double multi-reg retvals.
+  if (RetVT != MVT::isVoid && RetVT != MVT::i1 && RetVT != MVT::i8 &&
+      RetVT != MVT::i16 && RetVT != MVT::i32) {
+    SmallVector<CCValAssign, 16> RVLocs;
+    CCState CCInfo(CC, false, *FuncInfo.MF, TM, RVLocs, *Context);
+    CCInfo.AnalyzeCallResult(RetVT, CCAssignFnForCall(CC, true));
+    if (RVLocs.size() >= 2 && RetVT != MVT::f64)
+      return false;
+  }
 
   // Set up the argument vectors.
   SmallVector<Value*, 8> Args;
@@ -2300,18 +2308,33 @@ bool ARMFastISel::SelectCall(const Instruction *I,
 
   // Issue the call.
   MachineInstrBuilder MIB;
+  const GlobalValue *GV = dyn_cast<GlobalValue>(Callee);
   unsigned CallOpc = ARMSelectCallOp(GV);
+  unsigned CalleeReg = 0;
+
+  if (!GV){
+    CallOpc = isThumb2 ? ARM::tBLXr : ARM::BLX;
+    CalleeReg = getRegForValue(Callee);
+    if (CalleeReg == 0) return false;
+  }
+
   // Explicitly adding the predicate here.
   if(isThumb2) {
     // Explicitly adding the predicate here.
     MIB = AddDefaultPred(BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL,
                                  TII.get(CallOpc)));
-    if (!IntrMemName)
+    if (!GV)
+      MIB.addReg(CalleeReg);
+    else if (!IntrMemName)
       MIB.addGlobalAddress(GV, 0, 0);
     else 
       MIB.addExternalSymbol(IntrMemName, 0);
   } else {
-    if (!IntrMemName)
+    if (!GV)
+      MIB = AddDefaultPred(BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL,
+                                   TII.get(CallOpc))
+            .addReg(CalleeReg));
+    else if (!IntrMemName)
       // Explicitly adding the predicate here.
       MIB = AddDefaultPred(BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL,
                                    TII.get(CallOpc))
@@ -2429,6 +2452,10 @@ bool ARMFastISel::SelectIntrinsicCall(const IntrinsicInst &I) {
       return false;
     
     return SelectCall(&I, "memset");
+  }
+  case Intrinsic::trap: {
+    BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL, TII.get(ARM::TRAP));
+    return true;
   }
   }
 }
@@ -2640,8 +2667,7 @@ namespace llvm {
 
     // Darwin and thumb1 only for now.
     const ARMSubtarget *Subtarget = &TM.getSubtarget<ARMSubtarget>();
-    if (Subtarget->isTargetIOS() && !Subtarget->isThumb1Only() &&
-        !DisableARMFastISel)
+    if (Subtarget->isTargetIOS() && !Subtarget->isThumb1Only())
       return new ARMFastISel(funcInfo);
     return 0;
   }

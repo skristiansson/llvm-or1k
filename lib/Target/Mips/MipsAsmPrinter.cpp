@@ -112,37 +112,6 @@ void MipsAsmPrinter::EmitInstruction(const MachineInstr *MI) {
 
     return;
   }
-  case Mips::CPRESTORE: {
-    const MachineOperand &MO = MI->getOperand(0);
-    assert(MO.isImm() && "CPRESTORE's operand must be an immediate.");
-    int64_t Offset = MO.getImm();
-
-    if (OutStreamer.hasRawTextSupport()) {
-      if (!isInt<16>(Offset)) {
-        EmitInstrWithMacroNoAT(MI);
-        return;
-      }
-    } else {
-      MCInstLowering.LowerCPRESTORE(Offset, MCInsts);
-
-      for (SmallVector<MCInst, 4>::iterator I = MCInsts.begin();
-           I != MCInsts.end(); ++I)
-        OutStreamer.EmitInstruction(*I);
-
-      return;
-    }
-
-    break;
-  }
-  case Mips::SETGP01: {
-    MCInstLowering.LowerSETGP01(MI, MCInsts);
-
-    for (SmallVector<MCInst, 4>::iterator I = MCInsts.begin();
-         I != MCInsts.end(); ++I)
-      OutStreamer.EmitInstruction(*I);
-
-    return;
-  }
   default:
     break;
   }
@@ -197,9 +166,9 @@ void MipsAsmPrinter::printSavedRegsBitmask(raw_ostream &O) {
   const MachineFrameInfo *MFI = MF->getFrameInfo();
   const std::vector<CalleeSavedInfo> &CSI = MFI->getCalleeSavedInfo();
   // size of stack area to which FP callee-saved regs are saved.
-  unsigned CPURegSize = Mips::CPURegsRegisterClass->getSize();
-  unsigned FGR32RegSize = Mips::FGR32RegisterClass->getSize();
-  unsigned AFGR64RegSize = Mips::AFGR64RegisterClass->getSize();
+  unsigned CPURegSize = Mips::CPURegsRegClass.getSize();
+  unsigned FGR32RegSize = Mips::FGR32RegClass.getSize();
+  unsigned AFGR64RegSize = Mips::AFGR64RegClass.getSize();
   bool HasAFGR64Reg = false;
   unsigned CSFPRegsSize = 0;
   unsigned i, e = CSI.size();
@@ -207,11 +176,11 @@ void MipsAsmPrinter::printSavedRegsBitmask(raw_ostream &O) {
   // Set FPU Bitmask.
   for (i = 0; i != e; ++i) {
     unsigned Reg = CSI[i].getReg();
-    if (Mips::CPURegsRegisterClass->contains(Reg))
+    if (Mips::CPURegsRegClass.contains(Reg))
       break;
 
     unsigned RegNum = getMipsRegisterNumbering(Reg);
-    if (Mips::AFGR64RegisterClass->contains(Reg)) {
+    if (Mips::AFGR64RegClass.contains(Reg)) {
       FPUBitmask |= (3 << RegNum);
       CSFPRegsSize += AFGR64RegSize;
       HasAFGR64Reg = true;
@@ -283,8 +252,14 @@ const char *MipsAsmPrinter::getCurrentABIString() const {
 }
 
 void MipsAsmPrinter::EmitFunctionEntryLabel() {
-  if (OutStreamer.hasRawTextSupport())
+  if (OutStreamer.hasRawTextSupport()) {
+    if (Subtarget->inMips16Mode())
+      OutStreamer.EmitRawText(StringRef("\t.set\tmips16"));
+    else
+      OutStreamer.EmitRawText(StringRef("\t.set\tnomips16"));
+    OutStreamer.EmitRawText(StringRef("\t.set\tnomicromips"));
     OutStreamer.EmitRawText("\t.ent\t" + Twine(CurrentFnSym->getName()));
+  }
   OutStreamer.EmitLabel(CurrentFnSym);
 }
 
@@ -295,10 +270,6 @@ void MipsAsmPrinter::EmitFunctionBodyStart() {
 
   emitFrameDirective();
 
-  bool EmitCPLoad = (MF->getTarget().getRelocationModel() == Reloc::PIC_) &&
-    Subtarget->isABI_O32() && MipsFI->globalBaseRegSet() &&
-    MipsFI->globalBaseRegFixed();
-
   if (OutStreamer.hasRawTextSupport()) {
     SmallString<128> Str;
     raw_svector_ostream OS(Str);
@@ -306,17 +277,15 @@ void MipsAsmPrinter::EmitFunctionBodyStart() {
     OutStreamer.EmitRawText(OS.str());
 
     OutStreamer.EmitRawText(StringRef("\t.set\tnoreorder"));
-
-    // Emit .cpload directive if needed.
-    if (EmitCPLoad)
-      OutStreamer.EmitRawText(StringRef("\t.cpload\t$25"));
-
     OutStreamer.EmitRawText(StringRef("\t.set\tnomacro"));
     if (MipsFI->getEmitNOAT())
       OutStreamer.EmitRawText(StringRef("\t.set\tnoat"));
-  } else if (EmitCPLoad) {
+  }
+
+  if ((MF->getTarget().getRelocationModel() == Reloc::PIC_) &&
+      Subtarget->isABI_O32() && MipsFI->globalBaseRegSet()) {
     SmallVector<MCInst, 4> MCInsts;
-    MCInstLowering.LowerCPLOAD(MCInsts);
+    MCInstLowering.LowerSETGP01(MCInsts);
     for (SmallVector<MCInst, 4>::iterator I = MCInsts.begin();
          I != MCInsts.end(); ++I)
       OutStreamer.EmitInstruction(*I);
@@ -382,14 +351,36 @@ bool MipsAsmPrinter::isBlockOnlyReachableByFallthrough(const MachineBasicBlock*
 }
 
 // Print out an operand for an inline asm expression.
-bool MipsAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
+bool MipsAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNum,
                                      unsigned AsmVariant,const char *ExtraCode,
                                      raw_ostream &O) {
   // Does this asm operand have a single letter operand modifier?
-  if (ExtraCode && ExtraCode[0])
-    return true; // Unknown modifier.
+  if (ExtraCode && ExtraCode[0]) {
+    if (ExtraCode[1] != 0) return true; // Unknown modifier.
 
-  printOperand(MI, OpNo, O);
+    const MachineOperand &MO = MI->getOperand(OpNum);
+    switch (ExtraCode[0]) {
+    default:
+      return true;  // Unknown modifier.
+    case 'X': // hex const int
+      if ((MO.getType()) != MachineOperand::MO_Immediate)
+        return true;
+      O << "0x" << StringRef(utohexstr(MO.getImm())).lower();
+      return false;
+    case 'x': // hex const int (low 16 bits)
+      if ((MO.getType()) != MachineOperand::MO_Immediate)
+        return true;
+      O << "0x" << StringRef(utohexstr(MO.getImm() & 0xffff)).lower();
+      return false;
+    case 'd': // decimal const int
+      if ((MO.getType()) != MachineOperand::MO_Immediate)
+        return true;
+      O << MO.getImm();
+      return false;
+    }
+  }
+
+  printOperand(MI, OpNum, O);
   return false;
 }
 

@@ -209,12 +209,12 @@ void ARMInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   } else {
     assert(Op.isExpr() && "unknown operand kind in printOperand");
     // If a symbolic branch target was added as a constant expression then print
-    // that address in hex.
+    // that address in hex. And only print 32 unsigned bits for the address.
     const MCConstantExpr *BranchTarget = dyn_cast<MCConstantExpr>(Op.getExpr());
     int64_t Address;
     if (BranchTarget && BranchTarget->EvaluateAsAbsolute(Address)) {
       O << "0x";
-      O.write_hex(Address);
+      O.write_hex((uint32_t)Address);
     }
     else {
       // Otherwise, just print the expression.
@@ -426,9 +426,13 @@ void ARMInstPrinter::printAM3PreOrOffsetIndexOp(const MCInst *MI, unsigned Op,
     return;
   }
 
-  if (unsigned ImmOffs = ARM_AM::getAM3Offset(MO3.getImm()))
+  //If the op is sub we have to print the immediate even if it is 0 
+  unsigned ImmOffs = ARM_AM::getAM3Offset(MO3.getImm());
+  ARM_AM::AddrOpc op = ARM_AM::getAM3Op(MO3.getImm());
+ 
+  if (ImmOffs || (op == ARM_AM::sub))
     O << ", #"
-      << ARM_AM::getAddrOpcStr(ARM_AM::getAM3Op(MO3.getImm()))
+      << ARM_AM::getAddrOpcStr(op)
       << ImmOffs;
   O << ']';
 }
@@ -643,12 +647,30 @@ void ARMInstPrinter::printMSRMaskOperand(const MCInst *MI, unsigned OpNum,
   unsigned Mask = Op.getImm() & 0xf;
 
   if (getAvailableFeatures() & ARM::FeatureMClass) {
-    switch (Op.getImm()) {
+    unsigned SYSm = Op.getImm();
+    unsigned Opcode = MI->getOpcode();
+    // For reads of the special registers ignore the "mask encoding" bits
+    // which are only for writes.
+    if (Opcode == ARM::t2MRS_M)
+      SYSm &= 0xff;
+    switch (SYSm) {
     default: llvm_unreachable("Unexpected mask value!");
-    case 0: O << "apsr"; return;
-    case 1: O << "iapsr"; return;
-    case 2: O << "eapsr"; return;
-    case 3: O << "xpsr"; return;
+    case     0:
+    case 0x800: O << "apsr"; return; // with _nzcvq bits is an alias for aspr
+    case 0x400: O << "apsr_g"; return;
+    case 0xc00: O << "apsr_nzcvqg"; return;
+    case     1:
+    case 0x801: O << "iapsr"; return; // with _nzcvq bits is an alias for iapsr
+    case 0x401: O << "iapsr_g"; return;
+    case 0xc01: O << "iapsr_nzcvqg"; return;
+    case     2:
+    case 0x802: O << "eapsr"; return; // with _nzcvq bits is an alias for eapsr
+    case 0x402: O << "eapsr_g"; return;
+    case 0xc02: O << "eapsr_nzcvqg"; return;
+    case     3:
+    case 0x803: O << "xpsr"; return; // with _nzcvq bits is an alias for xpsr
+    case 0x403: O << "xpsr_g"; return;
+    case 0xc03: O << "xpsr_nzcvqg"; return;
     case 5: O << "ipsr"; return;
     case 6: O << "epsr"; return;
     case 7: O << "iepsr"; return;
@@ -754,7 +776,8 @@ void ARMInstPrinter::printThumbITMask(const MCInst *MI, unsigned OpNum,
                                       raw_ostream &O) {
   // (3 - the number of trailing zeros) is the number of then / else.
   unsigned Mask = MI->getOperand(OpNum).getImm();
-  unsigned CondBit0 = Mask >> 4 & 1;
+  unsigned Firstcond = MI->getOperand(OpNum-1).getImm();
+  unsigned CondBit0 = Firstcond & 1;
   unsigned NumTZ = CountTrailingZeros_32(Mask);
   assert(NumTZ <= 3 && "Invalid IT mask!");
   for (unsigned Pos = 3, e = NumTZ; Pos > e; --Pos) {

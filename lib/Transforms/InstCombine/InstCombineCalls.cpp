@@ -172,7 +172,7 @@ Instruction *InstCombiner::SimplifyMemSet(MemSetInst *MI) {
 Instruction *InstCombiner::visitCallInst(CallInst &CI) {
   if (isFreeCall(&CI))
     return visitFree(CI);
-  if (isMalloc(&CI))
+  if (extractMallocCall(&CI) || extractCallocCall(&CI))
     return visitMalloc(CI);
 
   // If the caller function is nounwind, mark the call as nounwind, even if the
@@ -247,7 +247,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
   default: break;
   case Intrinsic::objectsize: {
     // We need target data for just about everything so depend on it.
-    if (!TD) break;
+    if (!TD) return 0;
 
     Type *ReturnTy = CI.getType();
     uint64_t DontKnow = II->getArgOperand(1) == Builder->getTrue() ? 0 : -1ULL;
@@ -260,7 +260,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
 
     // Try to look through constant GEPs.
     if (GEPOperator *GEP = dyn_cast<GEPOperator>(Op1)) {
-      if (!GEP->hasAllConstantIndices()) break;
+      if (!GEP->hasAllConstantIndices()) return 0;
 
       // Get the current byte offset into the thing. Use the original
       // operand in case we're looking through a bitcast.
@@ -274,7 +274,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
       // Make sure we're not a constant offset from an external
       // global.
       if (GlobalVariable *GV = dyn_cast<GlobalVariable>(Op1))
-        if (!GV->hasDefinitiveInitializer()) break;
+        if (!GV->hasDefinitiveInitializer()) return 0;
     }
 
     // If we've stripped down to a single global variable that we
@@ -294,23 +294,29 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
         Size = TD->getTypeAllocSize(AI->getAllocatedType());
         if (AI->isArrayAllocation()) {
           const ConstantInt *C = dyn_cast<ConstantInt>(AI->getArraySize());
-          if (!C) break;
+          if (!C) return 0;
           Size *= C->getZExtValue();
         }
       }
     } else if (CallInst *MI = extractMallocCall(Op1)) {
       // Get allocation size.
-      Type* MallocType = getMallocAllocatedType(MI);
-      if (MallocType && MallocType->isSized())
-        if (Value *NElems = getMallocArraySize(MI, TD, true))
-          if (ConstantInt *NElements = dyn_cast<ConstantInt>(NElems))
-            Size = NElements->getZExtValue() * TD->getTypeAllocSize(MallocType);
+      Value *Arg = MI->getArgOperand(0);
+      if (ConstantInt *CI = dyn_cast<ConstantInt>(Arg))
+          Size = CI->getZExtValue();
+
+    } else if (CallInst *MI = extractCallocCall(Op1)) {
+      // Get allocation size.
+      Value *Arg1 = MI->getArgOperand(0);
+      Value *Arg2 = MI->getArgOperand(1);
+      if (ConstantInt *CI1 = dyn_cast<ConstantInt>(Arg1))
+        if (ConstantInt *CI2 = dyn_cast<ConstantInt>(Arg2))
+          Size = (CI1->getValue() * CI2->getValue()).getZExtValue();
     }
 
     // Do not return "I don't know" here. Later optimization passes could
     // make it possible to evaluate objectsize to a constant.
     if (Size == -1ULL)
-      break;
+      return 0;
 
     if (Size < Offset) {
       // Out of bound reference? Negative index normalized to large
@@ -691,6 +697,57 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
                                          MemAlign, false));
       return II;
     }
+    break;
+  }
+
+  case Intrinsic::arm_neon_vmulls:
+  case Intrinsic::arm_neon_vmullu: {
+    Value *Arg0 = II->getArgOperand(0);
+    Value *Arg1 = II->getArgOperand(1);
+
+    // Handle mul by zero first:
+    if (isa<ConstantAggregateZero>(Arg0) || isa<ConstantAggregateZero>(Arg1)) {
+      return ReplaceInstUsesWith(CI, ConstantAggregateZero::get(II->getType()));
+    }
+
+    // Check for constant LHS & RHS - in this case we just simplify.
+    bool Zext = (II->getIntrinsicID() == Intrinsic::arm_neon_vmullu);
+    VectorType *NewVT = cast<VectorType>(II->getType());
+    unsigned NewWidth = NewVT->getElementType()->getIntegerBitWidth();
+    if (ConstantDataVector *CV0 = dyn_cast<ConstantDataVector>(Arg0)) {
+      if (ConstantDataVector *CV1 = dyn_cast<ConstantDataVector>(Arg1)) {
+        VectorType* VT = cast<VectorType>(CV0->getType());
+        SmallVector<Constant*, 4> NewElems;
+        for (unsigned i = 0; i < VT->getNumElements(); ++i) {
+          APInt CV0E =
+            (cast<ConstantInt>(CV0->getAggregateElement(i)))->getValue();
+          CV0E = Zext ? CV0E.zext(NewWidth) : CV0E.sext(NewWidth);
+          APInt CV1E =
+            (cast<ConstantInt>(CV1->getAggregateElement(i)))->getValue();
+          CV1E = Zext ? CV1E.zext(NewWidth) : CV1E.sext(NewWidth);
+          NewElems.push_back(
+            ConstantInt::get(NewVT->getElementType(), CV0E * CV1E));
+        }
+        return ReplaceInstUsesWith(CI, ConstantVector::get(NewElems));
+      }
+
+      // Couldn't simplify - cannonicalize constant to the RHS.
+      std::swap(Arg0, Arg1);
+    }
+
+    // Handle mul by one:
+    if (ConstantDataVector *CV1 = dyn_cast<ConstantDataVector>(Arg1)) {
+      if (ConstantInt *Splat =
+            dyn_cast_or_null<ConstantInt>(CV1->getSplatValue())) {
+        if (Splat->isOne()) {
+          if (Zext)
+            return CastInst::CreateZExtOrBitCast(Arg0, II->getType());
+          // else    
+          return CastInst::CreateSExtOrBitCast(Arg0, II->getType());
+        }
+      }
+    }
+
     break;
   }
 
@@ -1194,8 +1251,7 @@ bool InstCombiner::transformConstExprCastCall(CallSite CS) {
   if (NewRetTy->isVoidTy())
     Caller->setName("");   // Void type should not have a name.
 
-  const AttrListPtr &NewCallerPAL = AttrListPtr::get(attrVec.begin(),
-                                                     attrVec.end());
+  const AttrListPtr &NewCallerPAL = AttrListPtr::get(attrVec);
 
   Instruction *NC;
   if (InvokeInst *II = dyn_cast<InvokeInst>(Caller)) {
@@ -1367,8 +1423,7 @@ InstCombiner::transformCallThroughTrampoline(CallSite CS,
         NestF->getType() == PointerType::getUnqual(NewFTy) ?
         NestF : ConstantExpr::getBitCast(NestF,
                                          PointerType::getUnqual(NewFTy));
-      const AttrListPtr &NewPAL = AttrListPtr::get(NewAttrs.begin(),
-                                                   NewAttrs.end());
+      const AttrListPtr &NewPAL = AttrListPtr::get(NewAttrs);
 
       Instruction *NewCaller;
       if (InvokeInst *II = dyn_cast<InvokeInst>(Caller)) {

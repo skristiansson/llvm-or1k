@@ -127,8 +127,8 @@ namespace llvm {
                              StringRef Name = StringRef());
 
     /// createReferenceType - Create debugging information entry for a c++
-    /// style reference.
-    DIType createReferenceType(DIType RTy);
+    /// style reference or rvalue reference type.
+    DIType createReferenceType(unsigned Tag, DIType RTy);
 
     /// createTypedef - Create debugging information entry for a typedef.
     /// @param Ty          Original type.
@@ -331,8 +331,8 @@ namespace llvm {
     /// @param Elements     Enumeration elements.
     DIType createEnumerationType(DIDescriptor Scope, StringRef Name, 
                                  DIFile File, unsigned LineNumber, 
-                                 uint64_t SizeInBits, 
-                                 uint64_t AlignInBits, DIArray Elements);
+                                 uint64_t SizeInBits, uint64_t AlignInBits,
+                                 DIArray Elements, DIType ClassType);
 
     /// createSubroutineType - Create subroutine type.
     /// @param File          File in which this subroutine is defined.
@@ -348,8 +348,8 @@ namespace llvm {
     DIType createTemporaryType(DIFile F);
 
     /// createForwardDecl - Create a temporary forward-declared type.
-    DIType createForwardDecl(unsigned Tag, StringRef Name, DIFile F,
-                             unsigned Line, unsigned RuntimeLang = 0);
+    DIType createForwardDecl(unsigned Tag, StringRef Name, DIDescriptor Scope,
+                             DIFile F, unsigned Line, unsigned RuntimeLang = 0);
 
     /// retainType - Retain DIType in a module even if it is not referenced 
     /// through debug info anchors.

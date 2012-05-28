@@ -55,6 +55,8 @@ class NoCapture<int argNo> : IntrinsicProperty {
   int ArgNo = argNo;
 }
 
+def IntrNoReturn : IntrinsicProperty;
+
 //===----------------------------------------------------------------------===//
 // Types used by intrinsics.
 //===----------------------------------------------------------------------===//
@@ -63,10 +65,14 @@ class LLVMType<ValueType vt> {
   ValueType VT = vt;
 }
 
-class LLVMPointerType<LLVMType elty>
+class LLVMQualPointerType<LLVMType elty, int addrspace>
   : LLVMType<iPTR>{
   LLVMType ElTy = elty;
+  int AddrSpace = addrspace;
 }
+
+class LLVMPointerType<LLVMType elty>
+  : LLVMQualPointerType<elty, 0>;
 
 class LLVMAnyPointerType<LLVMType elty>
   : LLVMType<iPTRAny>{
@@ -396,8 +402,10 @@ def int_invariant_end   : Intrinsic<[],
 //
 def int_flt_rounds : Intrinsic<[llvm_i32_ty]>,
                      GCCBuiltin<"__builtin_flt_rounds">;
-def int_trap : Intrinsic<[]>,
+def int_trap : Intrinsic<[], [], [IntrNoReturn]>,
                GCCBuiltin<"__builtin_trap">;
+def int_debugtrap : Intrinsic<[]>,
+                    GCCBuiltin<"__builtin_debugtrap">;
 
 // Intrisics to support half precision floating point format
 let Properties = [IntrNoMem] in {
@@ -439,5 +447,5 @@ include "llvm/IntrinsicsX86.td"
 include "llvm/IntrinsicsARM.td"
 include "llvm/IntrinsicsCellSPU.td"
 include "llvm/IntrinsicsXCore.td"
-include "llvm/IntrinsicsPTX.td"
 include "llvm/IntrinsicsHexagon.td"
+include "llvm/IntrinsicsNVVM.td"

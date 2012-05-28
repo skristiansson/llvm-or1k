@@ -49,6 +49,9 @@ else()
   set(ENABLE_ASSERTIONS "0")
 endif()
 
+set(HOST_OS ${CMAKE_HOST_SYSTEM_NAME})
+set(HOST_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
+
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in
   ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg
@@ -75,7 +78,7 @@ add_dependencies(check.deps
               UnitTests
               BugpointPasses LLVMHello
               llc lli llvm-ar llvm-as llvm-dis llvm-extract llvm-dwarfdump
-              llvm-ld llvm-link llvm-mc llvm-nm llvm-objdump llvm-readobj
+              llvm-link llvm-mc llvm-nm llvm-objdump llvm-readobj
               macho-dump opt
-              FileCheck count not json-bench)
+              FileCheck count not)
 set_target_properties(check.deps PROPERTIES FOLDER "Tests")

@@ -47,15 +47,15 @@ void DIBuilder::finalize() {
   DIType(TempSubprograms).replaceAllUsesWith(SPs);
   for (unsigned i = 0, e = SPs.getNumElements(); i != e; ++i) {
     DISubprogram SP(SPs.getElement(i));
+    SmallVector<Value *, 4> Variables;
     if (NamedMDNode *NMD = getFnSpecificMDNode(M, SP)) {
-      SmallVector<Value *, 4> Variables;
       for (unsigned ii = 0, ee = NMD->getNumOperands(); ii != ee; ++ii)
         Variables.push_back(NMD->getOperand(ii));
-      if (MDNode *Temp = SP.getVariablesNodes()) {
-        DIArray AV = getOrCreateArray(Variables);
-        DIType(Temp).replaceAllUsesWith(AV);
-      }
       NMD->eraseFromParent();
+    }
+    if (MDNode *Temp = SP.getVariablesNodes()) {
+      DIArray AV = getOrCreateArray(Variables);
+      DIType(Temp).replaceAllUsesWith(AV);
     }
   }
 
@@ -229,12 +229,13 @@ DIType DIBuilder::createPointerType(DIType PointeeTy, uint64_t SizeInBits,
   return DIType(MDNode::get(VMContext, Elts));
 }
 
-/// createReferenceType - Create debugging information entry for a reference.
-DIType DIBuilder::createReferenceType(DIType RTy) {
+/// createReferenceType - Create debugging information entry for a reference
+/// type.
+DIType DIBuilder::createReferenceType(unsigned Tag, DIType RTy) {
   assert(RTy.Verify() && "Unable to create reference type");
   // References are encoded in DIDerivedType format.
   Value *Elts[] = {
-    GetTagConstant(VMContext, dwarf::DW_TAG_reference_type),
+    GetTagConstant(VMContext, Tag),
     NULL, // TheCU,
     NULL, // Name
     NULL, // Filename
@@ -547,7 +548,8 @@ DIType DIBuilder::createEnumerationType(DIDescriptor Scope, StringRef Name,
                                         DIFile File, unsigned LineNumber,
                                         uint64_t SizeInBits,
                                         uint64_t AlignInBits,
-                                        DIArray Elements) {
+                                        DIArray Elements,
+                                        DIType ClassType) {
   // TAG_enumeration_type is encoded in DICompositeType format.
   Value *Elts[] = {
     GetTagConstant(VMContext, dwarf::DW_TAG_enumeration_type),
@@ -559,7 +561,7 @@ DIType DIBuilder::createEnumerationType(DIDescriptor Scope, StringRef Name,
     ConstantInt::get(Type::getInt64Ty(VMContext), AlignInBits),
     ConstantInt::get(Type::getInt32Ty(VMContext), 0),
     ConstantInt::get(Type::getInt32Ty(VMContext), 0),
-    NULL,
+    ClassType,
     Elements,
     ConstantInt::get(Type::getInt32Ty(VMContext), 0),
     llvm::Constant::getNullValue(Type::getInt32Ty(VMContext)),
@@ -677,12 +679,13 @@ DIType DIBuilder::createTemporaryType(DIFile F) {
 
 /// createForwardDecl - Create a temporary forward-declared type that
 /// can be RAUW'd if the full type is seen.
-DIType DIBuilder::createForwardDecl(unsigned Tag, StringRef Name, DIFile F,
+DIType DIBuilder::createForwardDecl(unsigned Tag, StringRef Name,
+                                    DIDescriptor Scope, DIFile F,
                                     unsigned Line, unsigned RuntimeLang) {
   // Create a temporary MDNode.
   Value *Elts[] = {
     GetTagConstant(VMContext, Tag),
-    NULL, // TheCU
+    getNonCompileUnitScope(Scope),
     MDString::get(VMContext, Name),
     F,
     ConstantInt::get(Type::getInt32Ty(VMContext), Line),
@@ -906,7 +909,7 @@ DISubprogram DIBuilder::createMethod(DIDescriptor Context,
     TParam,
     llvm::Constant::getNullValue(Type::getInt32Ty(VMContext)),
     THolder,
-    // FIXME: Do we want to use a different scope lines?
+    // FIXME: Do we want to use different scope/lines?
     ConstantInt::get(Type::getInt32Ty(VMContext), LineNo)
   };
   MDNode *Node = MDNode::get(VMContext, Elts);

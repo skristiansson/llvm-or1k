@@ -265,6 +265,7 @@ std::string SDNode::getOperationName(const SelectionDAG *G) const {
   case ISD::STACKSAVE:                  return "stacksave";
   case ISD::STACKRESTORE:               return "stackrestore";
   case ISD::TRAP:                       return "trap";
+  case ISD::DEBUGTRAP:                  return "debugtrap";
 
   // Bit manipulation
   case ISD::BSWAP:                      return "bswap";

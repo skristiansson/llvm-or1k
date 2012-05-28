@@ -135,6 +135,8 @@ public:
       ReplacedValues[SDValue(Old, i)] = SDValue(New, i);
   }
 
+  SelectionDAG &getDAG() const { return DAG; }
+
 private:
   SDNode *AnalyzeNewNode(SDNode *N);
   void AnalyzeNewValue(SDValue &Val);
@@ -151,7 +153,7 @@ private:
 
   /// DisintegrateMERGE_VALUES - Replace each result of the given MERGE_VALUES
   /// node with the corresponding input operand, except for the result 'ResNo',
-  /// which is returned.
+  /// for which the corresponding input operand is returned.
   SDValue DisintegrateMERGE_VALUES(SDNode *N, unsigned ResNo);
 
   SDValue GetVectorElementPointer(SDValue VecPtr, EVT EltVT, SDValue Index);
