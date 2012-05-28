@@ -9,7 +9,7 @@ with autotools:
 ../configure CC=gcc CXX=g++ --enable-debug-runtime --prefix=/path/to/instdir
 
 with cmake:
-cmake .. -DCMAKE_BUILD_TYPE=Debug+Asserts -DCMAKE_INSTALL_PREFIX=/path/to/instdir
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=/path/to/instdir
 
 make install
 
