@@ -45,7 +45,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   TD = getTargetData();
 
   // Set up the register classes.
-  addRegisterClass(MVT::i32, OR1K::GPRRegisterClass);
+  addRegisterClass(MVT::i32, &OR1K::GPRRegClass);
 
   // Compute derived properties from the register classes
   computeRegisterProperties();
@@ -231,8 +231,7 @@ OR1KTargetLowering::LowerCCCArguments(SDValue Chain,
           llvm_unreachable(0);
         }
       case MVT::i32:
-        unsigned VReg =
-          RegInfo.createVirtualRegister(OR1K::GPRRegisterClass);
+        unsigned VReg = RegInfo.createVirtualRegister(&OR1K::GPRRegClass);
         RegInfo.addLiveIn(VA.getLocReg(), VReg);
         SDValue ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, RegVT);
 
