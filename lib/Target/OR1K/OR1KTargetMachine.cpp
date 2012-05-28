@@ -65,7 +65,7 @@ TargetPassConfig *OR1KTargetMachine::createPassConfig(PassManagerBase &PM) {
 // Install an instruction selector pass using
 // the ISelDag to gen OR1K code.
 bool OR1KPassConfig::addInstSelector() {
-  PM.add(createOR1KISelDag(getOR1KTargetMachine()));
+  PM->add(createOR1KISelDag(getOR1KTargetMachine()));
   return false;
 }
 
@@ -74,6 +74,6 @@ bool OR1KPassConfig::addInstSelector() {
 // print out the code after the passes.
 
 bool OR1KPassConfig::addPreEmitPass() {
-  PM.add(createOR1KDelaySlotFillerPass(getOR1KTargetMachine()));
+  PM->add(createOR1KDelaySlotFillerPass(getOR1KTargetMachine()));
   return true;
 }
