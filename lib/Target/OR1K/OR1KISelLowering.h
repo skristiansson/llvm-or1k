@@ -65,6 +65,17 @@ namespace llvm {
     SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerJumpTable(SDValue Op, SelectionDAG &DAG) const;
+
+    std::pair<unsigned, const TargetRegisterClass*>
+    getRegForInlineAsmConstraint(const std::string &Constraint, EVT VT) const;
+    ConstraintWeight
+    getSingleConstraintMatchWeight(AsmOperandInfo &info,
+                                   const char *constraint) const;
+    virtual void LowerAsmOperandForConstraint(SDValue Op,
+                                              std::string &Constraint,
+                                              std::vector<SDValue> &Ops,
+                                              SelectionDAG &DAG) const;
+
     MachineBasicBlock* EmitInstrWithCustomInserter(MachineInstr *MI,
                                                    MachineBasicBlock *BB) const;
 

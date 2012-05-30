@@ -46,12 +46,69 @@ namespace {
       return "OR1K Assembly Printer";
     }
 
+    void printOperand(const MachineInstr *MI, int OpNum,
+                      raw_ostream &O, const char* Modifier = 0);
+    bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
+                         unsigned AsmVariant, const char *ExtraCode,
+                         raw_ostream &O);
     void EmitInstruction(const MachineInstr *MI);
     virtual bool isBlockOnlyReachableByFallthrough(const MachineBasicBlock*
                                                    MBB) const;
   };
 } // end of anonymous namespace
 
+void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
+                                  raw_ostream &O, const char *Modifier) {
+  const MachineOperand &MO = MI->getOperand(OpNum);
+  switch (MO.getType()) {
+  case MachineOperand::MO_Register:
+    O << OR1KInstPrinter::getRegisterName(MO.getReg());
+    break;
+
+  case MachineOperand::MO_Immediate:
+    O << MO.getImm();
+    break;
+
+  case MachineOperand::MO_MachineBasicBlock:
+    O << *MO.getMBB()->getSymbol();
+    break;
+
+  case MachineOperand::MO_GlobalAddress:
+    O << *Mang->getSymbol(MO.getGlobal());
+    break;
+
+  case MachineOperand::MO_BlockAddress: {
+     MCSymbol* BA = GetBlockAddressSymbol(MO.getBlockAddress());
+     O << BA->getName();
+     break;
+   }
+
+   case MachineOperand::MO_ExternalSymbol:
+     O << *GetExternalSymbolSymbol(MO.getSymbolName());
+     break;
+
+   case MachineOperand::MO_JumpTableIndex:
+     O << MAI->getPrivateGlobalPrefix() << "JTI" << getFunctionNumber()
+       << '_' << MO.getIndex();
+     break;
+
+  default:
+    llvm_unreachable("<unknown operand type>");
+  }
+}
+
+/// PrintAsmOperand - Print out an operand for an inline asm expression.
+///
+bool OR1KAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
+                                     unsigned AsmVariant,
+                                     const char *ExtraCode, raw_ostream &O) {
+  // Does this asm operand have a single letter operand modifier?
+  if (ExtraCode && ExtraCode[0])
+    return true; // Unknown modifier.
+
+  printOperand(MI, OpNo, O);
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
