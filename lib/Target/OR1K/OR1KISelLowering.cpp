@@ -103,6 +103,11 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8,   Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16,  Expand);
 
+  // Extended load operations for i1 types must be promoted
+  setLoadExtAction(ISD::EXTLOAD,             MVT::i1,   Promote);
+  setLoadExtAction(ISD::ZEXTLOAD,            MVT::i1,   Promote);
+  setLoadExtAction(ISD::SEXTLOAD,            MVT::i1,   Promote);
+
   setMinFunctionAlignment(4);
   setPrefFunctionAlignment(4);
 }
