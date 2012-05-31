@@ -52,6 +52,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
 
   setOperationAction(ISD::BR_CC,             MVT::i32, Custom);
   setOperationAction(ISD::BR_JT,             MVT::Other, Expand);
+  setOperationAction(ISD::BRCOND,            MVT::Other, Expand);
   setOperationAction(ISD::SETCC,             MVT::i32, Expand);
   setOperationAction(ISD::SETCC,             MVT::i64, Expand);
   setOperationAction(ISD::SETCC,             MVT::f32, Expand);
