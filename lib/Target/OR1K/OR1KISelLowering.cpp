@@ -160,7 +160,7 @@ OR1KTargetLowering::getSingleConstraintMatchWeight(
   case 'K': // unsigned 16 bit immediate
   case 'L': // immediate in the range 0 to 31
   case 'M': // signed 32 bit immediate where lower 16 bits are 0
-  case 'N': // signed 25 bit immediate
+  case 'N': // signed 26 bit immediate
   case 'O': // integer zero
     if (isa<ConstantInt>(CallOperandVal))
       weight = CW_Constant;
@@ -226,7 +226,7 @@ void OR1KTargetLowering::LowerAsmOperandForConstraint(SDValue Op,
       }
     }
     return;
-  case 'N': // signed 25 bit immediate
+  case 'N': // signed 26 bit immediate
     if (ConstantSDNode *C = dyn_cast<ConstantSDNode>(Op)) {
       int64_t Val = C->getSExtValue();
       if ((Val >= -33554432) && (Val <= 33554431)) {
