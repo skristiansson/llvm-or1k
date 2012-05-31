@@ -50,6 +50,8 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   // Compute derived properties from the register classes
   computeRegisterProperties();
 
+  setStackPointerRegisterToSaveRestore(OR1K::R1);
+
   setOperationAction(ISD::BR_CC,             MVT::i32, Custom);
   setOperationAction(ISD::BR_JT,             MVT::Other, Expand);
   setOperationAction(ISD::BRCOND,            MVT::Other, Expand);
@@ -66,6 +68,9 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::GlobalAddress,     MVT::i32, Custom);
   setOperationAction(ISD::JumpTable,         MVT::i32, Custom);
 
+  setOperationAction(ISD::DYNAMIC_STACKALLOC, MVT::i32, Expand);
+  setOperationAction(ISD::STACKSAVE,          MVT::Other, Expand);
+  setOperationAction(ISD::STACKRESTORE,       MVT::Other, Expand);
 
   if (!Subtarget.hasDiv()) {
     setOperationAction(ISD::SDIV,            MVT::i32, Expand);
