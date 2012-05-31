@@ -156,7 +156,6 @@ OR1KTargetLowering::getSingleConstraintMatchWeight(
     // but allow it at the lowest weight.
   if (CallOperandVal == NULL)
     return CW_Default;
-  Type *type = CallOperandVal->getType();
   // Look at the constraint type.
   switch (*constraint) {
   default:
