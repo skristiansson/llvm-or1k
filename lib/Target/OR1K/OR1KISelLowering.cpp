@@ -101,6 +101,12 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SMUL_LOHI,         MVT::f32, Expand);
   setOperationAction(ISD::SMUL_LOHI,         MVT::f64, Expand);
 
+  // FIXME: implement (with l.addc etc)
+  setOperationAction(ISD::ADDC, MVT::i32, Expand);
+  setOperationAction(ISD::ADDE, MVT::i32, Expand);
+  setOperationAction(ISD::SUBC, MVT::i32, Expand);
+  setOperationAction(ISD::SUBE, MVT::i32, Expand);
+
   if (!Subtarget.hasRor()) {
     setOperationAction(ISD::ROTR,            MVT::i32, Expand);
   }
