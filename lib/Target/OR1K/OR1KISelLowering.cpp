@@ -110,6 +110,8 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SRL_PARTS,         MVT::i32, Expand);
   setOperationAction(ISD::SRA_PARTS,         MVT::i32, Expand);
 
+  setOperationAction(ISD::BSWAP,             MVT::i32, Expand);
+
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1,   Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8,   Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16,  Expand);
