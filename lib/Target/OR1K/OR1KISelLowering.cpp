@@ -72,6 +72,11 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::STACKSAVE,          MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE,       MVT::Other, Expand);
 
+  setOperationAction(ISD::VASTART,            MVT::Other, Custom);
+  setOperationAction(ISD::VAARG,              MVT::Other, Expand);
+  setOperationAction(ISD::VACOPY,             MVT::Other, Expand);
+  setOperationAction(ISD::VAEND,              MVT::Other, Expand);
+
   if (!Subtarget.hasDiv()) {
     setOperationAction(ISD::SDIV,            MVT::i32, Expand);
     setOperationAction(ISD::UDIV,            MVT::i32, Expand);
@@ -138,6 +143,7 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
   case ISD::GlobalAddress:    return LowerGlobalAddress(Op, DAG);
   case ISD::JumpTable:        return LowerJumpTable(Op, DAG);
   case ISD::SELECT_CC:        return LowerSELECT_CC(Op, DAG);
+  case ISD::VASTART:          return LowerVASTART(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -361,14 +367,13 @@ OR1KTargetLowering::LowerCCCArguments(SDValue Chain,
   MachineFunction &MF = DAG.getMachineFunction();
   MachineFrameInfo *MFI = MF.getFrameInfo();
   MachineRegisterInfo &RegInfo = MF.getRegInfo();
+  OR1KMachineFunctionInfo *OR1KMFI = MF.getInfo<OR1KMachineFunctionInfo>();
 
   // Assign locations to all of the incoming arguments.
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
                  getTargetMachine(), ArgLocs, *DAG.getContext());
   CCInfo.AnalyzeFormalArguments(Ins, CC_OR1K32);
-
-  assert(!isVarArg && "Varargs not supported yet");
 
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
     CCValAssign &VA = ArgLocs[i];
@@ -425,6 +430,13 @@ OR1KTargetLowering::LowerCCCArguments(SDValue Chain,
                                    MachinePointerInfo::getFixedStack(FI),
                                    false, false, false, 0));
     }
+  }
+
+  if (isVarArg) {
+    // Record the frame index of the first variable argument
+    // which is a value necessary to VASTART.
+    int FI = MFI->CreateFixedObject(4, CCInfo.getNextStackOffset(), true);
+    OR1KMFI->setVarArgsFrameIndex(FI);
   }
 
   return Chain;
@@ -679,6 +691,21 @@ SDValue OR1KTargetLowering::LowerSELECT_CC(SDValue Op,
   Ops.push_back(Flag);
 
   return DAG.getNode(OR1KISD::SELECT_CC, dl, VTs, &Ops[0], Ops.size());
+}
+
+SDValue OR1KTargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
+  MachineFunction &MF = DAG.getMachineFunction();
+  OR1KMachineFunctionInfo *FuncInfo = MF.getInfo<OR1KMachineFunctionInfo>();
+
+  DebugLoc dl = Op.getDebugLoc();
+  SDValue FI = DAG.getFrameIndex(FuncInfo->getVarArgsFrameIndex(),
+                                 getPointerTy());
+
+  // vastart just stores the address of the VarArgsFrameIndex slot into the
+  // memory location argument.
+  const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
+  return DAG.getStore(Op.getOperand(0), dl, FI, Op.getOperand(1),
+                      MachinePointerInfo(SV), false, false, 0);
 }
 
 const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {

@@ -22,10 +22,16 @@ namespace llvm {
 /// contains private OR1K target-specific information for each MachineFunction.
 class OR1KMachineFunctionInfo : public MachineFunctionInfo {
   virtual void anchor();
+
+  /// VarArgsFrameIndex - FrameIndex for start of varargs area.
+  int VarArgsFrameIndex;
+
 public:
   OR1KMachineFunctionInfo() {}
 
   explicit OR1KMachineFunctionInfo(MachineFunction &MF) {}
+  int getVarArgsFrameIndex() const { return VarArgsFrameIndex; }
+  void setVarArgsFrameIndex(int Index) { VarArgsFrameIndex = Index; }
 };
 
 } // End llvm namespace
