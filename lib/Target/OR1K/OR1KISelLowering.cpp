@@ -79,6 +79,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SDIVREM,           MVT::i32, Expand);
   setOperationAction(ISD::UDIVREM,           MVT::i32, Expand);
   setOperationAction(ISD::SREM,              MVT::i32, Expand);
+  setOperationAction(ISD::UREM,              MVT::i32, Expand);
 
   if (!Subtarget.hasMul()) {
     setOperationAction(ISD::MUL,             MVT::i32, Expand);
