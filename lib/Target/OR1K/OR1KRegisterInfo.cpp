@@ -37,9 +37,8 @@ const uint16_t*
 OR1KRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   static const uint16_t CalleeSavedRegs[] = {
     OR1K::R14, OR1K::R16, OR1K::R18,
-    OR1K::R9, OR1K::R14, OR1K::R16, OR1K::R18,
-    OR1K::R20, OR1K::R22, OR1K::R24, OR1K::R26,
-    OR1K::R28, OR1K::R30
+    OR1K::R20, OR1K::R22, OR1K::R24,
+    OR1K::R26, OR1K::R28, OR1K::R30
   };
   return CalleeSavedRegs;
 }
