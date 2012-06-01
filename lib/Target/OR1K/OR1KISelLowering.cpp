@@ -106,6 +106,9 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   }
   // FIXME: use l.ror (rotate right) to do rotate left
   setOperationAction(ISD::ROTL,              MVT::i32, Expand);
+  setOperationAction(ISD::SHL_PARTS,         MVT::i32, Expand);
+  setOperationAction(ISD::SRL_PARTS,         MVT::i32, Expand);
+  setOperationAction(ISD::SRA_PARTS,         MVT::i32, Expand);
 
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1,   Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8,   Expand);
