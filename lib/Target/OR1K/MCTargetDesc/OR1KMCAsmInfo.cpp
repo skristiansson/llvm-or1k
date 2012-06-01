@@ -17,6 +17,7 @@ using namespace llvm;
 OR1KMCAsmInfo::OR1KMCAsmInfo(const Target &T, StringRef TT) {
   HasSetDirective             = false;
   PrivateGlobalPrefix         = ".L";
+  WeakRefDirective            = "\t.weak\t";
 
   // OR1K assembly requires ".section" before ".bss"
   UsesELFSectionDirectiveForBSS = true;
