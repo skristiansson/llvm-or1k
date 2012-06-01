@@ -15,7 +15,6 @@
 using namespace llvm;
 
 OR1KMCAsmInfo::OR1KMCAsmInfo(const Target &T, StringRef TT) {
-  HasSetDirective             = false;
   PrivateGlobalPrefix         = ".L";
   WeakRefDirective            = "\t.weak\t";
 
