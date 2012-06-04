@@ -33,22 +33,22 @@ def SDT_OR1KBrCC         : SDTypeProfile<0, 1, [SDTCisVT<0, OtherVT>]>;
 def SDT_OR1KWrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                 SDTCisPtrTy<0>]>;
 
-def call          : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
-                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
-                            SDNPVariadic]>;
-def retflag       : SDNode<"OR1KISD::RET_FLAG", SDTNone,
-                           [SDNPHasChain, SDNPOptInGlue]>;
-def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
-                           [SDNPHasChain, SDNPOutGlue]>;
-def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
-                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
-def OR1Ksetflag   : SDNode<"OR1KISD::SET_FLAG", SDT_OR1KSetFlag,
-                           [SDNPOutGlue]>;
-def OR1Kbrcc      : SDNode<"OR1KISD::BR_CC", SDT_OR1KBrCC,
-                            [SDNPHasChain, SDNPInGlue]>;
-def OR1Kselectcc  : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
-                            [SDNPInGlue]>;
-def OR1KWrapper   : SDNode<"OR1KISD::Wrapper", SDT_OR1KWrapper>;
+def call            : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
+                             [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
+                              SDNPVariadic]>;
+def retflag         : SDNode<"OR1KISD::RET_FLAG", SDTNone,
+                             [SDNPHasChain, SDNPOptInGlue]>;
+def callseq_start   : SDNode<"ISD::CALLSEQ_START", SDT_OR1KCallSeqStart,
+                             [SDNPHasChain, SDNPOutGlue]>;
+def callseq_end     : SDNode<"ISD::CALLSEQ_END",   SDT_OR1KCallSeqEnd,
+                             [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
+def OR1Ksetflag     : SDNode<"OR1KISD::SET_FLAG", SDT_OR1KSetFlag,
+                             [SDNPOutGlue]>;
+def OR1Kbrcc        : SDNode<"OR1KISD::BR_CC", SDT_OR1KBrCC,
+                              [SDNPHasChain, SDNPInGlue]>;
+def OR1Kselectcc    : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
+                              [SDNPInGlue]>;
+def OR1KWrapper     : SDNode<"OR1KISD::Wrapper", SDT_OR1KWrapper>;
 
 // Extract bits 0-15 (low-end) of an immediate value.
 def LO16 : SDNodeXForm<imm, [{
