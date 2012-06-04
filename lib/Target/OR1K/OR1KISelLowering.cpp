@@ -68,7 +68,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::GlobalAddress,     MVT::i32, Custom);
   setOperationAction(ISD::JumpTable,         MVT::i32, Custom);
 
-  setOperationAction(ISD::DYNAMIC_STACKALLOC, MVT::i32, Expand);
+  setOperationAction(ISD::DYNAMIC_STACKALLOC, MVT::i32,   Custom);
   setOperationAction(ISD::STACKSAVE,          MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE,       MVT::Other, Expand);
 
@@ -144,6 +144,7 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
   case ISD::JumpTable:          return LowerJumpTable(Op, DAG);
   case ISD::SELECT_CC:          return LowerSELECT_CC(Op, DAG);
   case ISD::VASTART:            return LowerVASTART(Op, DAG);
+  case ISD::DYNAMIC_STACKALLOC: return LowerDYNAMIC_STACKALLOC(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -706,6 +707,43 @@ SDValue OR1KTargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
   const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
   return DAG.getStore(Op.getOperand(0), dl, FI, Op.getOperand(1),
                       MachinePointerInfo(SV), false, false, 0);
+}
+
+SDValue
+OR1KTargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
+                                            SelectionDAG &DAG) const {
+  SDValue Chain = Op.getOperand(0);
+  SDValue Size = Op.getOperand(1);
+  DebugLoc dl = Op.getDebugLoc();
+
+  unsigned SPReg = getStackPointerRegisterToSaveRestore();
+
+  // Get a reference to the stack pointer.
+  SDValue StackPointer = DAG.getCopyFromReg(Chain, dl, SPReg, MVT::i32);
+
+  // Subtract the dynamic size from the actual stack size to
+  // obtain the new stack size.
+  SDValue Sub = DAG.getNode(ISD::SUB, dl, MVT::i32, StackPointer, Size);
+
+  //
+  // For OR1K, the outgoing memory arguments area should be on top of the
+  // alloca area on the stack i.e., the outgoing memory arguments should be
+  // at a lower address than the alloca area. Move the alloca area down the
+  // stack by adding back the space reserved for outgoing arguments to SP
+  // here.
+  //
+  // We do not know what the size of the outgoing args is at this point.
+  // So, we add a pseudo instruction ADJDYNALLOC that will adjust the
+  // stack pointer. We replace this instruction with on that has the correct,
+  // known offset in emitPrologue().
+  SDValue ArgAdjust = DAG.getNode(OR1KISD::ADJDYNALLOC, dl, MVT::i32, Sub);
+
+  // The Sub result contains the new stack start address, so it
+  // must be placed in the stack pointer register.
+  SDValue CopyChain = DAG.getCopyToReg(Chain, dl, SPReg, Sub);
+
+  SDValue Ops[2] = { ArgAdjust, CopyChain };
+  return DAG.getMergeValues(Ops, 2, dl);
 }
 
 const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {

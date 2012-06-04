@@ -61,6 +61,32 @@ void OR1KFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   MFI->setStackSize(FrameSize);
 }
 
+// Iterates through each basic block in a machine function and replaces
+// ADJDYNALLOC pseudo instructions with a OR1K:ADDI with the
+// maximum call frame size as the immediate.
+void OR1KFrameLowering::replaceAdjDynAllocPseudo(MachineFunction &MF) const {
+  const OR1KInstrInfo &TII =
+    *static_cast<const OR1KInstrInfo*>(MF.getTarget().getInstrInfo());
+  unsigned MaxCallFrameSize = MF.getFrameInfo()->getMaxCallFrameSize();
+
+  for (MachineFunction::iterator MBB = MF.begin(), E = MF.end();
+      MBB != E; ++MBB) {
+    MachineBasicBlock::iterator MBBI = MBB->begin();
+    while (MBBI != MBB->end()) {
+      MachineInstr *MI = MBBI++;
+      if (MI->getOpcode() == OR1K::ADJDYNALLOC) {
+        DebugLoc DL = MI->getDebugLoc();
+        unsigned Dst = MI->getOperand(0).getReg();
+        unsigned Src = MI->getOperand(1).getReg();
+
+        BuildMI(*MBB, MI, DL, TII.get(OR1K::ADDI), Dst)
+          .addReg(Src).addImm(MaxCallFrameSize);
+        MI->eraseFromParent();
+      }
+    }
+  }
+}
+
 void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   MachineBasicBlock &MBB   = MF.front();
   MachineFrameInfo *MFI    = MF.getFrameInfo();
@@ -103,6 +129,10 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   if (StackSize) {
     BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), OR1K::R1)
       .addReg(OR1K::R1).addImm(-StackSize);
+  }
+
+  if (MFI->hasVarSizedObjects()) {
+    replaceAdjDynAllocPseudo(MF);
   }
 }
 

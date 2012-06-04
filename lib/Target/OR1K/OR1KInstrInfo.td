@@ -32,6 +32,7 @@ def SDT_OR1KSelectCC     : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
 def SDT_OR1KBrCC         : SDTypeProfile<0, 1, [SDTCisVT<0, OtherVT>]>;
 def SDT_OR1KWrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                 SDTCisPtrTy<0>]>;
+def SDT_OR1KAdjDynAlloc  : SDTypeProfile<1, 1, [SDTCisVT<0, i32>]>;
 
 def call            : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
                              [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -49,6 +50,7 @@ def OR1Kbrcc        : SDNode<"OR1KISD::BR_CC", SDT_OR1KBrCC,
 def OR1Kselectcc    : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
                               [SDNPInGlue]>;
 def OR1KWrapper     : SDNode<"OR1KISD::Wrapper", SDT_OR1KWrapper>;
+def OR1Kadjdynalloc : SDNode<"OR1KISD::ADJDYNALLOC", SDT_OR1KAdjDynAlloc>;
 
 // Extract bits 0-15 (low-end) of an immediate value.
 def LO16 : SDNodeXForm<imm, [{
@@ -548,6 +550,12 @@ def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
 def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
                               "#ADJCALLSTACKUP",
                               [(callseq_end timm:$amt1, timm:$amt2)]>;
+}
+
+let Defs = [R1], Uses = [R1] in {
+  def ADJDYNALLOC : Pseudo<(outs GPR:$dst), (ins GPR:$src),
+                    "#ADJDYNALLOC",
+                    [(set GPR:$dst, (OR1Kadjdynalloc GPR:$src))]>;
 }
 
 let Uses = [SR], usesCustomInserter = 1, Predicates = [NoCmov] in {
