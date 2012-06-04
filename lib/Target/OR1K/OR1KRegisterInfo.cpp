@@ -63,7 +63,6 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
   MBB.erase(I);
 }
 
-
 void
 OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                        int SPAdj, RegScavenger *RS) const {
@@ -90,7 +89,6 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     Offset += MF.getFrameInfo()->getStackSize();
 
   // FIXME: implement a MOVHI - ORI sequence if imm does not fit
-  // Sparc has an example
   assert(isInt<16>(Offset) && "Offset is not small enough to fit in imm field");
 
   // Replace frame index with a frame pointer reference.
