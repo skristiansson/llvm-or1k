@@ -139,11 +139,11 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
 SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
                                            SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
-  case ISD::BR_CC:            return LowerBR_CC(Op, DAG);
-  case ISD::GlobalAddress:    return LowerGlobalAddress(Op, DAG);
-  case ISD::JumpTable:        return LowerJumpTable(Op, DAG);
-  case ISD::SELECT_CC:        return LowerSELECT_CC(Op, DAG);
-  case ISD::VASTART:          return LowerVASTART(Op, DAG);
+  case ISD::BR_CC:              return LowerBR_CC(Op, DAG);
+  case ISD::GlobalAddress:      return LowerGlobalAddress(Op, DAG);
+  case ISD::JumpTable:          return LowerJumpTable(Op, DAG);
+  case ISD::SELECT_CC:          return LowerSELECT_CC(Op, DAG);
+  case ISD::VASTART:            return LowerVASTART(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
