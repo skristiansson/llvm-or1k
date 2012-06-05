@@ -125,10 +125,20 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
       .addReg(OR1K::R1).addImm(0);
   }
 
-  // Adjust stack : l.addi r1, r1, -imm
-  if (StackSize) {
-    BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), OR1K::R1)
-      .addReg(OR1K::R1).addImm(-StackSize);
+  if (isInt<16>(StackSize)) {
+    // Adjust stack : l.addi r1, r1, -imm
+    if (StackSize) {
+      BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), OR1K::R1)
+        .addReg(OR1K::R1).addImm(-StackSize);
+    }
+  } else {
+    // FIXME: allocate a register instead of just using r13
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::MOVHI), OR1K::R13)
+      .addImm((uint32_t)-StackSize >> 16);
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::ORI), OR1K::R13)
+      .addReg(OR1K::R13).addImm(-StackSize & 0xffffU);
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADD), OR1K::R1)
+      .addReg(OR1K::R1).addReg(OR1K::R13);
   }
 
   if (MFI->hasVarSizedObjects()) {
@@ -162,6 +172,7 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
     BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), OR1K::R2)
       .addReg(OR1K::R1).addImm(FPOffset);
   } else {
+    assert(isInt<16>(StackSize) && "Offset to large for imm");
     // l.addi r1, r1, imm
     if (StackSize) {
       BuildMI(MBB, MBBI, dl, TII.get(OR1K::ADDI), OR1K::R1)

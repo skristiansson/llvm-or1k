@@ -18,6 +18,7 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineLocation.h"
+#include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetFrameLowering.h"
 #include "llvm/Target/TargetInstrInfo.h"
@@ -56,6 +57,11 @@ BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   return Reserved;
 }
 
+bool
+OR1KRegisterInfo::requiresRegisterScavenging(const MachineFunction &MF) const {
+  return true;
+}
+
 void OR1KRegisterInfo::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator I) const {
@@ -73,6 +79,7 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineFunction &MF = *MI.getParent()->getParent();
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
   bool HasFP = TFI->hasFP(MF);
+  DebugLoc dl = MI.getDebugLoc();
 
   while (!MI.getOperand(i).isFI()) {
     ++i;
@@ -88,12 +95,30 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   if (!HasFP)
     Offset += MF.getFrameInfo()->getStackSize();
 
-  // FIXME: implement a MOVHI - ORI sequence if imm does not fit
-  assert(isInt<16>(Offset) && "Offset is not small enough to fit in imm field");
-
   // Replace frame index with a frame pointer reference.
   // If the offset is small enough to fit in the immediate field, directly
   // encode it.
+  // Otherwise scavenge a register and encode it in to a MOVHI - ORI sequence
+  if (!isInt<16>(Offset)) {
+    assert(RS && "Register scavenging must be on");
+    unsigned Reg = RS->FindUnusedReg(&OR1K::GPRRegClass);
+    if (!Reg)
+       Reg = RS->scavengeRegister(&OR1K::GPRRegClass, II, SPAdj);
+    assert(Reg && "Register scavenger failed");
+
+    // Reg = hi(offset) | lo(offset)
+    BuildMI(*MI.getParent(), II, dl, TII.get(OR1K::MOVHI), Reg)
+      .addImm((uint32_t)Offset >> 16);
+    BuildMI(*MI.getParent(), II, dl, TII.get(OR1K::ORI), Reg)
+      .addReg(Reg).addImm(Offset & 0xffffU);
+    // Reg = Reg + Sp
+    MI.setDesc(TII.get(OR1K::ADD));
+    MI.getOperand(i).ChangeToRegister(Reg, false, false, true);
+    MI.getOperand(i+1).ChangeToRegister((HasFP ? OR1K::R2 : OR1K::R1), false);
+
+    return;
+  }
+
   MI.getOperand(i).ChangeToRegister((HasFP ? OR1K::R2 : OR1K::R1), false);
   MI.getOperand(i+1).ChangeToImmediate(Offset);
 }
