@@ -146,9 +146,9 @@ def NoCmov       : Predicate<"!Subtarget.hasCmov()">;
 // -------------------------------------------------- //
 
 class SF_RR<bits<5> op2Val, string asmstr, PatLeaf Cond>
-	: InstRR<0x9, (outs), (ins GPR:$rA, GPR:$rB),
-		!strconcat(asmstr, "\t$rA, $rB"),
-		[(OR1Ksetflag GPR:$rA, GPR:$rB, Cond)]>
+        : InstRR<0x9, (outs), (ins GPR:$rA, GPR:$rB),
+                !strconcat(asmstr, "\t$rA, $rB"),
+                [(OR1Ksetflag GPR:$rA, GPR:$rB, Cond)]>
 {
   bits<5> op2;
   bits<5> rA;
