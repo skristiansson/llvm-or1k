@@ -161,26 +161,10 @@ class SF_RR<bits<5> op2Val, string asmstr, PatLeaf Cond>
   let op2 = op2Val;
 }
 
-class SF_RIS<bits<5> op2Val, string asmstr, PatLeaf Cond>
-	: InstRI<0xf, (outs), (ins GPR:$rA, s16imm:$imm),
-		!strconcat(asmstr, "i\t$rA, $imm"),
-		[(OR1Ksetflag GPR:$rA, immSExt16:$imm, Cond)]>
-{
-  bits<5> op2;
-  bits<5> rA;
-  bits<16> imm16;
-
-  let Inst{25-21} = op2;
-  let Inst{20-16} = rA;
-  let Inst{15-0} = imm16;
-
-  let op2 = op2Val;
-}
-
-class SF_RIU<bits<5> op2Val, string asmstr, PatLeaf Cond>
-        : InstRI<0xf, (outs), (ins GPR:$rA, i16imm:$imm),
+class SF_RI<bits<5> op2Val, string asmstr, PatLeaf Cond>
+        : InstRI<0xf, (outs), (ins GPR:$rA, s16imm:$imm),
                 !strconcat(asmstr, "i\t$rA, $imm"),
-                [(OR1Ksetflag GPR:$rA, immZExt16:$imm, Cond)]>
+                [(OR1Ksetflag GPR:$rA, immSExt16:$imm, Cond)]>
 {
   bits<5> op2;
   bits<5> rA;
@@ -193,30 +177,24 @@ class SF_RIU<bits<5> op2Val, string asmstr, PatLeaf Cond>
   let op2 = op2Val;
 }
 
-multiclass SFU<bits<5> op2Val, string asmstr, PatLeaf Cond>
+multiclass SF<bits<5> op2Val, string asmstr, PatLeaf Cond>
 {
-  def _rr : SF_RR <op2Val, asmstr, Cond>;
-  def _ri : SF_RIU<op2Val, asmstr, Cond>;
-}
-
-multiclass SFS<bits<5> op2Val, string asmstr, PatLeaf Cond>
-{
-  def _rr : SF_RR <op2Val, asmstr, Cond>;
-  def _ri : SF_RIS<op2Val, asmstr, Cond>;
+  def _rr : SF_RR<op2Val, asmstr, Cond>;
+  def _ri : SF_RI<op2Val, asmstr, Cond>;
 }
 
 // l.sfxx instructions
 let Defs = [SR], hasSideEffects = 1 in {
-defm SFEQ  : SFS<0x0, "l.sfeq",  OR1K_CC_EQ>;
-defm SFNE  : SFS<0x1, "l.sfne",  OR1K_CC_NE>;
-defm SFGTU : SFU<0x2, "l.sfgtu", OR1K_CC_GTU>;
-defm SFGEU : SFU<0x3, "l.sfgeu", OR1K_CC_GEU>;
-defm SFLTU : SFU<0x4, "l.sfltu", OR1K_CC_LTU>;
-defm SFLEU : SFU<0x5, "l.sfleu", OR1K_CC_LEU>;
-defm SFGTS : SFS<0xa, "l.sfgts", OR1K_CC_GT>;
-defm SFGES : SFS<0xb, "l.sfges", OR1K_CC_GE>;
-defm SFLTS : SFS<0xc, "l.sflts", OR1K_CC_LT>;
-defm SFLES : SFS<0xd, "l.sfles", OR1K_CC_LE>;
+defm SFEQ  : SF<0x0, "l.sfeq",  OR1K_CC_EQ>;
+defm SFNE  : SF<0x1, "l.sfne",  OR1K_CC_NE>;
+defm SFGTU : SF<0x2, "l.sfgtu", OR1K_CC_GTU>;
+defm SFGEU : SF<0x3, "l.sfgeu", OR1K_CC_GEU>;
+defm SFLTU : SF<0x4, "l.sfltu", OR1K_CC_LTU>;
+defm SFLEU : SF<0x5, "l.sfleu", OR1K_CC_LEU>;
+defm SFGTS : SF<0xa, "l.sfgts", OR1K_CC_GT>;
+defm SFGES : SF<0xb, "l.sfges", OR1K_CC_GE>;
+defm SFLTS : SF<0xc, "l.sflts", OR1K_CC_LT>;
+defm SFLES : SF<0xd, "l.sfles", OR1K_CC_LE>;
 }
 // -------------------------------------------------- //
 // ALU instructions

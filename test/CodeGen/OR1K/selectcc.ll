@@ -187,3 +187,15 @@ entry:
   %. = sext i1 %cmp to i32
   ret i32 %.
 }
+
+define i32 @ugtri2(i32 %a) {
+entry:
+  %cmp = icmp ugt i32 %a, 43520
+  %. = sext i1 %cmp to i32
+  ret i32 %.
+}
+
+; CHECK: ugtri2:
+; CHECK: l.ori   r4, r0, 43520
+; CHECK: l.sfgtu r3, r4
+; CHECK: l.bf
