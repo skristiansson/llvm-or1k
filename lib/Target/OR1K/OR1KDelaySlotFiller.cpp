@@ -29,7 +29,13 @@ STATISTIC(FilledSlots, "Number of delay slots filled");
 static cl::opt<bool> DisableDelaySlotFiller(
   "disable-or1k-delay-filler",
   cl::init(false),
-  cl::desc("Fill the OR1K delay slots with useful instructions."),
+  cl::desc("Do not fill OR1K delay slots"),
+  cl::Hidden);
+
+static cl::opt<bool> CompatDelaySlotFiller(
+  "compat-or1k-delay-filler",
+  cl::init(false),
+  cl::desc("Fill OR1K delay slots with l.nops."),
   cl::Hidden);
 
 namespace {
@@ -90,11 +96,15 @@ bool Filler::runOnMachineBasicBlock(MachineBasicBlock &MBB) {
   bool Changed = false;
   LastFiller = MBB.end();
 
+  // No delay slots
+  if (DisableDelaySlotFiller)
+    return false;
+
   for (MachineBasicBlock::iterator I = MBB.begin(); I != MBB.end(); ++I)
     if (I->getDesc().hasDelaySlot()) {
       MachineBasicBlock::iterator J = I;
 
-      if (!DisableDelaySlotFiller && findDelayInstr(MBB, I, J))
+      if (!CompatDelaySlotFiller && findDelayInstr(MBB, I, J))
         MBB.splice(llvm::next(I), &MBB, J);
       else
         BuildMI(MBB, llvm::next(I), DebugLoc(), TII->get(OR1K::NOP)).addImm(0);
