@@ -134,6 +134,10 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
 
   setMinFunctionAlignment(4);
   setPrefFunctionAlignment(4);
+
+  maxStoresPerMemcpy = 16;
+  maxStoresPerMemcpyOptSize = 8;
+  maxStoresPerMemset = 16;
 }
 
 SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
