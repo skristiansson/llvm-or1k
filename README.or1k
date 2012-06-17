@@ -26,4 +26,4 @@ TODO (not a complete list)
 --------------------------
 - Handle unconditional branches in AnalyzeBranch
 - Floating point support
-- Add support for (creating) vararg functions
+- Integrated assembler support
