@@ -753,11 +753,13 @@ OR1KTargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
 const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default: return NULL;
+  case OR1KISD::ADJDYNALLOC:        return "OR1KISD::ADJDYNALLOC";
   case OR1KISD::RET_FLAG:           return "OR1KISD::RET_FLAG";
   case OR1KISD::CALL:               return "OR1KISD::CALL";
   case OR1KISD::SELECT_CC:          return "OR1KISD::SELECT_CC";
   case OR1KISD::SET_FLAG:           return "OR1KISD::SET_FLAG";
   case OR1KISD::BR_CC:              return "OR1KISD::BR_CC";
+  case OR1KISD::Wrapper:            return "OR1KISD::Wrapper";
   }
 }
 
