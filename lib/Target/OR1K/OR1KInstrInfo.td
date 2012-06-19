@@ -51,6 +51,8 @@ def OR1Kselectcc    : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
                               [SDNPInGlue]>;
 def OR1KWrapper     : SDNode<"OR1KISD::Wrapper", SDT_OR1KWrapper>;
 def OR1Kadjdynalloc : SDNode<"OR1KISD::ADJDYNALLOC", SDT_OR1KAdjDynAlloc>;
+def OR1Kff1         : SDNode<"OR1KISD::FF1", SDTIntUnaryOp>;
+def OR1Kfl1         : SDNode<"OR1KISD::FL1", SDTIntUnaryOp>;
 
 // Extract bits 0-15 (low-end) of an immediate value.
 def LO16 : SDNodeXForm<imm, [{
@@ -287,6 +289,30 @@ let Predicates=[HasDiv] in {
   def DIV  : ALU_RR<0x9, "l.div", sdiv>;
   def DIVU : ALU_RR<0xa, "l.divu", udiv>;
 }
+
+class ALU2_RR<bits<2> subOp1, bits<4> subOp2, string asmstr, SDNode OpNode>
+      : InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA),
+               !strconcat(asmstr, "\t$rD, $rA"),
+               [(set GPR:$rD, (OpNode GPR:$rA))]>
+{
+  bits<5> rD;
+  bits<5> rA;
+  bits<2> op2;
+  bits<4> op3;
+
+  let Inst{25-21} = rD;
+  let Inst{20-16} = rA;
+
+  let Inst{9-8} = op2;
+  let Inst{3-0} = op3;
+
+  let op2 = subOp1;
+  let op3 = subOp2;
+}
+
+def FF1 : ALU2_RR<0x0, 0xf, "l.ff1", OR1Kff1>;
+def FL1 : ALU2_RR<0x1, 0xf, "l.fl1", OR1Kfl1>;
+
 // -------------------------------------------------- //
 // SHIFT instructions
 // -------------------------------------------------- //

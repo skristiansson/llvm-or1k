@@ -122,6 +122,11 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SRA_PARTS,         MVT::i32, Expand);
 
   setOperationAction(ISD::BSWAP,             MVT::i32, Expand);
+  setOperationAction(ISD::CTTZ,              MVT::i32, Custom);
+  setOperationAction(ISD::CTLZ,              MVT::i32, Custom);
+  setOperationAction(ISD::CTTZ_ZERO_UNDEF,   MVT::i32, Custom);
+  setOperationAction(ISD::CTLZ_ZERO_UNDEF,   MVT::i32, Custom);
+  setOperationAction(ISD::CTPOP,             MVT::i32, Expand);
 
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1,   Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8,   Expand);
@@ -149,6 +154,10 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
   case ISD::SELECT_CC:          return LowerSELECT_CC(Op, DAG);
   case ISD::VASTART:            return LowerVASTART(Op, DAG);
   case ISD::DYNAMIC_STACKALLOC: return LowerDYNAMIC_STACKALLOC(Op, DAG);
+  case ISD::CTTZ:               return LowerCTTZ(Op, DAG);
+  case ISD::CTLZ:               return LowerCTLZ(Op, DAG);
+  case ISD::CTTZ_ZERO_UNDEF:    return LowerCTTZ_ZERO_UNDEF(Op, DAG);
+  case ISD::CTLZ_ZERO_UNDEF:    return LowerCTLZ_ZERO_UNDEF(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -750,6 +759,58 @@ OR1KTargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
   return DAG.getMergeValues(Ops, 2, dl);
 }
 
+/// LowerCTTZ/LowerCTLZ - Lower the trailing/leading zero count
+/// by evaluating the value of the source reg, if zero simply use a
+/// find one instruction, otherwise act as if zero was undefined.
+///
+SDValue
+OR1KTargetLowering::LowerCTTZ(SDValue Op,
+                              SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
+  EVT VT = Op.getValueType();
+  SDValue SrcReg = Op.getOperand(0);
+  SDValue ff1 = DAG.getNode(OR1KISD::FF1, dl, VT, SrcReg);
+  SDValue ZeroUndef = LowerCTTZ_ZERO_UNDEF(Op, DAG);
+  SDValue CC = DAG.getCondCode(ISD::SETEQ);
+  return DAG.getNode(ISD::SELECT_CC, dl, VT, SrcReg,
+                     DAG.getConstant(0, MVT::i32), ff1, ZeroUndef, CC);
+}
+
+SDValue
+OR1KTargetLowering::LowerCTLZ(SDValue Op,
+                              SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
+  EVT VT = Op.getValueType();
+  SDValue SrcReg = Op.getOperand(0);
+  SDValue fl1 = DAG.getNode(OR1KISD::FL1, dl, VT, Op.getOperand(0));
+  SDValue ZeroUndef = LowerCTLZ_ZERO_UNDEF(Op, DAG);
+  SDValue CC = DAG.getCondCode(ISD::SETEQ);
+  return DAG.getNode(ISD::SELECT_CC, dl, VT, SrcReg,
+                     DAG.getConstant(0, MVT::i32), fl1, ZeroUndef, CC);
+}
+
+/// LowerCTTZ_ZERO_UNDEF/LowerCTLZ_ZERO_UNDEF - Lower count of zeros
+/// by using the relation cttz = ff1 - 1 and ctlz = fl1 - 1, for all
+/// values except zero.
+///
+SDValue
+OR1KTargetLowering::LowerCTTZ_ZERO_UNDEF(SDValue Op,
+                                         SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
+  EVT VT = Op.getValueType();
+  SDValue ff1 = DAG.getNode(OR1KISD::FF1, dl, VT, Op.getOperand(0));
+  return DAG.getNode(ISD::SUB, dl, VT, ff1, DAG.getConstant(1, MVT::i32));
+}
+
+SDValue
+OR1KTargetLowering::LowerCTLZ_ZERO_UNDEF(SDValue Op,
+                                         SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
+  EVT VT = Op.getValueType();
+  SDValue fl1 = DAG.getNode(OR1KISD::FL1, dl, VT, Op.getOperand(0));
+  return DAG.getNode(ISD::SUB, dl, VT, fl1, DAG.getConstant(1, MVT::i32));
+}
+
 const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default: return NULL;
@@ -760,6 +821,8 @@ const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   case OR1KISD::SET_FLAG:           return "OR1KISD::SET_FLAG";
   case OR1KISD::BR_CC:              return "OR1KISD::BR_CC";
   case OR1KISD::Wrapper:            return "OR1KISD::Wrapper";
+  case OR1KISD::FF1:                return "OR1KISD::FF1";
+  case OR1KISD::FL1:                return "OR1KISD::FL1";
   }
 }
 
