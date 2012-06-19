@@ -446,9 +446,9 @@ class BRANCHL_R<bits<4> subOp, string asmstring>
 		!strconcat(asmstring, "\t$rB"),
 		[(call GPR:$rB)]>
 {
-  bits<26> imm26;
+  bits<5> rB;
 
-  let Inst{25-0} = imm26;
+  let Inst{15-11} = rB;
 
   let opcode = subOp;
 }
