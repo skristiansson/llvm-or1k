@@ -506,7 +506,6 @@ OR1KTargetLowering::LowerReturn(SDValue Chain,
 
 /// LowerCCCCallTo - functions arguments are copied from virtual regs to
 /// (physical regs)/(stack frame), CALLSEQ_START and CALLSEQ_END are emitted.
-/// TODO: sret.
 SDValue
 OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
                                    CallingConv::ID CallConv, bool isVarArg,
@@ -522,6 +521,7 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
                  getTargetMachine(), ArgLocs, *DAG.getContext());
   GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee);
+  MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
 
   NumFixedArgs = 0;
   if (isVarArg && G) {
@@ -537,6 +537,28 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
   // Get a count of how many bytes are to be pushed on the stack.
   unsigned NumBytes = CCInfo.getNextStackOffset();
 
+  // Create local copies for byval args.
+  SmallVector<SDValue, 8> ByValArgs;
+  for (unsigned i = 0,  e = Outs.size(); i != e; ++i) {
+    ISD::ArgFlagsTy Flags = Outs[i].Flags;
+    if (!Flags.isByVal())
+      continue;
+
+    SDValue Arg = OutVals[i];
+    unsigned Size = Flags.getByValSize();
+    unsigned Align = Flags.getByValAlign();
+
+    int FI = MFI->CreateStackObject(Size, Align, false);
+    SDValue FIPtr = DAG.getFrameIndex(FI, getPointerTy());
+    SDValue SizeNode = DAG.getConstant(Size, MVT::i32);
+
+    Chain = DAG.getMemcpy(Chain, dl, FIPtr, Arg, SizeNode, Align,
+                          /*isVolatile=*/false,
+                          /*AlwaysInline=*/false,
+                          MachinePointerInfo(), MachinePointerInfo());
+    ByValArgs.push_back(FIPtr);
+  }
+
   Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(NumBytes,
                                                       getPointerTy(), true));
 
@@ -545,10 +567,11 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
   SDValue StackPtr;
 
   // Walk the register/memloc assignments, inserting copies/loads.
-  for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
+  for (unsigned i = 0, j = 0, e = ArgLocs.size(); i != e; ++i) {
     CCValAssign &VA = ArgLocs[i];
-
     SDValue Arg = OutVals[i];
+    ISD::ArgFlagsTy Flags = Outs[i].Flags;
+
 
     // Promote the value if needed.
     switch (VA.getLocInfo()) {
@@ -564,6 +587,10 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
         Arg = DAG.getNode(ISD::ANY_EXTEND, dl, VA.getLocVT(), Arg);
         break;
     }
+
+    // Use local copy if it is a byval arg.
+    if (Flags.isByVal())
+      Arg = ByValArgs[j++];
 
     // Arguments that can be passed on register must be kept at RegsToPass
     // vector
