@@ -51,8 +51,9 @@ void OR1KFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   // Update maximum call frame size.
   MFI->setMaxCallFrameSize(maxCallFrameSize);
 
-  // Include call frame size in total.
-  FrameSize += maxCallFrameSize;
+   // Include call frame size in total.
+  if (!(hasReservedCallFrame(MF) && MFI->adjustsStack()))
+    FrameSize += maxCallFrameSize;
 
   // Make sure the frame is aligned.
   FrameSize = RoundUpToAlignment(FrameSize, TargetAlign);
