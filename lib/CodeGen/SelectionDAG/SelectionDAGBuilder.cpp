@@ -21,6 +21,7 @@
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Constants.h"
 #include "llvm/CallingConv.h"
+#include "llvm/DebugInfo.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/GlobalVariable.h"
@@ -42,7 +43,6 @@
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/SelectionDAG.h"
-#include "llvm/Analysis/DebugInfo.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameLowering.h"
 #include "llvm/Target/TargetInstrInfo.h"
@@ -51,7 +51,7 @@
 #include "llvm/Target/TargetLowering.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/CRSBuilder.h"
+#include "llvm/Support/IntegersSubsetMapping.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
@@ -844,7 +844,7 @@ void SelectionDAGBuilder::clear() {
 }
 
 /// clearDanglingDebugInfo - Clear the dangling debug information
-/// map. This function is seperated from the clear so that debug
+/// map. This function is separated from the clear so that debug
 /// information that is dangling in a basic block can be properly
 /// resolved in a different basic block. This allows the
 /// SelectionDAG to resolve dangling debug information attached
@@ -1828,9 +1828,13 @@ void SelectionDAGBuilder::visitInvoke(const InvokeInst &I) {
   MachineBasicBlock *LandingPad = FuncInfo.MBBMap[I.getSuccessor(1)];
 
   const Value *Callee(I.getCalledValue());
+  const Function *Fn = dyn_cast<Function>(Callee);
   if (isa<InlineAsm>(Callee))
     visitInlineAsm(&I);
-  else
+  else if (Fn && Fn->isIntrinsic()) {
+    assert(Fn->getIntrinsicID() == Intrinsic::donothing);
+    return; // ignore invokes to @llvm.donothing
+  } else
     LowerCallTo(&I, getValue(Callee), false, LandingPad);
 
   // If the value of the invoke is used outside of its defining block, make it
@@ -2048,7 +2052,7 @@ bool SelectionDAGBuilder::handleSmallSwitchRange(CaseRec& CR,
 }
 
 static inline bool areJTsAllowed(const TargetLowering &TLI) {
-  return !TLI.getTargetMachine().Options.DisableJumpTables &&
+  return TLI.supportJumpTables() &&
           (TLI.isOperationLegalOrCustom(ISD::BR_JT, MVT::Other) ||
            TLI.isOperationLegalOrCustom(ISD::BRIND, MVT::Other));
 }
@@ -2427,7 +2431,7 @@ size_t SelectionDAGBuilder::Clusterify(CaseVector& Cases,
   
   /// Use a shorter form of declaration, and also
   /// show the we want to use CRSBuilder as Clusterifier.
-  typedef CRSBuilderBase<MachineBasicBlock, true> Clusterifier;
+  typedef IntegersSubsetMapping<MachineBasicBlock> Clusterifier;
   
   Clusterifier TheClusterifier;
 
@@ -2456,9 +2460,12 @@ size_t SelectionDAGBuilder::Clusterify(CaseVector& Cases,
       BPI->setEdgeWeight(SI.getParent(), C.second->getBasicBlock(), W);  
     }
 
-    Cases.push_back(Case(C.first.Low, C.first.High, C.second, W));
+    // FIXME: Currently work with ConstantInt based numbers.
+    // Changing it to APInt based is a pretty heavy for this commit.
+    Cases.push_back(Case(C.first.getLow().toConstantInt(),
+                         C.first.getHigh().toConstantInt(), C.second, W));
     
-    if (C.first.Low != C.first.High)
+    if (C.first.getLow() != C.first.getHigh())
     // A range counts double, since it requires two compares.
     ++numCmps;
   }
@@ -2807,7 +2814,7 @@ void SelectionDAGBuilder::visitExtractElement(const User &I) {
 }
 
 // Utility for visitShuffleVector - Return true if every element in Mask,
-// begining from position Pos and ending in Pos+Size, falls within the
+// beginning from position Pos and ending in Pos+Size, falls within the
 // specified sequential range [L, L+Pos). or is undef.
 static bool isSequentialInRange(const SmallVectorImpl<int> &Mask,
                                 unsigned Pos, unsigned Size, int Low) {
@@ -4917,6 +4924,11 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
   case Intrinsic::pow:
     visitPow(I);
     return 0;
+  case Intrinsic::fabs:
+    setValue(&I, DAG.getNode(ISD::FABS, dl,
+                             getValue(I.getArgOperand(0)).getValueType(),
+                             getValue(I.getArgOperand(0))));
+    return 0;
   case Intrinsic::fma:
     setValue(&I, DAG.getNode(ISD::FMA, dl,
                              getValue(I.getArgOperand(0)).getValueType(),
@@ -4924,6 +4936,29 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
                              getValue(I.getArgOperand(1)),
                              getValue(I.getArgOperand(2))));
     return 0;
+  case Intrinsic::fmuladd: {
+    EVT VT = TLI.getValueType(I.getType());
+    if (TM.Options.AllowFPOpFusion != FPOpFusion::Strict &&
+        TLI.isOperationLegal(ISD::FMA, VT) &&
+        TLI.isFMAFasterThanMulAndAdd(VT)){
+      setValue(&I, DAG.getNode(ISD::FMA, dl,
+                               getValue(I.getArgOperand(0)).getValueType(),
+                               getValue(I.getArgOperand(0)),
+                               getValue(I.getArgOperand(1)),
+                               getValue(I.getArgOperand(2))));
+    } else {
+      SDValue Mul = DAG.getNode(ISD::FMUL, dl,
+                                getValue(I.getArgOperand(0)).getValueType(),
+                                getValue(I.getArgOperand(0)),
+                                getValue(I.getArgOperand(1)));
+      SDValue Add = DAG.getNode(ISD::FADD, dl,
+                                getValue(I.getArgOperand(0)).getValueType(),
+                                Mul,
+                                getValue(I.getArgOperand(2)));
+      setValue(&I, Add);
+    }
+    return 0;
+  }
   case Intrinsic::convert_to_fp16:
     setValue(&I, DAG.getNode(ISD::FP32_TO_FP16, dl,
                              MVT::i16, getValue(I.getArgOperand(0))));
@@ -5146,6 +5181,9 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
   case Intrinsic::invariant_end:
   case Intrinsic::lifetime_end:
     // Discard region information.
+    return 0;
+  case Intrinsic::donothing:
+    // ignore
     return 0;
   }
 }
@@ -6211,8 +6249,15 @@ void SelectionDAGBuilder::visitInlineAsm(ImmutableCallSite CS) {
       assert((OpInfo.ConstraintType == TargetLowering::C_RegisterClass ||
               OpInfo.ConstraintType == TargetLowering::C_Register) &&
              "Unknown constraint type!");
-      assert(!OpInfo.isIndirect &&
-             "Don't know how to handle indirect register inputs yet!");
+
+      // TODO: Support this.
+      if (OpInfo.isIndirect) {
+        LLVMContext &Ctx = *DAG.getContext();
+        Ctx.emitError(CS.getInstruction(),
+                      "Don't know how to handle indirect register inputs yet "
+                      "for constraint '" + Twine(OpInfo.ConstraintCode) + "'");
+        break;
+      }
 
       // Copy the input into the appropriate registers.
       if (OpInfo.AssignedRegs.Regs.empty()) {

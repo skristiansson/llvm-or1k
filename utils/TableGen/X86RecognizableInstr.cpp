@@ -277,8 +277,8 @@ RecognizableInstr::RecognizableInstr(DisassemblerTables &tables,
 }
   
 void RecognizableInstr::processInstr(DisassemblerTables &tables,
-	const CodeGenInstruction &insn,
-                                   InstrUID uid)
+                                     const CodeGenInstruction &insn,
+                                     InstrUID uid)
 {
   // Ignore "asm parser only" instructions.
   if (insn.TheDef->getValueAsBit("isAsmParserOnly"))
@@ -508,13 +508,13 @@ bool RecognizableInstr::has256BitOperands() const {
   return false;
 }
   
-void RecognizableInstr::handleOperand(
-  bool optional,
-  unsigned &operandIndex,
-  unsigned &physicalOperandIndex,
-  unsigned &numPhysicalOperands,
-  unsigned *operandMapping,
-  OperandEncoding (*encodingFromString)(const std::string&, bool hasOpSizePrefix)) {
+void RecognizableInstr::handleOperand(bool optional, unsigned &operandIndex,
+                                      unsigned &physicalOperandIndex,
+                                      unsigned &numPhysicalOperands,
+                                      const unsigned *operandMapping,
+                                      OperandEncoding (*encodingFromString)
+                                        (const std::string&,
+                                         bool hasOpSizePrefix)) {
   if (optional) {
     if (physicalOperandIndex >= numPhysicalOperands)
       return;
@@ -563,7 +563,6 @@ void RecognizableInstr::emitInstructionSpecifier(DisassemblerTables &tables) {
     
   const std::vector<CGIOperandList::OperandInfo> &OperandList = *Operands;
   
-  unsigned operandIndex;
   unsigned numOperands = OperandList.size();
   unsigned numPhysicalOperands = 0;
   
@@ -575,12 +574,13 @@ void RecognizableInstr::emitInstructionSpecifier(DisassemblerTables &tables) {
   
   assert(numOperands <= X86_MAX_OPERANDS && "X86_MAX_OPERANDS is not large enough");
   
-  for (operandIndex = 0; operandIndex < numOperands; ++operandIndex) {
+  for (unsigned operandIndex = 0; operandIndex < numOperands; ++operandIndex) {
     if (OperandList[operandIndex].Constraints.size()) {
       const CGIOperandList::ConstraintInfo &Constraint =
         OperandList[operandIndex].Constraints[0];
       if (Constraint.isTied()) {
-        operandMapping[operandIndex] = Constraint.getTiedOperand();
+        operandMapping[operandIndex] = operandIndex;
+        operandMapping[Constraint.getTiedOperand()] = operandIndex;
       } else {
         ++numPhysicalOperands;
         operandMapping[operandIndex] = operandIndex;
@@ -621,7 +621,7 @@ void RecognizableInstr::emitInstructionSpecifier(DisassemblerTables &tables) {
                 class##EncodingFromString);
   
   // operandIndex should always be < numOperands
-  operandIndex = 0;
+  unsigned operandIndex = 0;
   // physicalOperandIndex should always be < numPhysicalOperands
   unsigned physicalOperandIndex = 0;
     
@@ -690,12 +690,13 @@ void RecognizableInstr::emitInstructionSpecifier(DisassemblerTables &tables) {
     // Operand 2 is a register operand in the R/M field.
     // - In AVX, there is a register operand in the VEX.vvvv field here -
     // Operand 3 (optional) is an immediate.
+    // Operand 4 (optional) is an immediate.
 
     if (HasVEX_4VPrefix || HasVEX_4VOp3Prefix)
       assert(numPhysicalOperands >= 3 && numPhysicalOperands <= 5 &&
              "Unexpected number of operands for MRMSrcRegFrm with VEX_4V"); 
     else
-      assert(numPhysicalOperands >= 2 && numPhysicalOperands <= 3 &&
+      assert(numPhysicalOperands >= 2 && numPhysicalOperands <= 4 &&
              "Unexpected number of operands for MRMSrcRegFrm");
   
     HANDLE_OPERAND(roRegister)
@@ -716,6 +717,7 @@ void RecognizableInstr::emitInstructionSpecifier(DisassemblerTables &tables) {
     if (!HasMemOp4Prefix)
       HANDLE_OPTIONAL(immediate)
     HANDLE_OPTIONAL(immediate) // above might be a register in 7:4
+    HANDLE_OPTIONAL(immediate)
     break;
   case X86Local::MRMSrcMem:
     // Operand 1 is a register operand in the Reg/Opcode field.
@@ -759,16 +761,18 @@ void RecognizableInstr::emitInstructionSpecifier(DisassemblerTables &tables) {
   case X86Local::MRM7r:
     // Operand 1 is a register operand in the R/M field.
     // Operand 2 (optional) is an immediate or relocation.
+    // Operand 3 (optional) is an immediate.
     if (HasVEX_4VPrefix)
       assert(numPhysicalOperands <= 3 &&
              "Unexpected number of operands for MRMnRFrm with VEX_4V");
     else
-      assert(numPhysicalOperands <= 2 &&
+      assert(numPhysicalOperands <= 3 &&
              "Unexpected number of operands for MRMnRFrm");
     if (HasVEX_4VPrefix)
       HANDLE_OPERAND(vvvvRegister)
     HANDLE_OPTIONAL(rmRegister)
     HANDLE_OPTIONAL(relocation)
+    HANDLE_OPTIONAL(immediate)
     break;
   case X86Local::MRM0m:
   case X86Local::MRM1m:
@@ -1102,6 +1106,8 @@ OperandType RecognizableInstr::typeFromString(const std::string &s,
   TYPE("VR128",               TYPE_XMM128)
   TYPE("f128mem",             TYPE_M128)
   TYPE("f256mem",             TYPE_M256)
+  TYPE("v128mem",             TYPE_M128)
+  TYPE("v256mem",             TYPE_M256)
   TYPE("FR64",                TYPE_XMM64)
   TYPE("f64mem",              TYPE_M64FP)
   TYPE("sdmem",               TYPE_M64FP)
@@ -1231,6 +1237,8 @@ OperandEncoding RecognizableInstr::memoryEncodingFromString
   ENCODING("sdmem",           ENCODING_RM)
   ENCODING("f128mem",         ENCODING_RM)
   ENCODING("f256mem",         ENCODING_RM)
+  ENCODING("v128mem",         ENCODING_RM)
+  ENCODING("v256mem",         ENCODING_RM)
   ENCODING("f64mem",          ENCODING_RM)
   ENCODING("f32mem",          ENCODING_RM)
   ENCODING("i128mem",         ENCODING_RM)

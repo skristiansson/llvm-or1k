@@ -83,3 +83,122 @@ entry:
   %cond = select i1 %cmp, i32 %sub, i32 0
   ret i32 %cond
 }
+; redundant cmp instruction
+define i32 @l(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: l:
+; CHECK-NOT: cmp
+  %cmp = icmp slt i32 %b, %a
+  %sub = sub nsw i32 %a, %b
+  %cond = select i1 %cmp, i32 %sub, i32 %a
+  ret i32 %cond
+}
+define i32 @m(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: m:
+; CHECK-NOT: cmp
+  %cmp = icmp sgt i32 %a, %b
+  %sub = sub nsw i32 %a, %b
+  %cond = select i1 %cmp, i32 %b, i32 %sub
+  ret i32 %cond
+}
+; If EFLAGS is live-out, we can't remove cmp if there exists
+; a swapped sub.
+define i32 @l2(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: l2:
+; CHECK: cmp
+  %cmp = icmp eq i32 %b, %a
+  %sub = sub nsw i32 %a, %b
+  br i1 %cmp, label %if.then, label %if.else
+
+if.then:
+  %cmp2 = icmp sgt i32 %b, %a
+  %sel = select i1 %cmp2, i32 %sub, i32 %a
+  ret i32 %sel
+
+if.else:
+  ret i32 %sub
+}
+define i32 @l3(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: l3:
+; CHECK: sub
+; CHECK-NOT: cmp
+; CHECK: jge
+  %cmp = icmp sgt i32 %b, %a
+  %sub = sub nsw i32 %a, %b
+  br i1 %cmp, label %if.then, label %if.else
+
+if.then:
+  ret i32 %sub
+
+if.else:
+  %add = add nsw i32 %sub, 1
+  ret i32 %add
+}
+; rdar://11830760
+; When Movr0 is between sub and cmp, we need to move "Movr0" before sub.
+define i32 @l4(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: l4:
+; CHECK: sub
+; CHECK-NOT: cmp
+  %cmp = icmp sgt i32 %b, %a
+  %sub = sub i32 %a, %b
+  %.sub = select i1 %cmp, i32 0, i32 %sub
+  ret i32 %.sub
+}
+; rdar://11540023
+define i32 @n(i32 %x, i32 %y) nounwind {
+entry:
+; CHECK: n:
+; CHECK-NOT: sub
+; CHECK: cmp
+  %sub = sub nsw i32 %x, %y
+  %cmp = icmp slt i32 %sub, 0
+  %y.x = select i1 %cmp, i32 %y, i32 %x
+  ret i32 %y.x
+}
+; PR://13046
+define void @o() nounwind uwtable {
+entry:
+  %0 = load i16* undef, align 2
+  br i1 undef, label %if.then.i, label %if.end.i
+
+if.then.i:                                        ; preds = %entry
+  unreachable
+
+if.end.i:                                         ; preds = %entry
+  br i1 undef, label %sw.bb, label %sw.default
+
+sw.bb:                                            ; preds = %if.end.i
+  br i1 undef, label %if.then44, label %if.end29
+
+if.end29:                                         ; preds = %sw.bb
+; CHECK: o:
+; CHECK: cmp
+  %1 = urem i16 %0, 10
+  %cmp25 = icmp eq i16 %1, 0
+  %. = select i1 %cmp25, i16 2, i16 0
+  br i1 %cmp25, label %if.then44, label %sw.default
+
+sw.default:                                       ; preds = %if.end29, %if.end.i
+  br i1 undef, label %if.then.i96, label %if.else.i97
+
+if.then.i96:                                      ; preds = %sw.default
+  unreachable
+
+if.else.i97:                                      ; preds = %sw.default
+  unreachable
+
+if.then44:                                        ; preds = %if.end29, %sw.bb
+  %aModeRefSel.1.ph = phi i16 [ %., %if.end29 ], [ 3, %sw.bb ]
+  br i1 undef, label %if.then.i103, label %if.else.i104
+
+if.then.i103:                                     ; preds = %if.then44
+  unreachable
+
+if.else.i104:                                     ; preds = %if.then44
+  ret void
+}

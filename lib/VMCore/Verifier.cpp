@@ -68,6 +68,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ConstantRange.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -805,23 +806,24 @@ void Verifier::visitSwitchInst(SwitchInst &SI) {
   // Check to make sure that all of the constants in the switch instruction
   // have the same type as the switched-on value.
   Type *SwitchTy = SI.getCondition()->getType();
-  CRSBuilder Builder;
-  std::map<ConstantRangesSet::Range, unsigned> RangeSetMap;
+  IntegerType *IntTy = cast<IntegerType>(SwitchTy);
+  IntegersSubsetToBB Mapping;
+  std::map<IntegersSubset::Range, unsigned> RangeSetMap;
   for (SwitchInst::CaseIt i = SI.case_begin(), e = SI.case_end(); i != e; ++i) {
-    ConstantRangesSet RS = i.getCaseValueEx();
-    for (unsigned ri = 0, rie = RS.getNumItems(); ri < rie; ++ri) {
-      ConstantRangesSet::Range r = RS.getItem(ri);
-      Assert1(r.Low->getType() == SwitchTy,
+    IntegersSubset CaseRanges = i.getCaseValueEx();
+    for (unsigned ri = 0, rie = CaseRanges.getNumItems(); ri < rie; ++ri) {
+      IntegersSubset::Range r = CaseRanges.getItem(ri);
+      Assert1(((const APInt&)r.getLow()).getBitWidth() == IntTy->getBitWidth(),
               "Switch constants must all be same type as switch value!", &SI);
-      Assert1(r.High->getType() == SwitchTy,
+      Assert1(((const APInt&)r.getHigh()).getBitWidth() == IntTy->getBitWidth(),
               "Switch constants must all be same type as switch value!", &SI);
-      Builder.add(r);
+      Mapping.add(r);
       RangeSetMap[r] = i.getCaseIndex();
     }
   }
   
-  CRSBuilder::RangeIterator errItem;
-  if (!Builder.verify(errItem)) {
+  IntegersSubsetToBB::RangeIterator errItem;
+  if (!Mapping.verify(errItem)) {
     unsigned CaseIndex = RangeSetMap[errItem->first];
     SwitchInst::CaseIt i(&SI, CaseIndex);
     Assert2(false, "Duplicate integer as switch case", &SI, i.getCaseValueEx());
@@ -1361,6 +1363,10 @@ void Verifier::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   visitInstruction(GEP);
 }
 
+static bool isContiguous(const ConstantRange &A, const ConstantRange &B) {
+  return A.getUpper() == B.getLower() || A.getLower() == B.getUpper();
+}
+
 void Verifier::visitLoadInst(LoadInst &LI) {
   PointerType *PTy = dyn_cast<PointerType>(LI.getOperand(0)->getType());
   Assert1(PTy, "Load operand must be a pointer.", &LI);
@@ -1382,6 +1388,8 @@ void Verifier::visitLoadInst(LoadInst &LI) {
     Assert1(NumOperands % 2 == 0, "Unfinished range!", Range);
     unsigned NumRanges = NumOperands / 2;
     Assert1(NumRanges >= 1, "It should have at least one range!", Range);
+
+    ConstantRange LastRange(1); // Dummy initial value
     for (unsigned i = 0; i < NumRanges; ++i) {
       ConstantInt *Low = dyn_cast<ConstantInt>(Range->getOperand(2*i));
       Assert1(Low, "The lower limit must be an integer!", Low);
@@ -1390,9 +1398,35 @@ void Verifier::visitLoadInst(LoadInst &LI) {
       Assert1(High->getType() == Low->getType() &&
               High->getType() == ElTy, "Range types must match load type!",
               &LI);
-      Assert1(High->getValue() != Low->getValue(), "Range must not be empty!",
+
+      APInt HighV = High->getValue();
+      APInt LowV = Low->getValue();
+      ConstantRange CurRange(LowV, HighV);
+      Assert1(!CurRange.isEmptySet() && !CurRange.isFullSet(),
+              "Range must not be empty!", Range);
+      if (i != 0) {
+        Assert1(CurRange.intersectWith(LastRange).isEmptySet(),
+                "Intervals are overlapping", Range);
+        Assert1(LowV.sgt(LastRange.getLower()), "Intervals are not in order",
+                Range);
+        Assert1(!isContiguous(CurRange, LastRange), "Intervals are contiguous",
+                Range);
+      }
+      LastRange = ConstantRange(LowV, HighV);
+    }
+    if (NumRanges > 2) {
+      APInt FirstLow =
+        dyn_cast<ConstantInt>(Range->getOperand(0))->getValue();
+      APInt FirstHigh =
+        dyn_cast<ConstantInt>(Range->getOperand(1))->getValue();
+      ConstantRange FirstRange(FirstLow, FirstHigh);
+      Assert1(FirstRange.intersectWith(LastRange).isEmptySet(),
+              "Intervals are overlapping", Range);
+      Assert1(!isContiguous(FirstRange, LastRange), "Intervals are contiguous",
               Range);
     }
+
+
   }
 
   visitInstruction(LI);
@@ -1541,53 +1575,9 @@ void Verifier::visitLandingPadInst(LandingPadInst &LPI) {
 
 void Verifier::verifyDominatesUse(Instruction &I, unsigned i) {
   Instruction *Op = cast<Instruction>(I.getOperand(i));
-  BasicBlock *BB = I.getParent();
-  BasicBlock *OpBlock = Op->getParent();
-  PHINode *PN = dyn_cast<PHINode>(&I);
 
-  // DT can handle non phi instructions for us.
-  if (!PN) {
-    // Definition must dominate use unless use is unreachable!
-    Assert2(InstsInThisBlock.count(Op) || !DT->isReachableFromEntry(BB) ||
-            DT->dominates(Op, &I),
-            "Instruction does not dominate all uses!", Op, &I);
-    return;
-  }
-
-  // Check that a definition dominates all of its uses.
-  if (InvokeInst *II = dyn_cast<InvokeInst>(Op)) {
-    // Invoke results are only usable in the normal destination, not in the
-    // exceptional destination.
-    BasicBlock *NormalDest = II->getNormalDest();
-
-
-    // PHI nodes differ from other nodes because they actually "use" the
-    // value in the predecessor basic blocks they correspond to.
-    BasicBlock *UseBlock = BB;
-    unsigned j = PHINode::getIncomingValueNumForOperand(i);
-    UseBlock = PN->getIncomingBlock(j);
-    Assert2(UseBlock, "Invoke operand is PHI node with bad incoming-BB",
-            Op, &I);
-
-    if (UseBlock == OpBlock) {
-      // Special case of a phi node in the normal destination or the unwind
-      // destination.
-      Assert2(BB == NormalDest || !DT->isReachableFromEntry(UseBlock),
-              "Invoke result not available in the unwind destination!",
-              Op, &I);
-    } else {
-      Assert2(DT->dominates(II, UseBlock) ||
-              !DT->isReachableFromEntry(UseBlock),
-              "Invoke result does not dominate all uses!", Op, &I);
-    }
-  }
-
-  // PHI nodes are more difficult than other nodes because they actually
-  // "use" the value in the predecessor basic blocks they correspond to.
-  unsigned j = PHINode::getIncomingValueNumForOperand(i);
-  BasicBlock *PredBB = PN->getIncomingBlock(j);
-  Assert2(PredBB && (DT->dominates(OpBlock, PredBB) ||
-                     !DT->isReachableFromEntry(PredBB)),
+  const Use &U = I.getOperandUse(i);
+  Assert2(InstsInThisBlock.count(Op) || DT->dominates(Op, U),
           "Instruction does not dominate all uses!", Op, &I);
 }
 
@@ -1646,8 +1636,11 @@ void Verifier::visitInstruction(Instruction &I) {
     if (Function *F = dyn_cast<Function>(I.getOperand(i))) {
       // Check to make sure that the "address of" an intrinsic function is never
       // taken.
-      Assert1(!F->isIntrinsic() || (i + 1 == e && isa<CallInst>(I)),
+      Assert1(!F->isIntrinsic() || i == (isa<CallInst>(I) ? e-1 : 0),
               "Cannot take the address of an intrinsic!", &I);
+      Assert1(!F->isIntrinsic() || isa<CallInst>(I) ||
+              F->getIntrinsicID() == Intrinsic::donothing,
+              "Cannot invoke an intrinsinc other than donothing", &I);
       Assert1(F->getParent() == Mod, "Referencing function in another module!",
               &I);
     } else if (BasicBlock *OpBB = dyn_cast<BasicBlock>(I.getOperand(i))) {
@@ -1733,7 +1726,7 @@ bool Verifier::VerifyIntrinsicType(Type *Ty,
   }
       
   case IITDescriptor::Argument:
-    // Two cases here - If this is the second occurrance of an argument, verify
+    // Two cases here - If this is the second occurrence of an argument, verify
     // that the later instance matches the previous instance. 
     if (D.getArgumentNumber() < ArgTys.size())
       return Ty != ArgTys[D.getArgumentNumber()];  

@@ -79,7 +79,17 @@ namespace llvm {
       Sync,
 
       Ext,
-      Ins
+      Ins,
+
+      // Load/Store Left/Right nodes.
+      LWL = ISD::FIRST_TARGET_MEMORY_OPCODE,
+      LWR,
+      SWL,
+      SWR,
+      LDL,
+      LDR,
+      SDL,
+      SDR
     };
   }
 
@@ -128,15 +138,20 @@ namespace llvm {
     SDValue LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerJumpTable(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSELECT(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSETCC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerVASTART(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFCOPYSIGN(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFABS(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerMEMBARRIER(SDValue Op, SelectionDAG& DAG) const;
     SDValue LowerATOMIC_FENCE(SDValue Op, SelectionDAG& DAG) const;
     SDValue LowerShiftLeftParts(SDValue Op, SelectionDAG& DAG) const;
-    SDValue LowerShiftRightParts(SDValue Op, SelectionDAG& DAG, bool IsSRA) const;
+    SDValue LowerShiftRightParts(SDValue Op, SelectionDAG& DAG,
+                                 bool IsSRA) const;
+    SDValue LowerLOAD(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerSTORE(SDValue Op, SelectionDAG &DAG) const;
 
     virtual SDValue
       LowerFormalArguments(SDValue Chain,
@@ -182,6 +197,11 @@ namespace llvm {
                                               SelectionDAG &DAG) const;
 
     virtual bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const;
+
+    virtual EVT getOptimalMemOpType(uint64_t Size, unsigned DstAlign,
+                                    unsigned SrcAlign, bool IsZeroVal,
+                                    bool MemcpyStrSrc,
+                                    MachineFunction &MF) const;
 
     /// isFPImmLegal - Returns true if the target can instruction select the
     /// specified FP immediate natively. If false, the legalizer will

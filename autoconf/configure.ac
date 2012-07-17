@@ -648,7 +648,7 @@ case "$enableval" in
   *) AC_MSG_ERROR([Invalid setting for --enable-timestamps. Use "yes" or "no"]) ;;
 esac
 AC_DEFINE_UNQUOTED([ENABLE_TIMESTAMPS],$ENABLE_TIMESTAMPS,
-                   [Define if timestamp information (e.g., __DATE___) is allowed])
+                   [Define if timestamp information (e.g., __DATE__) is allowed])
 
 dnl Allow specific targets to be specified for building (or not)
 TARGETS_TO_BUILD=""
@@ -1054,8 +1054,6 @@ AC_PATH_PROG(DOXYGEN, [doxygen])
 AC_PATH_PROG(GROFF, [groff])
 AC_PATH_PROG(GZIPBIN, [gzip])
 AC_PATH_PROG(PDFROFF, [pdfroff])
-AC_PATH_PROG(RUNTEST, [runtest])
-DJ_AC_PATH_TCLSH
 AC_PATH_PROG(ZIP, [zip])
 AC_PATH_PROGS(OCAMLC, [ocamlc])
 AC_PATH_PROGS(OCAMLOPT, [ocamlopt])

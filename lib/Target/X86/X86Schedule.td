@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// Instruction Itinerary classes used for X86 
+// Instruction Itinerary classes used for X86
 def IIC_DEFAULT     : InstrItinClass;
 def IIC_ALU_MEM     : InstrItinClass;
 def IIC_ALU_NONMEM  : InstrItinClass;
@@ -456,9 +456,26 @@ def IIC_NOP : InstrItinClass;
 //===----------------------------------------------------------------------===//
 // Processor instruction itineraries.
 
-def GenericItineraries : ProcessorItineraries<[], [], []>;
+// IssueWidth is analagous to the number of decode units. Core and its
+// descendents, including Nehalem and SandyBridge have 4 decoders.
+// Resources beyond the decoder operate on micro-ops and are bufferred
+// so adjacent micro-ops don't directly compete.
+//
+// MinLatency=0 indicates that RAW dependencies can be decoded in the
+// same cycle.
+//
+// HighLatency=10 is optimistic. X86InstrInfo::isHighLatencyDef
+// indicates high latency opcodes. Alternatively, InstrItinData
+// entries may be included here to define specific operand
+// latencies. Since these latencies are not used for pipeline hazards,
+// they do not need to be exact.
+//
+// The GenericModel contains no instruciton itineraries.
+def GenericModel : SchedMachineModel {
+  let IssueWidth = 4;
+  let MinLatency = 0;
+  let LoadLatency = 4;
+  let HighLatency = 10;
+}
 
 include "X86ScheduleAtom.td"
-
-
-

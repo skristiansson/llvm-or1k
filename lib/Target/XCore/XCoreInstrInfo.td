@@ -741,14 +741,12 @@ let isCall=1,
 // All calls clobber the link register and the non-callee-saved registers:
 Defs = [R0, R1, R2, R3, R11, LR], Uses = [SP] in {
 def BL_u10 : _FU10<
-                  (outs),
-                  (ins calltarget:$target, variable_ops),
+                  (outs), (ins calltarget:$target),
                   "bl $target",
                   [(XCoreBranchLink immU10:$target)]>;
 
 def BL_lu10 : _FLU10<
-                  (outs),
-                  (ins calltarget:$target, variable_ops),
+                  (outs), (ins calltarget:$target),
                   "bl $target",
                   [(XCoreBranchLink immU20:$target)]>;
 }
@@ -796,7 +794,7 @@ def MKMSK_rus : _FRUS<(outs GRRegs:$dst), (ins i32imm:$size),
 
 def MKMSK_2r : _FRUS<(outs GRRegs:$dst), (ins GRRegs:$size),
                  "mkmsk $dst, $size",
-                 [(set GRRegs:$dst, (add (shl 1, GRRegs:$size), 0xffffffff))]>;
+                 [(set GRRegs:$dst, (add (shl 1, GRRegs:$size), -1))]>;
 
 def GETR_rus : _FRUS<(outs GRRegs:$dst), (ins i32imm:$type),
                  "getr $dst, $type",
@@ -988,7 +986,7 @@ def ECALLF_1r : _F1R<(outs), (ins GRRegs:$src),
 let isCall=1, 
 // All calls clobber the link register and the non-callee-saved registers:
 Defs = [R0, R1, R2, R3, R11, LR], Uses = [SP] in {
-def BLA_1r : _F1R<(outs), (ins GRRegs:$addr, variable_ops),
+def BLA_1r : _F1R<(outs), (ins GRRegs:$addr),
                  "bla $addr",
                  [(XCoreBranchLink GRRegs:$addr)]>;
 }

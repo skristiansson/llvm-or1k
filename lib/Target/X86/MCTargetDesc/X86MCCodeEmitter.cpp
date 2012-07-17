@@ -570,7 +570,17 @@ void X86MCCodeEmitter::EmitVEXOpcodePrefix(uint64_t TSFlags, unsigned &CurByte,
   }
 
   // Classify VEX_B, VEX_4V, VEX_R, VEX_X
+  unsigned NumOps = Desc.getNumOperands();
   unsigned CurOp = 0;
+  if (NumOps > 1 && Desc.getOperandConstraint(1, MCOI::TIED_TO) == 0)
+    ++CurOp;
+  else if (NumOps > 3 && Desc.getOperandConstraint(2, MCOI::TIED_TO) == 0) {
+    assert(Desc.getOperandConstraint(NumOps - 1, MCOI::TIED_TO) == 1);
+    // Special case for GATHER with 2 TIED_TO operands
+    // Skip the first 2 operands: dst, mask_wb
+    CurOp += 2;
+  }
+
   switch (TSFlags & X86II::FormMask) {
   case X86II::MRMInitReg: llvm_unreachable("FIXME: Remove this!");
   case X86II::MRMDestMem: {
@@ -603,11 +613,11 @@ void X86MCCodeEmitter::EmitVEXOpcodePrefix(uint64_t TSFlags, unsigned &CurByte,
     //  FMA4:
     //  dst(ModR/M.reg), src1(VEX_4V), src2(ModR/M), src3(VEX_I8IMM)
     //  dst(ModR/M.reg), src1(VEX_4V), src2(VEX_I8IMM), src3(ModR/M),
-    if (X86II::isX86_64ExtendedReg(MI.getOperand(0).getReg()))
+    if (X86II::isX86_64ExtendedReg(MI.getOperand(CurOp++).getReg()))
       VEX_R = 0x0;
 
     if (HasVEX_4V)
-      VEX_4V = getVEXRegisterEncoding(MI, 1);
+      VEX_4V = getVEXRegisterEncoding(MI, CurOp);
 
     if (X86II::isX86_64ExtendedReg(
                MI.getOperand(MemOperand+X86::AddrBaseReg).getReg()))
@@ -617,7 +627,12 @@ void X86MCCodeEmitter::EmitVEXOpcodePrefix(uint64_t TSFlags, unsigned &CurByte,
       VEX_X = 0x0;
 
     if (HasVEX_4VOp3)
-      VEX_4V = getVEXRegisterEncoding(MI, X86::AddrNumOperands+1);
+      // Instruction format for 4VOp3:
+      //   src1(ModR/M), MemAddr, src3(VEX_4V)
+      // CurOp points to start of the MemoryOperand,
+      //   it skips TIED_TO operands if exist, then increments past src1.
+      // CurOp + X86::AddrNumOperands will point to src3.
+      VEX_4V = getVEXRegisterEncoding(MI, CurOp+X86::AddrNumOperands);
     break;
   case X86II::MRM0m: case X86II::MRM1m:
   case X86II::MRM2m: case X86II::MRM3m:
@@ -962,11 +977,14 @@ EncodeInstruction(const MCInst &MI, raw_ostream &OS,
   // FIXME: This should be handled during MCInst lowering.
   unsigned NumOps = Desc.getNumOperands();
   unsigned CurOp = 0;
-  if (NumOps > 1 && Desc.getOperandConstraint(1, MCOI::TIED_TO) != -1)
+  if (NumOps > 1 && Desc.getOperandConstraint(1, MCOI::TIED_TO) == 0)
     ++CurOp;
-  else if (NumOps > 2 && Desc.getOperandConstraint(NumOps-1, MCOI::TIED_TO)== 0)
-    // Skip the last source operand that is tied_to the dest reg. e.g. LXADD32
-    --NumOps;
+  else if (NumOps > 3 && Desc.getOperandConstraint(2, MCOI::TIED_TO) == 0) {
+    assert(Desc.getOperandConstraint(NumOps - 1, MCOI::TIED_TO) == 1);
+    // Special case for GATHER with 2 TIED_TO operands
+    // Skip the first 2 operands: dst, mask_wb
+    CurOp += 2;
+  }
 
   // Keep track of the current byte being emitted.
   unsigned CurByte = 0;
@@ -1150,8 +1168,9 @@ EncodeInstruction(const MCInst &MI, raw_ostream &OS,
   }
 
   // If there is a remaining operand, it must be a trailing immediate.  Emit it
-  // according to the right size for the instruction.
-  if (CurOp != NumOps) {
+  // according to the right size for the instruction. Some instructions
+  // (SSE4a extrq and insertq) have two trailing immediates.
+  while (CurOp != NumOps && NumOps - CurOp <= 2) {
     // The last source register of a 4 operand instruction in AVX is encoded
     // in bits[7:4] of a immediate byte.
     if ((TSFlags >> X86II::VEXShift) & X86II::VEX_I8IMM) {

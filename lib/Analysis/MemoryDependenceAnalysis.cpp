@@ -474,8 +474,7 @@ getPointerDependencyFrom(const AliasAnalysis::Location &MemLoc, bool isLoad,
     // a subsequent bitcast of the malloc call result.  There can be stores to
     // the malloced memory between the malloc call and its bitcast uses, and we
     // need to continue scanning until the malloc call.
-    if (isa<AllocaInst>(Inst) ||
-        (isa<CallInst>(Inst) && extractMallocCall(Inst))) {
+    if (isa<AllocaInst>(Inst) || isNoAliasFn(Inst)) {
       const Value *AccessPtr = GetUnderlyingObject(MemLoc.Ptr, TD);
       
       if (AccessPtr == Inst || AA->isMustAlias(Inst, AccessPtr))
@@ -906,7 +905,7 @@ getNonLocalPointerDepFromBB(const PHITransAddr &Pointer,
   if (!Pair.second) {
     if (CacheInfo->Size < Loc.Size) {
       // The query's Size is greater than the cached one. Throw out the
-      // cached data and procede with the query at the greater size.
+      // cached data and proceed with the query at the greater size.
       CacheInfo->Pair = BBSkipFirstBlockPair();
       CacheInfo->Size = Loc.Size;
       for (NonLocalDepInfo::iterator DI = CacheInfo->NonLocalDeps.begin(),

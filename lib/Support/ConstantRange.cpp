@@ -143,16 +143,18 @@ bool ConstantRange::isSignWrappedSet() const {
 /// getSetSize - Return the number of elements in this set.
 ///
 APInt ConstantRange::getSetSize() const {
-  if (isEmptySet()) 
-    return APInt(getBitWidth(), 0);
-  if (getBitWidth() == 1) {
-    if (Lower != Upper)  // One of T or F in the set...
-      return APInt(2, 1);
-    return APInt(2, 2);      // Must be full set...
+  if (isEmptySet())
+    return APInt(getBitWidth()+1, 0);
+
+  if (isFullSet())
+    return APInt::getMaxValue(getBitWidth()).zext(getBitWidth()+1) + 1;
+
+  if (isWrappedSet()) {
+    APInt Result = Upper + (APInt::getMaxValue(getBitWidth()) - Lower + 1);
+    return Result.zext(getBitWidth()+1);
   }
 
-  // Simply subtract the bounds...
-  return Upper - Lower;
+  return (Upper - Lower).zext(getBitWidth()+1);
 }
 
 /// getUnsignedMax - Return the largest unsigned value contained in the
@@ -248,6 +250,12 @@ ConstantRange ConstantRange::subtract(const APInt &Val) const {
   return ConstantRange(Lower - Val, Upper - Val);
 }
 
+/// \brief Subtract the specified range from this range (aka relative complement
+/// of the sets).
+ConstantRange ConstantRange::difference(const ConstantRange &CR) const {
+  return intersectWith(CR.inverse());
+}
+
 /// intersectWith - Return the range that results from the intersection of this
 /// range with another range.  The resultant range is guaranteed to include all
 /// elements contained in both input ranges, and to have the smallest possible
@@ -316,7 +324,7 @@ ConstantRange ConstantRange::intersectWith(const ConstantRange &CR) const {
 
     return CR;
   }
-  if (CR.Upper.ult(Lower)) {
+  if (CR.Upper.ule(Lower)) {
     if (CR.Lower.ult(Lower))
       return *this;
 
@@ -529,6 +537,12 @@ ConstantRange::multiply(const ConstantRange &Other) const {
 
   if (isEmptySet() || Other.isEmptySet())
     return ConstantRange(getBitWidth(), /*isFullSet=*/false);
+
+  // If any of the operands is zero, then the result is also zero.
+  if ((getSingleElement() && *getSingleElement() == 0) ||
+      (Other.getSingleElement() && *Other.getSingleElement() == 0))
+    return ConstantRange(APInt(getBitWidth(), 0));
+
   if (isFullSet() || Other.isFullSet())
     return ConstantRange(getBitWidth(), /*isFullSet=*/true);
 

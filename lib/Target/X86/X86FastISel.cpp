@@ -1693,7 +1693,6 @@ bool X86FastISel::DoSelectCall(const Instruction *I, const char *MemIntName) {
 
     // Promote the value if needed.
     switch (VA.getLocInfo()) {
-    default: llvm_unreachable("Unknown loc info!");
     case CCValAssign::Full: break;
     case CCValAssign::SExt: {
       assert(VA.getLocVT().isInteger() && !VA.getLocVT().isVector() &&
@@ -1737,6 +1736,14 @@ bool X86FastISel::DoSelectCall(const Instruction *I, const char *MemIntName) {
       ArgVT = VA.getLocVT();
       break;
     }
+    case CCValAssign::VExt: 
+      // VExt has not been implemented, so this should be impossible to reach
+      // for now.  However, fallback to Selection DAG isel once implemented.
+      return false;
+    case CCValAssign::Indirect:
+      // FIXME: Indirect doesn't need extending, but fast-isel doesn't fully
+      // support this.
+      return false;
     }
 
     if (VA.isRegLoc()) {
@@ -1838,20 +1845,20 @@ bool X86FastISel::DoSelectCall(const Instruction *I, const char *MemIntName) {
       MIB.addGlobalAddress(GV, 0, OpFlags);
   }
 
-  // Add an implicit use GOT pointer in EBX.
-  if (Subtarget->isPICStyleGOT())
-    MIB.addReg(X86::EBX);
-
-  if (Subtarget->is64Bit() && isVarArg && !Subtarget->isTargetWin64())
-    MIB.addReg(X86::AL);
-
-  // Add implicit physical register uses to the call.
-  for (unsigned i = 0, e = RegArgs.size(); i != e; ++i)
-    MIB.addReg(RegArgs[i]);
-
   // Add a register mask with the call-preserved registers.
   // Proper defs for return values will be added by setPhysRegsDeadExcept().
   MIB.addRegMask(TRI.getCallPreservedMask(CS.getCallingConv()));
+
+  // Add an implicit use GOT pointer in EBX.
+  if (Subtarget->isPICStyleGOT())
+    MIB.addReg(X86::EBX, RegState::Implicit);
+
+  if (Subtarget->is64Bit() && isVarArg && !Subtarget->isTargetWin64())
+    MIB.addReg(X86::AL, RegState::Implicit);
+
+  // Add implicit physical register uses to the call.
+  for (unsigned i = 0, e = RegArgs.size(); i != e; ++i)
+    MIB.addReg(RegArgs[i], RegState::Implicit);
 
   // Issue CALLSEQ_END
   unsigned AdjStackUp = TII.getCallFrameDestroyOpcode();

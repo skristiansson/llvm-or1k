@@ -567,8 +567,8 @@ def VMOVRRS  : AVConv3I<0b11000101, 0b1010,
   bits<4> Rt2;
 
   // Encode instruction operands.
-  let Inst{3-0}   = src1{3-0};
-  let Inst{5}     = src1{4};
+  let Inst{3-0}   = src1{4-1};
+  let Inst{5}     = src1{0};
   let Inst{15-12} = Rt;
   let Inst{19-16} = Rt2;
 
@@ -617,8 +617,8 @@ def VMOVSRR : AVConv5I<0b11000100, 0b1010,
   bits<4> src2;
 
   // Encode instruction operands.
-  let Inst{3-0}   = dst1{3-0};
-  let Inst{5}     = dst1{4};
+  let Inst{3-0}   = dst1{4-1};
+  let Inst{5}     = dst1{0};
   let Inst{15-12} = src1;
   let Inst{19-16} = src2;
 
@@ -1207,6 +1207,14 @@ def : Pat<(fsub_mlx (fmul_su SPR:$a, SPR:$b), SPR:$dstin),
           Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]>;
 
 // Match @llvm.fma.* intrinsics
+
+// (fma x, y, (fneg z)) -> (vfnms z, x, y))
+def : Pat<(f64 (fma DPR:$Dn, DPR:$Dm, (fneg DPR:$Ddin))),
+          (VFNMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(f32 (fma SPR:$Sn, SPR:$Sm, (fneg SPR:$Sdin))),
+          (VFNMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
 // (fneg (fma (fneg x), y, z)) -> (vfnms z, x, y)
 def : Pat<(fneg (f64 (fma (fneg DPR:$Dn), DPR:$Dm, DPR:$Ddin))),
           (VFNMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,

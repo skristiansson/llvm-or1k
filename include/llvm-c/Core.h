@@ -21,9 +21,9 @@
 
 /* Need these includes to support the LLVM 'cast' template for the C++ 'wrap' 
    and 'unwrap' conversion functions. */
+#include "llvm/IRBuilder.h"
 #include "llvm/Module.h"
 #include "llvm/PassRegistry.h"
-#include "llvm/Support/IRBuilder.h"
 
 extern "C" {
 #endif
@@ -2115,7 +2115,7 @@ LLVMBasicBlockRef LLVMGetInstructionParent(LLVMValueRef Inst);
 LLVMValueRef LLVMGetNextInstruction(LLVMValueRef Inst);
 
 /**
- * Obtain the instruction that occured before this one.
+ * Obtain the instruction that occurred before this one.
  *
  * If the instruction is the first instruction in a basic block, NULL
  * will be returned.

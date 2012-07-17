@@ -677,6 +677,12 @@ public:
     return UseUnderscoreLongJmp;
   }
 
+  /// supportJumpTables - return whether the target can generate code for
+  /// jump tables.
+  bool supportJumpTables() const {
+    return SupportJumpTables;
+  }
+
   /// getStackPointerRegisterToSaveRestore - If a physical register, this
   /// specifies the register that llvm.savestack/llvm.restorestack should save
   /// and restore.
@@ -989,6 +995,12 @@ protected:
   /// Defaults to false.
   void setUseUnderscoreLongJmp(bool Val) {
     UseUnderscoreLongJmp = Val;
+  }
+
+  /// setSupportJumpTables - Indicate whether the target can generate code for
+  /// jump tables.
+  void setSupportJumpTables(bool Val) {
+    SupportJumpTables = Val;
   }
 
   /// setStackPointerRegisterToSaveRestore - If set to a physical register, this
@@ -1657,6 +1669,14 @@ public:
     return false;
   }
 
+  /// isFMAFasterThanMulAndAdd - Return true if an FMA operation is faster than
+  /// a pair of mul and add instructions. fmuladd intrinsics will be expanded to
+  /// FMAs when this method returns true (and FMAs are legal), otherwise fmuladd
+  /// is expanded to mul + add.
+  virtual bool isFMAFasterThanMulAndAdd(EVT) const {
+    return false;
+  }
+
   /// isNarrowingProfitable - Return true if it's profitable to narrow
   /// operations of type VT1 to VT2. e.g. on x86, it's profitable to narrow
   /// from i32 to i8 but not from i32 to i16.
@@ -1720,13 +1740,6 @@ private:
   const TargetData *TD;
   const TargetLoweringObjectFile &TLOF;
 
-  /// We are in the process of implementing a new TypeLegalization action
-  /// which is the promotion of vector elements. This feature is under
-  /// development. Until this feature is complete, it is only enabled using a
-  /// flag. We pass this flag using a member because of circular dep issues.
-  /// This member will be removed with the flag once we complete the transition.
-  bool mayPromoteElements;
-
   /// PointerTy - The type to use for pointers, usually i32 or i64.
   ///
   MVT PointerTy;
@@ -1762,6 +1775,10 @@ private:
   /// UseUnderscoreLongJmp - This target prefers to use _longjmp to implement
   /// llvm.longjmp.  Defaults to false.
   bool UseUnderscoreLongJmp;
+
+  /// SupportJumpTables - Whether the target can generate code for jumptables.
+  /// If it's not true, then each jumptable must be lowered into if-then-else's.
+  bool SupportJumpTables;
 
   /// BooleanContents - Information about the contents of the high-bits in
   /// boolean values held in a type wider than i1.  See getBooleanContents.
@@ -1930,9 +1947,8 @@ private:
     if (NumElts == 1)
       return LegalizeKind(TypeScalarizeVector, EltVT);
 
-    // If we allow the promotion of vector elements using a flag,
-    // then try to widen vector elements until a legal type is found.
-    if (mayPromoteElements && EltVT.isInteger()) {
+    // Try to widen vector elements until a legal type is found.
+    if (EltVT.isInteger()) {
       // Vectors with a number of elements that is not a power of two are always
       // widened, for example <3 x float> -> <4 x float>.
       if (!VT.isPow2VectorType()) {

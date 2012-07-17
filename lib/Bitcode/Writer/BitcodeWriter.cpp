@@ -177,18 +177,7 @@ static void WriteAttributeTable(const ValueEnumerator &VE,
     for (unsigned i = 0, e = A.getNumSlots(); i != e; ++i) {
       const AttributeWithIndex &PAWI = A.getSlot(i);
       Record.push_back(PAWI.Index);
-
-      // FIXME: remove in LLVM 3.0
-      // Store the alignment in the bitcode as a 16-bit raw value instead of a
-      // 5-bit log2 encoded value. Shift the bits above the alignment up by
-      // 11 bits.
-      uint64_t FauxAttr = PAWI.Attrs.Raw() & 0xffff;
-      if (PAWI.Attrs & Attribute::Alignment)
-        FauxAttr |= (1ull<<16)<<
-            (((PAWI.Attrs & Attribute::Alignment).Raw()-1) >> 16);
-      FauxAttr |= (PAWI.Attrs.Raw() & (0x3FFull << 21)) << 11;
-
-      Record.push_back(FauxAttr);
+      Record.push_back(Attribute::encodeLLVMAttributesForBitcode(PAWI.Attrs));
     }
 
     Stream.EmitRecord(bitc::PARAMATTR_CODE_ENTRY, Record);
@@ -390,6 +379,17 @@ static unsigned getEncodedVisibility(const GlobalValue *GV) {
   llvm_unreachable("Invalid visibility");
 }
 
+static unsigned getEncodedThreadLocalMode(const GlobalVariable *GV) {
+  switch (GV->getThreadLocalMode()) {
+    case GlobalVariable::NotThreadLocal:         return 0;
+    case GlobalVariable::GeneralDynamicTLSModel: return 1;
+    case GlobalVariable::LocalDynamicTLSModel:   return 2;
+    case GlobalVariable::InitialExecTLSModel:    return 3;
+    case GlobalVariable::LocalExecTLSModel:      return 4;
+  }
+  llvm_unreachable("Invalid TLS model");
+}
+
 // Emit top-level description of module, including target triple, inline asm,
 // descriptors for global variables, and function prototype info.
 static void WriteModuleInfo(const Module *M, const ValueEnumerator &VE,
@@ -498,7 +498,7 @@ static void WriteModuleInfo(const Module *M, const ValueEnumerator &VE,
         GV->getVisibility() != GlobalValue::DefaultVisibility ||
         GV->hasUnnamedAddr()) {
       Vals.push_back(getEncodedVisibility(GV));
-      Vals.push_back(GV->isThreadLocal());
+      Vals.push_back(getEncodedThreadLocalMode(GV));
       Vals.push_back(GV->hasUnnamedAddr());
     } else {
       AbbrevToUse = SimpleGVarAbbrev;
@@ -1168,20 +1168,38 @@ static void WriteInstruction(const Instruction &I, unsigned InstID,
       Vals64.push_back(SI.getNumCases());
       for (SwitchInst::CaseIt i = SI.case_begin(), e = SI.case_end();
            i != e; ++i) {
-        ConstantRangesSet CRS = i.getCaseValueEx();
-        Vals64.push_back(CRS.getNumItems());
-        for (unsigned ri = 0, rn = CRS.getNumItems(); ri != rn; ++ri) {
-          ConstantRangesSet::Range r = CRS.getItem(ri);
-
-          Vals64.push_back(CRS.isSingleNumber(ri));
-
-          const APInt &Low = r.Low->getValue();
-          const APInt &High = r.High->getValue();
-          unsigned Code, Abbrev; // will unused.
+        IntegersSubset& CaseRanges = i.getCaseValueEx();
+        unsigned Code, Abbrev; // will unused.
+        
+        if (CaseRanges.isSingleNumber()) {
+          Vals64.push_back(1/*NumItems = 1*/);
+          Vals64.push_back(true/*IsSingleNumber = true*/);
+          EmitAPInt(Vals64, Code, Abbrev, CaseRanges.getSingleNumber(0), true);
+        } else {
           
-          EmitAPInt(Vals64, Code, Abbrev, Low, true);
-          if (r.Low != r.High)
-            EmitAPInt(Vals64, Code, Abbrev, High, true);
+          Vals64.push_back(CaseRanges.getNumItems());
+          
+          if (CaseRanges.isSingleNumbersOnly()) {
+            for (unsigned ri = 0, rn = CaseRanges.getNumItems();
+                 ri != rn; ++ri) {
+              
+              Vals64.push_back(true/*IsSingleNumber = true*/);
+              
+              EmitAPInt(Vals64, Code, Abbrev,
+                        CaseRanges.getSingleNumber(ri), true);
+            }
+          } else
+            for (unsigned ri = 0, rn = CaseRanges.getNumItems();
+                 ri != rn; ++ri) {
+              IntegersSubset::Range r = CaseRanges.getItem(ri);
+              bool IsSingleNumber = CaseRanges.isSingleNumber(ri);
+    
+              Vals64.push_back(IsSingleNumber);
+              
+              EmitAPInt(Vals64, Code, Abbrev, r.getLow(), true);
+              if (!IsSingleNumber)
+                EmitAPInt(Vals64, Code, Abbrev, r.getHigh(), true);
+            }
         }
         Vals64.push_back(VE.getValueID(i.getCaseSuccessor()));
       }

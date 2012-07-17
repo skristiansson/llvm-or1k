@@ -511,10 +511,12 @@ private:
   void ScalarizeVectorResult(SDNode *N, unsigned OpNo);
   SDValue ScalarizeVecRes_MERGE_VALUES(SDNode *N, unsigned ResNo);
   SDValue ScalarizeVecRes_BinOp(SDNode *N);
+  SDValue ScalarizeVecRes_TernaryOp(SDNode *N);
   SDValue ScalarizeVecRes_UnaryOp(SDNode *N);
   SDValue ScalarizeVecRes_InregOp(SDNode *N);
 
   SDValue ScalarizeVecRes_BITCAST(SDNode *N);
+  SDValue ScalarizeVecRes_BUILD_VECTOR(SDNode *N);
   SDValue ScalarizeVecRes_CONVERT_RNDSAT(SDNode *N);
   SDValue ScalarizeVecRes_EXTRACT_SUBVECTOR(SDNode *N);
   SDValue ScalarizeVecRes_FP_ROUND(SDNode *N);
@@ -555,6 +557,7 @@ private:
   // Vector Result Splitting: <128 x ty> -> 2 x <64 x ty>.
   void SplitVectorResult(SDNode *N, unsigned OpNo);
   void SplitVecRes_BinOp(SDNode *N, SDValue &Lo, SDValue &Hi);
+  void SplitVecRes_TernaryOp(SDNode *N, SDValue &Lo, SDValue &Hi);
   void SplitVecRes_UnaryOp(SDNode *N, SDValue &Lo, SDValue &Hi);
   void SplitVecRes_InregOp(SDNode *N, SDValue &Lo, SDValue &Hi);
 

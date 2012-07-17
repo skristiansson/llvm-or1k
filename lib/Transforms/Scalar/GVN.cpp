@@ -18,8 +18,15 @@
 #define DEBUG_TYPE "gvn"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/GlobalVariable.h"
+#include "llvm/IRBuilder.h"
 #include "llvm/IntrinsicInst.h"
 #include "llvm/LLVMContext.h"
+#include "llvm/Metadata.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/Dominators.h"
@@ -30,20 +37,14 @@
 #include "llvm/Analysis/PHITransAddr.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Assembly/Writer.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/PatternMatch.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DepthFirstIterator.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/IRBuilder.h"
-#include "llvm/Support/PatternMatch.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1435,7 +1436,7 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
     Instruction *DepInst = DepInfo.getInst();
 
     // Loading the allocation -> undef.
-    if (isa<AllocaInst>(DepInst) || isMalloc(DepInst) ||
+    if (isa<AllocaInst>(DepInst) || isMallocLikeFn(DepInst) ||
         // Loading immediately after lifetime begin -> undef.
         isLifetimeStart(DepInst)) {
       ValuesPerBlock.push_back(AvailableValueInBlock::get(DepBB,
@@ -1734,6 +1735,53 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
   return true;
 }
 
+static void patchReplacementInstruction(Value *Repl, Instruction *I) {
+  // Patch the replacement so that it is not more restrictive than the value
+  // being replaced.
+  BinaryOperator *Op = dyn_cast<BinaryOperator>(I);
+  BinaryOperator *ReplOp = dyn_cast<BinaryOperator>(Repl);
+  if (Op && ReplOp && isa<OverflowingBinaryOperator>(Op) &&
+      isa<OverflowingBinaryOperator>(ReplOp)) {
+    if (ReplOp->hasNoSignedWrap() && !Op->hasNoSignedWrap())
+      ReplOp->setHasNoSignedWrap(false);
+    if (ReplOp->hasNoUnsignedWrap() && !Op->hasNoUnsignedWrap())
+      ReplOp->setHasNoUnsignedWrap(false);
+  }
+  if (Instruction *ReplInst = dyn_cast<Instruction>(Repl)) {
+    SmallVector<std::pair<unsigned, MDNode*>, 4> Metadata;
+    ReplInst->getAllMetadataOtherThanDebugLoc(Metadata);
+    for (int i = 0, n = Metadata.size(); i < n; ++i) {
+      unsigned Kind = Metadata[i].first;
+      MDNode *IMD = I->getMetadata(Kind);
+      MDNode *ReplMD = Metadata[i].second;
+      switch(Kind) {
+      default:
+        ReplInst->setMetadata(Kind, NULL); // Remove unknown metadata
+        break;
+      case LLVMContext::MD_dbg:
+        llvm_unreachable("getAllMetadataOtherThanDebugLoc returned a MD_dbg");
+      case LLVMContext::MD_tbaa:
+        ReplInst->setMetadata(Kind, MDNode::getMostGenericTBAA(IMD, ReplMD));
+        break;
+      case LLVMContext::MD_range:
+        ReplInst->setMetadata(Kind, MDNode::getMostGenericRange(IMD, ReplMD));
+        break;
+      case LLVMContext::MD_prof:
+        llvm_unreachable("MD_prof in a non terminator instruction");
+        break;
+      case LLVMContext::MD_fpmath:
+        ReplInst->setMetadata(Kind, MDNode::getMostGenericFPMath(IMD, ReplMD));
+        break;
+      }
+    }
+  }
+}
+
+static void patchAndReplaceAllUsesWith(Value *Repl, Instruction *I) {
+  patchReplacementInstruction(Repl, I);
+  I->replaceAllUsesWith(Repl);
+}
+
 /// processLoad - Attempt to eliminate a load, first by eliminating it
 /// locally, and then attempting non-local elimination if that fails.
 bool GVN::processLoad(LoadInst *L) {
@@ -1892,7 +1940,7 @@ bool GVN::processLoad(LoadInst *L) {
     }
     
     // Remove it!
-    L->replaceAllUsesWith(AvailableVal);
+    patchAndReplaceAllUsesWith(AvailableVal, L);
     if (DepLI->getType()->isPointerTy())
       MD->invalidateCachedPointerInfo(DepLI);
     markInstructionForDeletion(L);
@@ -1903,7 +1951,7 @@ bool GVN::processLoad(LoadInst *L) {
   // If this load really doesn't depend on anything, then we must be loading an
   // undef value.  This can happen when loading for a fresh allocation with no
   // intervening stores, for example.
-  if (isa<AllocaInst>(DepInst) || isMalloc(DepInst)) {
+  if (isa<AllocaInst>(DepInst) || isMallocLikeFn(DepInst)) {
     L->replaceAllUsesWith(UndefValue::get(L->getType()));
     markInstructionForDeletion(L);
     ++NumGVNLoad;
@@ -2224,7 +2272,7 @@ bool GVN::processInstruction(Instruction *I) {
   }
   
   // Remove it!
-  I->replaceAllUsesWith(repl);
+  patchAndReplaceAllUsesWith(repl, I);
   if (MD && repl->getType()->isPointerTy())
     MD->invalidateCachedPointerInfo(repl);
   markInstructionForDeletion(I);

@@ -32,9 +32,6 @@ def imm_sr : Operand<i32>, PatLeaf<(imm), [{
   let ParserMatchClass = ThumbSRImmAsmOperand;
 }
 
-def imm_neg_XFORM : SDNodeXForm<imm, [{
-  return CurDAG->getTargetConstant(-(int)N->getZExtValue(), MVT::i32);
-}]>;
 def imm_comp_XFORM : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant(~((uint32_t)N->getZExtValue()), MVT::i32);
 }]>;
@@ -423,7 +420,7 @@ let isCall = 1,
   Defs = [LR], Uses = [SP] in {
   // Also used for Thumb2
   def tBL  : TIx2<0b11110, 0b11, 1,
-                  (outs), (ins pred:$p, t_bltarget:$func, variable_ops), IIC_Br,
+                  (outs), (ins pred:$p, t_bltarget:$func), IIC_Br,
                   "bl${p}\t$func",
                   [(ARMtcall tglobaladdr:$func)]>,
              Requires<[IsThumb]> {
@@ -437,7 +434,7 @@ let isCall = 1,
 
   // ARMv5T and above, also used for Thumb2
   def tBLXi : TIx2<0b11110, 0b11, 0,
-                 (outs), (ins pred:$p, t_blxtarget:$func, variable_ops), IIC_Br,
+                 (outs), (ins pred:$p, t_blxtarget:$func), IIC_Br,
                    "blx${p}\t$func",
                    [(ARMcall tglobaladdr:$func)]>,
               Requires<[IsThumb, HasV5T]> {
@@ -451,7 +448,7 @@ let isCall = 1,
   }
 
   // Also used for Thumb2
-  def tBLXr : TI<(outs), (ins pred:$p, GPR:$func, variable_ops), IIC_Br,
+  def tBLXr : TI<(outs), (ins pred:$p, GPR:$func), IIC_Br,
                   "blx${p}\t$func",
                   [(ARMtcall GPR:$func)]>,
               Requires<[IsThumb, HasV5T]>,
@@ -462,7 +459,7 @@ let isCall = 1,
   }
 
   // ARMv4T
-  def tBX_CALL : tPseudoInst<(outs), (ins tGPR:$func, variable_ops),
+  def tBX_CALL : tPseudoInst<(outs), (ins tGPR:$func),
                   4, IIC_Br,
                   [(ARMcall_nolink tGPR:$func)]>,
             Requires<[IsThumb, IsThumb1Only]>;
@@ -509,7 +506,7 @@ let isBranch = 1, isTerminator = 1 in
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1 in {
   // IOS versions.
   let Uses = [SP] in {
-    def tTAILJMPr : tPseudoExpand<(outs), (ins tcGPR:$dst, variable_ops),
+    def tTAILJMPr : tPseudoExpand<(outs), (ins tcGPR:$dst),
                      4, IIC_Br, [],
                      (tBX GPR:$dst, (ops 14, zero_reg))>,
                      Requires<[IsThumb]>;
@@ -519,7 +516,7 @@ let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1 in {
   // Non-IOS version:
   let Uses = [SP] in {
     def tTAILJMPdND : tPseudoExpand<(outs),
-                   (ins t_brtarget:$dst, pred:$p, variable_ops),
+                   (ins t_brtarget:$dst, pred:$p),
                    4, IIC_Br, [],
                    (tB t_brtarget:$dst, pred:$p)>,
                  Requires<[IsThumb, IsNotIOS]>;
@@ -1403,7 +1400,7 @@ def : InstAlias<"nop", (tMOVr R8, R8, 14, 0)>,Requires<[IsThumb, IsThumb1Only]>;
 
 // For round-trip assembly/disassembly, we have to handle a CPS instruction
 // without any iflags. That's not, strictly speaking, valid syntax, but it's
-// a useful extention and assembles to defined behaviour (the insn does
+// a useful extension and assembles to defined behaviour (the insn does
 // nothing).
 def : tInstAlias<"cps$imod", (tCPS imod_op:$imod, 0)>;
 def : tInstAlias<"cps$imod", (tCPS imod_op:$imod, 0)>;

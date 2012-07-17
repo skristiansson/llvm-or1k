@@ -170,10 +170,11 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   // -A + B  -->  B - A
   // -A + -B  -->  -(A + B)
   if (Value *LHSV = dyn_castNegVal(LHS)) {
-    if (Value *RHSV = dyn_castNegVal(RHS)) {
-      Value *NewAdd = Builder->CreateAdd(LHSV, RHSV, "sum");
-      return BinaryOperator::CreateNeg(NewAdd);
-    }
+    if (!isa<Constant>(RHS))
+      if (Value *RHSV = dyn_castNegVal(RHS)) {
+        Value *NewAdd = Builder->CreateAdd(LHSV, RHSV, "sum");
+        return BinaryOperator::CreateNeg(NewAdd);
+      }
     
     return BinaryOperator::CreateSub(RHS, LHSV);
   }
@@ -542,11 +543,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     if (SelectInst *SI = dyn_cast<SelectInst>(Op1))
       if (Instruction *R = FoldOpIntoSelect(I, SI))
         return R;
-
-    // C - zext(bool) -> bool ? C - 1 : C
-    if (ZExtInst *ZI = dyn_cast<ZExtInst>(Op1))
-      if (ZI->getSrcTy()->isIntegerTy(1))
-        return SelectInst::Create(ZI->getOperand(0), SubOne(C), C);
 
     // C-(X+C2) --> (C-C2)-X
     ConstantInt *C2;

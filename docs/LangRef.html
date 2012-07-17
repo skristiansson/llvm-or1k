@@ -257,6 +257,7 @@
           <li><a href="#int_exp">'<tt>llvm.exp.*</tt>' Intrinsic</a></li>
           <li><a href="#int_log">'<tt>llvm.log.*</tt>' Intrinsic</a></li>
           <li><a href="#int_fma">'<tt>llvm.fma.*</tt>' Intrinsic</a></li>
+          <li><a href="#int_fabs">'<tt>llvm.fabs.*</tt>' Intrinsic</a></li>
         </ol>
       </li>
       <li><a href="#int_manip">Bit Manipulation Intrinsics</a>
@@ -275,6 +276,11 @@
           <li><a href="#int_usub_overflow">'<tt>llvm.usub.with.overflow.*</tt> Intrinsics</a></li>
           <li><a href="#int_smul_overflow">'<tt>llvm.smul.with.overflow.*</tt> Intrinsics</a></li>
           <li><a href="#int_umul_overflow">'<tt>llvm.umul.with.overflow.*</tt> Intrinsics</a></li>
+        </ol>
+      </li>
+      <li><a href="#spec_arithmetic">Specialised Arithmetic Intrinsics</a>
+        <ol>
+          <li><a href="#fmuladd">'<tt>llvm.fmuladd</tt> Intrinsic</a></li>
         </ol>
       </li>
       <li><a href="#int_fp16">Half Precision Floating Point Intrinsics</a>
@@ -311,10 +317,12 @@
             '<tt>llvm.debugtrap</tt>' Intrinsic</a></li>
           <li><a href="#int_stackprotector">
             '<tt>llvm.stackprotector</tt>' Intrinsic</a></li>
-	  <li><a href="#int_objectsize">
+          <li><a href="#int_objectsize">
             '<tt>llvm.objectsize</tt>' Intrinsic</a></li>
-	  <li><a href="#int_expect">
+          <li><a href="#int_expect">
             '<tt>llvm.expect</tt>' Intrinsic</a></li>
+          <li><a href="#int_donothing">
+            '<tt>llvm.donothing</tt>' Intrinsic</a></li>
         </ol>
       </li>
     </ol>
@@ -833,9 +841,32 @@ define i32 @main() {   <i>; i32()* </i>&nbsp;
 <p>Global variables define regions of memory allocated at compilation time
    instead of run-time.  Global variables may optionally be initialized, may
    have an explicit section to be placed in, and may have an optional explicit
-   alignment specified.  A variable may be defined as "thread_local", which
+   alignment specified.</p>
+
+<p>A variable may be defined as <tt>thread_local</tt>, which
    means that it will not be shared by threads (each thread will have a
-   separated copy of the variable).  A variable may be defined as a global
+   separated copy of the variable).  Not all targets support thread-local
+   variables.  Optionally, a TLS model may be specified:</p>
+
+<dl>
+  <dt><b><tt>localdynamic</tt></b>:</dt>
+  <dd>For variables that are only used within the current shared library.</dd>
+
+  <dt><b><tt>initialexec</tt></b>:</dt>
+  <dd>For variables in modules that will not be loaded dynamically.</dd>
+
+  <dt><b><tt>localexec</tt></b>:</dt>
+  <dd>For variables defined in the executable and only used within it.</dd>
+</dl>
+
+<p>The models correspond to the ELF TLS models; see
+   <a href="http://people.redhat.com/drepper/tls.pdf">ELF
+   Handling For Thread-Local Storage</a> for more information on under which
+   circumstances the different models may be used.  The target may choose a
+   different TLS model if the specified model is not supported, or if a better
+   choice of model can be made.</p>
+
+<p>A variable may be defined as a global
    "constant," which indicates that the contents of the variable
    will <b>never</b> be modified (enabling better optimization, allowing the
    global data to be placed in the read-only section of an executable, etc).
@@ -886,6 +917,13 @@ define i32 @main() {   <i>; i32()* </i>&nbsp;
 
 <pre class="doc_code">
 @G = addrspace(5) constant float 1.0, section "foo", align 4
+</pre>
+
+<p>The following example defines a thread-local global with
+   the <tt>initialexec</tt> TLS model:</p>
+
+<pre class="doc_code">
+@G = thread_local(initialexec) global i32 0, align 4
 </pre>
 
 </div>
@@ -1050,7 +1088,7 @@ declare signext i8 @returns_signed_char()
       value to the function.  The attribute implies that a hidden copy of the
       pointee
       is made between the caller and the callee, so the callee is unable to
-      modify the value in the callee.  This attribute is only valid on LLVM
+      modify the value in the caller.  This attribute is only valid on LLVM
       pointer arguments.  It is generally used to pass structs and arrays by
       value, but is also valid on pointers to scalars.  The copy is considered
       to belong to the caller not the callee (for example,
@@ -3054,6 +3092,8 @@ call void @llvm.dbg.value(metadata !24, i64 0, metadata !25)
    <li>The range should not represent the full or empty set. That is,
        <tt>a!=b</tt>. </li>
 </ul>
+<p> In addition, the pairs must be in signed order of the lower bound and
+  they must be non-contiguous.</p>
 
 <p>Examples:</p>
 <div class="doc_code">
@@ -3061,10 +3101,12 @@ call void @llvm.dbg.value(metadata !24, i64 0, metadata !25)
   %a = load i8* %x, align 1, !range !0 ; Can only be 0 or 1
   %b = load i8* %y, align 1, !range !1 ; Can only be 255 (-1), 0 or 1
   %c = load i8* %z, align 1, !range !2 ; Can only be 0, 1, 3, 4 or 5
+  %d = load i8* %z, align 1, !range !3 ; Can only be -2, -1, 3, 4 or 5
 ...
 !0 = metadata !{ i8 0, i8 2 }
 !1 = metadata !{ i8 255, i8 2 }
 !2 = metadata !{ i8 0, i8 2, i8 3, i8 6 }
+!3 = metadata !{ i8 -2, i8 0, i8 3, i8 6 }
 </pre>
 </div>
 </div>
@@ -4730,7 +4772,7 @@ IfUnequal:
 
 <h5>Arguments:</h5>
 <p>The first two operands of a '<tt>shufflevector</tt>' instruction are vectors
-   with types that match each other. The third argument is a shuffle mask whose
+   with the same type.  The third argument is a shuffle mask whose
    element type is always 'i32'.  The result of the instruction is a vector
    whose length is the same as the shuffle mask and whose element type is the
    same as the element type of the first two operands.</p>
@@ -7467,6 +7509,40 @@ LLVM</a>.</p>
 
 </div>
 
+<!-- _______________________________________________________________________ -->
+<h4>
+  <a name="int_fabs">'<tt>llvm.fabs.*</tt>' Intrinsic</a>
+</h4>
+
+<div>
+
+<h5>Syntax:</h5>
+<p>This is an overloaded intrinsic. You can use <tt>llvm.fabs</tt> on any
+   floating point or vector of floating point type. Not all targets support all
+   types however.</p>
+
+<pre>
+  declare float     @llvm.fabs.f32(float  %Val)
+  declare double    @llvm.fabs.f64(double %Val)
+  declare x86_fp80  @llvm.fabs.f80(x86_fp80  %Val)
+  declare fp128     @llvm.fabs.f128(fp128 %Val)
+  declare ppc_fp128 @llvm.fabs.ppcf128(ppc_fp128  %Val)
+</pre>
+
+<h5>Overview:</h5>
+<p>The '<tt>llvm.fabs.*</tt>' intrinsics return the absolute value of
+   the operand.</p>
+
+<h5>Arguments:</h5>
+<p>The argument and return value are floating point numbers of the same
+   type.</p>
+
+<h5>Semantics:</h5>
+<p>This function returns the same values as the libm <tt>fabs</tt> functions
+   would, and handles error conditions in the same way.</p>
+
+</div>
+
 </div>
 
 <!-- ======================================================================= -->
@@ -7938,6 +8014,52 @@ LLVM</a>.</p>
 </pre>
 
 </div>
+
+</div>
+
+<!-- ======================================================================= -->
+<h3>
+  <a name="spec_arithmetic">Specialised Arithmetic Intrinsics</a>
+</h3>
+
+<!-- _______________________________________________________________________ -->
+
+<h4>
+  <a name="fmuladd">'<tt>llvm.fmuladd.*</tt>' Intrinsic</a>
+</h4>
+
+<div>
+
+<h5>Syntax:</h5>
+<pre>
+  declare float @llvm.fmuladd.f32(float %a, float %b, float %c)
+  declare double @llvm.fmuladd.f64(double %a, double %b, double %c)
+</pre>
+
+<h5>Overview:</h5>
+<p>The '<tt>llvm.fmuladd.*</tt>' intrinsic functions represent multiply-add
+expressions that can be fused if the code generator determines that the fused
+expression would be legal and efficient.</p>
+
+<h5>Arguments:</h5>
+<p>The '<tt>llvm.fmuladd.*</tt>' intrinsics each take three arguments: two
+multiplicands, a and b, and an addend c.</p>
+
+<h5>Semantics:</h5>
+<p>The expression:</p>
+<pre>
+  %0 = call float @llvm.fmuladd.f32(%a, %b, %c)
+</pre>
+<p>is equivalent to the expression a * b + c, except that rounding will not be
+performed between the multiplication and addition steps if the code generator
+fuses the operations. Fusion is not guaranteed, even if the target platform
+supports it. If a fused multiply-add is required the corresponding llvm.fma.*
+intrinsic function should be used instead.</p>
+
+<h5>Examples:</h5>
+<pre>
+  %r2 = call float @llvm.fmuladd.f32(float %a, float %b, float %c) ; yields {float}:r2 = (a * b) + c
+</pre>
 
 </div>
 
@@ -8518,6 +8640,30 @@ LLVM</a>.</p>
 
 <h5>Semantics:</h5>
 <p>This intrinsic is lowered to the <tt>val</tt>.</p>
+</div>
+
+<!-- _______________________________________________________________________ -->
+<h4>
+  <a name="int_donothing">'<tt>llvm.donothing</tt>' Intrinsic</a>
+</h4>
+
+<div>
+
+<h5>Syntax:</h5>
+<pre>
+  declare void @llvm.donothing() nounwind readnone
+</pre>
+
+<h5>Overview:</h5>
+<p>The <tt>llvm.donothing</tt> intrinsic doesn't perform any operation. It's the
+only intrinsic that can be called with an invoke instruction.</p>
+
+<h5>Arguments:</h5>
+<p>None.</p>
+
+<h5>Semantics:</h5>
+<p>This intrinsic does nothing, and it's removed by optimizers and ignored by
+codegen.</p>
 </div>
 
 </div>

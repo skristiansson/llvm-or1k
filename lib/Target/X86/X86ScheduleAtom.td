@@ -106,7 +106,7 @@ def AtomItineraries : ProcessorItineraries<
   InstrItinData<IIC_CMOV64_RM, [InstrStage<1, [Port0]>] >,
   InstrItinData<IIC_CMOV64_RR, [InstrStage<1, [Port0, Port1]>] >,
   // set
-  InstrItinData<IIC_SET_M, [InstrStage<2, [Port0, Port1]>] >, 
+  InstrItinData<IIC_SET_M, [InstrStage<2, [Port0, Port1]>] >,
   InstrItinData<IIC_SET_R, [InstrStage<1, [Port0, Port1]>] >,
   // jcc
   InstrItinData<IIC_Jcc, [InstrStage<1, [Port1]>] >,
@@ -518,3 +518,13 @@ def AtomItineraries : ProcessorItineraries<
   InstrItinData<IIC_NOP, [InstrStage<1, [Port0, Port1]>] >
   ]>;
 
+// Atom machine model.
+def AtomModel : SchedMachineModel {
+  let IssueWidth = 2;  // Allows 2 instructions per scheduling group.
+  let MinLatency = 1;  // InstrStage cycles overrides MinLatency.
+                       // OperandCycles may be used for expected latency.
+  let LoadLatency = 3; // Expected cycles, may be overriden by OperandCycles.
+  let HighLatency = 30;// Expected, may be overriden by OperandCycles.
+
+  let Itineraries = AtomItineraries;
+}

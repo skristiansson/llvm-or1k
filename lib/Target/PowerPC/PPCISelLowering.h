@@ -366,6 +366,12 @@ namespace llvm {
                         bool IsZeroVal, bool MemcpyStrSrc,
                         MachineFunction &MF) const;
 
+    /// isFMAFasterThanMulAndAdd - Return true if an FMA operation is faster than
+    /// a pair of mul and add instructions. fmuladd intrinsics will be expanded to
+    /// FMAs when this method returns true (and FMAs are legal), otherwise fmuladd
+    /// is expanded to mul + add.
+    virtual bool isFMAFasterThanMulAndAdd(EVT VT) const;
+
   private:
     SDValue getFramePointerFrameIndex(SelectionDAG & DAG) const;
     SDValue getReturnAddrFrameIndex(SelectionDAG & DAG) const;
@@ -389,6 +395,7 @@ namespace llvm {
     SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerConstantPool(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerJumpTable(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSETCC(SDValue Op, SelectionDAG &DAG) const;

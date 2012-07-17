@@ -274,6 +274,11 @@ namespace llvm {
       return VNI;
     }
 
+    /// createDeadDef - Make sure the interval has a value defined at Def.
+    /// If one already exists, return it. Otherwise allocate a new value and
+    /// add liveness for a dead def.
+    VNInfo *createDeadDef(SlotIndex Def, VNInfo::Allocator &VNInfoAllocator);
+
     /// Create a copy of the given value. The new value will be identical except
     /// for the Value number.
     VNInfo *createValueCopy(const VNInfo *orig,
@@ -481,8 +486,17 @@ namespace llvm {
               (thisIndex == otherIndex && reg < other.reg));
     }
 
-    void print(raw_ostream &OS, const TargetRegisterInfo *TRI = 0) const;
+    void print(raw_ostream &OS) const;
     void dump() const;
+
+    /// \brief Walk the interval and assert if any invariants fail to hold.
+    ///
+    /// Note that this is a no-op when asserts are disabled.
+#ifdef NDEBUG
+    void verify() const {}
+#else
+    void verify() const;
+#endif
 
   private:
 
@@ -490,6 +504,9 @@ namespace llvm {
     void extendIntervalEndTo(Ranges::iterator I, SlotIndex NewEnd);
     Ranges::iterator extendIntervalStartTo(Ranges::iterator I, SlotIndex NewStr);
     void markValNoForDeletion(VNInfo *V);
+    void mergeIntervalRanges(const LiveInterval &RHS,
+                             VNInfo *LHSValNo = 0,
+                             const VNInfo *RHSValNo = 0);
 
     LiveInterval& operator=(const LiveInterval& rhs); // DO NOT IMPLEMENT
 

@@ -32,3 +32,34 @@ entry:
   %sub. = select i1 %cmp, i32 %sub, i32 %b
   ret i32 %sub.
 }
+
+; rdar://11725965
+define i32 @i(i32 %a, i32 %b) nounwind readnone ssp {
+entry:
+; CHECK: i:
+; CHECK: subs
+; CHECK-NOT: cmp
+  %cmp = icmp ult i32 %a, %b
+  %sub = sub i32 %b, %a
+  %sub. = select i1 %cmp, i32 %sub, i32 0
+  ret i32 %sub.
+}
+; If CPSR is live-out, we can't remove cmp if there exists
+; a swapped sub.
+define i32 @j(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: j:
+; CHECK: sub
+; CHECK: cmp
+  %cmp = icmp eq i32 %b, %a
+  %sub = sub nsw i32 %a, %b
+  br i1 %cmp, label %if.then, label %if.else
+
+if.then:
+  %cmp2 = icmp sgt i32 %b, %a
+  %sel = select i1 %cmp2, i32 %sub, i32 %a
+  ret i32 %sel
+
+if.else:
+  ret i32 %sub
+}

@@ -161,10 +161,11 @@ def llvm_vararg_ty     : LLVMType<isVoid>;   // this means vararg here
 //    intrinsic.
 //  * Properties can be set to describe the behavior of the intrinsic.
 //
+class SDPatternOperator;
 class Intrinsic<list<LLVMType> ret_types,
                 list<LLVMType> param_types = [],
                 list<IntrinsicProperty> properties = [],
-                string name = ""> {
+                string name = ""> : SDPatternOperator {
   string LLVMName = name;
   string TargetPrefix = "";   // Set to a prefix for target-specific intrinsics.
   list<LLVMType> RetTypes = ret_types;
@@ -259,12 +260,17 @@ let Properties = [IntrReadMem] in {
   def int_log2 : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
   def int_exp  : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
   def int_exp2 : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
+  def int_fabs : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
 }
 
 let Properties = [IntrNoMem] in {
   def int_fma  : Intrinsic<[llvm_anyfloat_ty],
                          [LLVMMatchType<0>, LLVMMatchType<0>,
                           LLVMMatchType<0>]>;
+
+  def int_fmuladd : Intrinsic<[llvm_anyfloat_ty],
+                              [LLVMMatchType<0>, LLVMMatchType<0>,
+                               LLVMMatchType<0>]>;
 }
 
 // NOTE: these are internal interfaces.
@@ -407,6 +413,9 @@ def int_trap : Intrinsic<[], [], [IntrNoReturn]>,
 def int_debugtrap : Intrinsic<[]>,
                     GCCBuiltin<"__builtin_debugtrap">;
 
+// NOP: calls/invokes to this intrinsic are removed by codegen
+def int_donothing : Intrinsic<[], [], [IntrNoMem]>;
+
 // Intrisics to support half precision floating point format
 let Properties = [IntrNoMem] in {
 def int_convert_to_fp16   : Intrinsic<[llvm_i16_ty], [llvm_float_ty]>,
@@ -449,3 +458,4 @@ include "llvm/IntrinsicsCellSPU.td"
 include "llvm/IntrinsicsXCore.td"
 include "llvm/IntrinsicsHexagon.td"
 include "llvm/IntrinsicsNVVM.td"
+include "llvm/IntrinsicsMips.td"

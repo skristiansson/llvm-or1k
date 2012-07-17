@@ -465,7 +465,7 @@ public:
   iterator erase(iterator I) {
     iterator N = I;
     // Shift all elts down one.
-    std::copy(I+1, this->end(), I);
+    this->move(I+1, this->end(), I);
     // Drop the last elt.
     this->pop_back();
     return(N);
@@ -474,7 +474,7 @@ public:
   iterator erase(iterator S, iterator E) {
     iterator N = S;
     // Shift all elts down.
-    iterator I = std::copy(E, this->end(), S);
+    iterator I = this->move(E, this->end(), S);
     // Drop the last elts.
     this->destroy_range(I, this->end());
     this->setEnd(I);
@@ -540,13 +540,13 @@ public:
   }
 
   iterator insert(iterator I, size_type NumToInsert, const T &Elt) {
-    if (I == this->end()) {  // Important special case for empty vector.
-      append(NumToInsert, Elt);
-      return this->end()-1;
-    }
-
     // Convert iterator to elt# to avoid invalidating iterator when we reserve()
     size_t InsertElt = I - this->begin();
+
+    if (I == this->end()) {  // Important special case for empty vector.
+      append(NumToInsert, Elt);
+      return this->begin()+InsertElt;
+    }
 
     // Ensure there is enough space.
     reserve(static_cast<unsigned>(this->size() + NumToInsert));
@@ -572,11 +572,11 @@ public:
     // Otherwise, we're inserting more elements than exist already, and we're
     // not inserting at the end.
 
-    // Copy over the elements that we're about to overwrite.
+    // Move over the elements that we're about to overwrite.
     T *OldEnd = this->end();
     this->setEnd(this->end() + NumToInsert);
     size_t NumOverwritten = OldEnd-I;
-    this->uninitialized_copy(I, OldEnd, this->end()-NumOverwritten);
+    this->uninitialized_move(I, OldEnd, this->end()-NumOverwritten);
 
     // Replace the overwritten part.
     std::fill_n(I, NumOverwritten, Elt);
@@ -588,14 +588,15 @@ public:
 
   template<typename ItTy>
   iterator insert(iterator I, ItTy From, ItTy To) {
+    // Convert iterator to elt# to avoid invalidating iterator when we reserve()
+    size_t InsertElt = I - this->begin();
+
     if (I == this->end()) {  // Important special case for empty vector.
       append(From, To);
-      return this->end()-1;
+      return this->begin()+InsertElt;
     }
 
     size_t NumToInsert = std::distance(From, To);
-    // Convert iterator to elt# to avoid invalidating iterator when we reserve()
-    size_t InsertElt = I - this->begin();
 
     // Ensure there is enough space.
     reserve(static_cast<unsigned>(this->size() + NumToInsert));
@@ -621,16 +622,16 @@ public:
     // Otherwise, we're inserting more elements than exist already, and we're
     // not inserting at the end.
 
-    // Copy over the elements that we're about to overwrite.
+    // Move over the elements that we're about to overwrite.
     T *OldEnd = this->end();
     this->setEnd(this->end() + NumToInsert);
     size_t NumOverwritten = OldEnd-I;
-    this->uninitialized_copy(I, OldEnd, this->end()-NumOverwritten);
+    this->uninitialized_move(I, OldEnd, this->end()-NumOverwritten);
 
     // Replace the overwritten part.
-    for (; NumOverwritten > 0; --NumOverwritten) {
-      *I = *From;
-      ++I; ++From;
+    for (T *J = I; NumOverwritten > 0; --NumOverwritten) {
+      *J = *From;
+      ++J; ++From;
     }
 
     // Insert the non-overwritten middle part.

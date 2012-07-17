@@ -207,6 +207,10 @@ namespace llvm {
       // TLSADDR - Thread Local Storage.
       TLSADDR,
 
+      // TLSBASEADDR - Thread Local Storage. A call to get the start address
+      // of the TLS block for the current module.
+      TLSBASEADDR,
+
       // TLSCALL - Thread Local Storage.  When calling to an OS provided
       // thunk at the address from an earlier relocation.
       TLSCALL,
@@ -241,9 +245,6 @@ namespace llvm {
 
       // PCMP* - Vector integer comparisons.
       PCMPEQ, PCMPGT,
-
-      // VPCOM, VPCOMU - XOP Vector integer comparisons.
-      VPCOM, VPCOMU,
 
       // ADD, SUB, SMUL, etc. - Arithmetic operations with FLAGS results.
       ADD, SUB, ADC, SBB, SMUL,
@@ -320,6 +321,9 @@ namespace llvm {
 
       // SAHF - Store contents of %ah into %eflags.
       SAHF,
+
+      // RDRAND - Get a random integer and indicate whether it is valid in CF.
+      RDRAND,
 
       // ATOMADD64_DAG, ATOMSUB64_DAG, ATOMOR64_DAG, ATOMAND64_DAG,
       // ATOMXOR64_DAG, ATOMNAND64_DAG, ATOMSWAP64_DAG -
@@ -564,6 +568,18 @@ namespace llvm {
     /// by AM is legal for this target, for a load/store of the specified type.
     virtual bool isLegalAddressingMode(const AddrMode &AM, Type *Ty)const;
 
+    /// isLegalICmpImmediate - Return true if the specified immediate is legal
+    /// icmp immediate, that is the target has icmp instructions which can
+    /// compare a register against the immediate without having to materialize
+    /// the immediate into a register.
+    virtual bool isLegalICmpImmediate(int64_t Imm) const;
+
+    /// isLegalAddImmediate - Return true if the specified immediate is legal
+    /// add immediate, that is the target has add instructions which can
+    /// add a register and the immediate without having to materialize
+    /// the immediate into a register.
+    virtual bool isLegalAddImmediate(int64_t Imm) const;
+
     /// isTruncateFree - Return true if it's free to truncate a value of
     /// type Ty1 to type Ty2. e.g. On x86 it's free to truncate a i32 value in
     /// register EAX to i16 by referencing its sub-register AX.
@@ -767,6 +783,7 @@ namespace llvm {
     SDValue LowerVAARG(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerVACOPY(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFRAME_TO_ARGS_OFFSET(SDValue Op, SelectionDAG &DAG) const;

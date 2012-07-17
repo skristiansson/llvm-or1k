@@ -41,6 +41,9 @@ namespace llvm {
                     // PIC mode.
       WrapperJT,    // WrapperJT - A wrapper node for TargetJumpTable
 
+      // Add pseudo op to model memcpy for struct byval.
+      COPY_STRUCT_BYVAL,
+
       CALL,         // Function call.
       CALL_PRED,    // Function call that's predicable.
       CALL_NOLINK,  // Function call with branch not branch-and-link.
@@ -53,6 +56,7 @@ namespace llvm {
       PIC_ADD,      // Add with a PC operand and a PIC label.
 
       CMP,          // ARM compare instructions.
+      CMN,          // ARM CMN instructions.
       CMPZ,         // ARM compare that sets only Z flag.
       CMPFP,        // ARM VFP compare instruction, sets FPSCR.
       CMPFPw0,      // ARM VFP compare against zero instruction, sets FPSCR.
@@ -527,6 +531,9 @@ namespace llvm {
                                              MachineBasicBlock *MBB) const;
 
     bool RemapAddSubWithFlags(MachineInstr *MI, MachineBasicBlock *BB) const;
+
+    MachineBasicBlock *EmitStructByval(MachineInstr *MI,
+                                       MachineBasicBlock *MBB) const;
   };
 
   enum NEONModImmType {

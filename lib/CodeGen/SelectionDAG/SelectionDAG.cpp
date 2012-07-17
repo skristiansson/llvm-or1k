@@ -14,16 +14,16 @@
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "SDNodeOrdering.h"
 #include "SDNodeDbgValue.h"
+#include "llvm/CallingConv.h"
 #include "llvm/Constants.h"
-#include "llvm/Analysis/DebugInfo.h"
-#include "llvm/Analysis/ValueTracking.h"
+#include "llvm/DebugInfo.h"
+#include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/GlobalAlias.h"
 #include "llvm/GlobalVariable.h"
 #include "llvm/Intrinsics.h"
-#include "llvm/DerivedTypes.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Assembly/Writer.h"
-#include "llvm/CallingConv.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -216,6 +216,22 @@ bool ISD::isScalarToVector(const SDNode *N) {
     if (V.getOpcode() != ISD::UNDEF)
       return false;
   }
+  return true;
+}
+
+/// allOperandsUndef - Return true if the node has at least one operand
+/// and all operands of the specified node are ISD::UNDEF.
+bool ISD::allOperandsUndef(const SDNode *N) {
+  // Return false if the node has no operands.
+  // This is "logically inconsistent" with the definition of "all" but
+  // is probably the desired behavior.
+  if (N->getNumOperands() == 0)
+    return false;
+
+  for (unsigned i = 0, e = N->getNumOperands(); i != e ; ++i)
+    if (N->getOperand(i).getOpcode() != ISD::UNDEF)
+      return false;
+
   return true;
 }
 
@@ -1949,6 +1965,7 @@ void SelectionDAG::ComputeMaskedBits(SDValue Op, APInt &KnownZero,
     APInt InMask = APInt::getLowBitsSet(BitWidth, VT.getSizeInBits());
     ComputeMaskedBits(Op.getOperand(0), KnownZero, KnownOne, Depth+1);
     KnownZero |= (~InMask);
+    KnownOne  &= (~KnownZero);
     return;
   }
   case ISD::FGETSIGN:
@@ -2674,6 +2691,11 @@ SDValue SelectionDAG::getNode(unsigned Opcode, DebugLoc DL, EVT VT,
     if (N1 == N2) return N1;
     break;
   case ISD::CONCAT_VECTORS:
+    // Concat of UNDEFs is UNDEF.
+    if (N1.getOpcode() == ISD::UNDEF &&
+        N2.getOpcode() == ISD::UNDEF)
+      return getUNDEF(VT);
+
     // A CONCAT_VECTOR with all operands BUILD_VECTOR can be simplified to
     // one big BUILD_VECTOR.
     if (N1.getOpcode() == ISD::BUILD_VECTOR &&

@@ -116,7 +116,7 @@ TargetPassConfig *MipsTargetMachine::createPassConfig(PassManagerBase &PM) {
 // Install an instruction selector pass using
 // the ISelDag to gen Mips code.
 bool MipsPassConfig::addInstSelector() {
-  PM->add(createMipsISelDag(getMipsTargetMachine()));
+  addPass(createMipsISelDag(getMipsTargetMachine()));
   return false;
 }
 
@@ -124,7 +124,13 @@ bool MipsPassConfig::addInstSelector() {
 // machine code is emitted. return true if -print-machineinstrs should
 // print out the code after the passes.
 bool MipsPassConfig::addPreEmitPass() {
-  PM->add(createMipsDelaySlotFillerPass(getMipsTargetMachine()));
+  MipsTargetMachine &TM = getMipsTargetMachine();
+  addPass(createMipsDelaySlotFillerPass(TM));
+
+  // NOTE: long branch has not been implemented for mips16.
+  if (TM.getSubtarget<MipsSubtarget>().hasStandardEncoding())
+    addPass(createMipsLongBranchPass(TM));
+
   return true;
 }
 

@@ -181,7 +181,7 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   } else if (MO.isFPImm()) {
     return static_cast<unsigned>(APFloat(MO.getFPImm())
         .bitcastToAPInt().getHiBits(32).getLimitedValue());
-  } 
+  }
 
   // MO must be an Expr.
   assert(MO.isExpr());
@@ -195,10 +195,27 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   }
 
   assert (Kind == MCExpr::SymbolRef);
-    
+
   Mips::Fixups FixupKind = Mips::Fixups(0);
 
   switch(cast<MCSymbolRefExpr>(Expr)->getKind()) {
+  default: llvm_unreachable("Unknown fixup kind!");
+    break;
+  case MCSymbolRefExpr::VK_Mips_GPOFF_HI :
+    FixupKind = Mips::fixup_Mips_GPOFF_HI;
+    break;
+  case MCSymbolRefExpr::VK_Mips_GPOFF_LO :
+    FixupKind = Mips::fixup_Mips_GPOFF_LO;
+    break;
+  case MCSymbolRefExpr::VK_Mips_GOT_PAGE :
+    FixupKind = Mips::fixup_Mips_GOT_PAGE;
+    break;
+  case MCSymbolRefExpr::VK_Mips_GOT_OFST :
+    FixupKind = Mips::fixup_Mips_GOT_OFST;
+    break;
+  case MCSymbolRefExpr::VK_Mips_GOT_DISP :
+    FixupKind = Mips::fixup_Mips_GOT_DISP;
+    break;
   case MCSymbolRefExpr::VK_Mips_GPREL:
     FixupKind = Mips::fixup_Mips_GPREL16;
     break;
@@ -237,8 +254,6 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
     break;
   case MCSymbolRefExpr::VK_Mips_TPREL_LO:
     FixupKind = Mips::fixup_Mips_TPREL_LO;
-    break;
-  default:
     break;
   } // switch
 

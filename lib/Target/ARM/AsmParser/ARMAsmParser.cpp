@@ -236,7 +236,10 @@ public:
     Match_RequiresITBlock = FIRST_TARGET_MATCH_RESULT_TY,
     Match_RequiresNotITBlock,
     Match_RequiresV6,
-    Match_RequiresThumb2
+    Match_RequiresThumb2,
+#define GET_OPERAND_DIAGNOSTIC_TYPES
+#include "ARMGenAsmMatcher.inc"
+
   };
 
   ARMAsmParser(MCSubtargetInfo &_STI, MCAsmParser &_Parser)
@@ -3253,10 +3256,11 @@ ARMAsmParser::OperandMatchResultTy ARMAsmParser::
 parseMemBarrierOptOperand(SmallVectorImpl<MCParsedAsmOperand*> &Operands) {
   SMLoc S = Parser.getTok().getLoc();
   const AsmToken &Tok = Parser.getTok();
-  assert(Tok.is(AsmToken::Identifier) && "Token is not an Identifier");
+  if (!Tok.is(AsmToken::Identifier))
+    return MatchOperand_NoMatch;
   StringRef OptStr = Tok.getString();
 
-  unsigned Opt = StringSwitch<unsigned>(OptStr.slice(0, OptStr.size()))
+  unsigned Opt = StringSwitch<unsigned>(OptStr.slice(0, OptStr.size()).lower())
     .Case("sy",    ARM_MB::SY)
     .Case("st",    ARM_MB::ST)
     .Case("sh",    ARM_MB::ISH)
@@ -3284,7 +3288,8 @@ ARMAsmParser::OperandMatchResultTy ARMAsmParser::
 parseProcIFlagsOperand(SmallVectorImpl<MCParsedAsmOperand*> &Operands) {
   SMLoc S = Parser.getTok().getLoc();
   const AsmToken &Tok = Parser.getTok();
-  assert(Tok.is(AsmToken::Identifier) && "Token is not an Identifier");
+  if (!Tok.is(AsmToken::Identifier)) 
+    return MatchOperand_NoMatch;
   StringRef IFlagsStr = Tok.getString();
 
   // An iflags string of "none" is interpreted to mean that none of the AIF
@@ -3353,22 +3358,22 @@ parseMSRMaskOperand(SmallVectorImpl<MCParsedAsmOperand*> &Operands) {
       .Case("xpsr_nzcvq", 0x803)
       .Case("xpsr_g", 0x403)
       .Case("xpsr_nzcvqg", 0xc03)
-      .Case("ipsr", 5)
-      .Case("epsr", 6)
-      .Case("iepsr", 7)
-      .Case("msp", 8)
-      .Case("psp", 9)
-      .Case("primask", 16)
-      .Case("basepri", 17)
-      .Case("basepri_max", 18)
-      .Case("faultmask", 19)
-      .Case("control", 20)
+      .Case("ipsr", 0x805)
+      .Case("epsr", 0x806)
+      .Case("iepsr", 0x807)
+      .Case("msp", 0x808)
+      .Case("psp", 0x809)
+      .Case("primask", 0x810)
+      .Case("basepri", 0x811)
+      .Case("basepri_max", 0x812)
+      .Case("faultmask", 0x813)
+      .Case("control", 0x814)
       .Default(~0U);
 
     if (FlagsVal == ~0U)
       return MatchOperand_NoMatch;
 
-    if (!hasV7Ops() && FlagsVal >= 17 && FlagsVal <= 19)
+    if (!hasV7Ops() && FlagsVal >= 0x811 && FlagsVal <= 0x813)
       // basepri, basepri_max and faultmask only valid for V7m.
       return MatchOperand_NoMatch;
 
@@ -6789,8 +6794,8 @@ processInstruction(MCInst &Inst,
     case ARM_AM::ror: newOpc = ARM::t2RORri; isNarrow = false; break;
     case ARM_AM::rrx: isNarrow = false; newOpc = ARM::t2RRX; break;
     }
-    unsigned Ammount = ARM_AM::getSORegOffset(Inst.getOperand(2).getImm());
-    if (Ammount == 32) Ammount = 0;
+    unsigned Amount = ARM_AM::getSORegOffset(Inst.getOperand(2).getImm());
+    if (Amount == 32) Amount = 0;
     TmpInst.setOpcode(newOpc);
     TmpInst.addOperand(Inst.getOperand(0)); // Rd
     if (isNarrow)
@@ -6798,7 +6803,7 @@ processInstruction(MCInst &Inst,
           Inst.getOpcode() == ARM::t2MOVSsi ? ARM::CPSR : 0));
     TmpInst.addOperand(Inst.getOperand(1)); // Rn
     if (newOpc != ARM::t2RRX)
-      TmpInst.addOperand(MCOperand::CreateImm(Ammount));
+      TmpInst.addOperand(MCOperand::CreateImm(Amount));
     TmpInst.addOperand(Inst.getOperand(3)); // CondCode
     TmpInst.addOperand(Inst.getOperand(4));
     if (!isNarrow)
@@ -7242,7 +7247,9 @@ processInstruction(MCInst &Inst,
     case ARM::ADDrsi: newOpc = ARM::ADDrr; break;
     }
     // If the shift is by zero, use the non-shifted instruction definition.
-    if (ARM_AM::getSORegOffset(Inst.getOperand(3).getImm()) == 0) {
+    // The exception is for right shifts, where 0 == 32
+    if (ARM_AM::getSORegOffset(Inst.getOperand(3).getImm()) == 0 &&
+        !(SOpc == ARM_AM::lsr || SOpc == ARM_AM::asr)) {
       MCInst TmpInst;
       TmpInst.setOpcode(newOpc);
       TmpInst.addOperand(Inst.getOperand(0));
@@ -7281,6 +7288,86 @@ processInstruction(MCInst &Inst,
     ITState.CurPosition = 0;
     ITState.FirstCond = true;
     break;
+  }
+  case ARM::t2LSLrr:
+  case ARM::t2LSRrr:
+  case ARM::t2ASRrr:
+  case ARM::t2SBCrr:
+  case ARM::t2RORrr:
+  case ARM::t2BICrr:
+  {
+    // Assemblers should use the narrow encodings of these instructions when permissible.
+    if ((isARMLowRegister(Inst.getOperand(1).getReg()) &&
+         isARMLowRegister(Inst.getOperand(2).getReg())) &&
+        Inst.getOperand(0).getReg() == Inst.getOperand(1).getReg() &&
+        ((!inITBlock() && Inst.getOperand(5).getReg() == ARM::CPSR) ||
+         (inITBlock() && Inst.getOperand(5).getReg() != ARM::CPSR)) && 
+        (!static_cast<ARMOperand*>(Operands[3])->isToken() ||
+         !static_cast<ARMOperand*>(Operands[3])->getToken().equals_lower(".w"))) {
+      unsigned NewOpc;
+      switch (Inst.getOpcode()) {
+        default: llvm_unreachable("unexpected opcode");
+        case ARM::t2LSLrr: NewOpc = ARM::tLSLrr; break;
+        case ARM::t2LSRrr: NewOpc = ARM::tLSRrr; break;
+        case ARM::t2ASRrr: NewOpc = ARM::tASRrr; break;
+        case ARM::t2SBCrr: NewOpc = ARM::tSBC; break;
+        case ARM::t2RORrr: NewOpc = ARM::tROR; break;
+        case ARM::t2BICrr: NewOpc = ARM::tBIC; break;
+      }
+      MCInst TmpInst;
+      TmpInst.setOpcode(NewOpc);
+      TmpInst.addOperand(Inst.getOperand(0));
+      TmpInst.addOperand(Inst.getOperand(5));
+      TmpInst.addOperand(Inst.getOperand(1));
+      TmpInst.addOperand(Inst.getOperand(2));
+      TmpInst.addOperand(Inst.getOperand(3));
+      TmpInst.addOperand(Inst.getOperand(4));
+      Inst = TmpInst;
+      return true;
+    }
+    return false;
+  }
+  case ARM::t2ANDrr:
+  case ARM::t2EORrr:
+  case ARM::t2ADCrr:
+  case ARM::t2ORRrr:
+  {
+    // Assemblers should use the narrow encodings of these instructions when permissible.
+    // These instructions are special in that they are commutable, so shorter encodings
+    // are available more often.
+    if ((isARMLowRegister(Inst.getOperand(1).getReg()) &&
+         isARMLowRegister(Inst.getOperand(2).getReg())) &&
+        (Inst.getOperand(0).getReg() == Inst.getOperand(1).getReg() ||
+         Inst.getOperand(0).getReg() == Inst.getOperand(2).getReg()) &&
+        ((!inITBlock() && Inst.getOperand(5).getReg() == ARM::CPSR) ||
+         (inITBlock() && Inst.getOperand(5).getReg() != ARM::CPSR)) && 
+        (!static_cast<ARMOperand*>(Operands[3])->isToken() ||
+         !static_cast<ARMOperand*>(Operands[3])->getToken().equals_lower(".w"))) {
+      unsigned NewOpc;
+      switch (Inst.getOpcode()) {
+        default: llvm_unreachable("unexpected opcode");
+        case ARM::t2ADCrr: NewOpc = ARM::tADC; break;
+        case ARM::t2ANDrr: NewOpc = ARM::tAND; break;
+        case ARM::t2EORrr: NewOpc = ARM::tEOR; break;
+        case ARM::t2ORRrr: NewOpc = ARM::tORR; break;
+      }
+      MCInst TmpInst;
+      TmpInst.setOpcode(NewOpc);
+      TmpInst.addOperand(Inst.getOperand(0));
+      TmpInst.addOperand(Inst.getOperand(5));
+      if (Inst.getOperand(0).getReg() == Inst.getOperand(1).getReg()) {
+        TmpInst.addOperand(Inst.getOperand(1));
+        TmpInst.addOperand(Inst.getOperand(2));
+      } else {
+        TmpInst.addOperand(Inst.getOperand(2));
+        TmpInst.addOperand(Inst.getOperand(1));
+      }
+      TmpInst.addOperand(Inst.getOperand(3));
+      TmpInst.addOperand(Inst.getOperand(4));
+      Inst = TmpInst;
+      return true;
+    }
+    return false;
   }
   }
   return false;
@@ -7400,7 +7487,7 @@ MatchAndEmitInstruction(SMLoc IDLoc,
     return Error(IDLoc, "invalid instruction",
                  ((ARMOperand*)Operands[0])->getLocRange());
   case Match_ConversionFail:
-    // The converter function will have already emited a diagnostic.
+    // The converter function will have already emitted a diagnostic.
     return true;
   case Match_RequiresNotITBlock:
     return Error(IDLoc, "flag setting instruction only valid outside IT block");
@@ -7410,6 +7497,11 @@ MatchAndEmitInstruction(SMLoc IDLoc,
     return Error(IDLoc, "instruction variant requires ARMv6 or later");
   case Match_RequiresThumb2:
     return Error(IDLoc, "instruction variant requires Thumb2");
+  case Match_ImmRange0_15: {
+    SMLoc ErrorLoc = ((ARMOperand*)Operands[ErrorInfo])->getStartLoc();
+    if (ErrorLoc == SMLoc()) ErrorLoc = IDLoc;
+    return Error(ErrorLoc, "immediate operand must be in the range [0,15]");
+  }
   }
 
   llvm_unreachable("Implement any new match types added!");

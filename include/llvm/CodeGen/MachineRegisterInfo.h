@@ -237,6 +237,11 @@ public:
   /// form, so there should only be one definition.
   MachineInstr *getVRegDef(unsigned Reg) const;
 
+  /// getUniqueVRegDef - Return the unique machine instr that defines the
+  /// specified virtual register or null if none is found.  If there are
+  /// multiple definitions or no definition, return null.
+  MachineInstr *getUniqueVRegDef(unsigned Reg) const;
+
   /// clearKillFlags - Iterate over all the uses of the given register and
   /// clear the kill flag from the MachineOperand. This function is used by
   /// optimization passes which extend register lifetimes and need only
@@ -336,7 +341,7 @@ public:
   bool isPhysRegOrOverlapUsed(unsigned Reg) const {
     if (UsedPhysRegMask.test(Reg))
       return true;
-    for (const uint16_t *AI = TRI->getOverlaps(Reg); *AI; ++AI)
+    for (MCRegAliasIterator AI(Reg, TRI, true); AI.isValid(); ++AI)
       if (UsedPhysRegs.test(*AI))
         return true;
     return false;

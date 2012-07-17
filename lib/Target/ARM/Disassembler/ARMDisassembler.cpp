@@ -3463,9 +3463,9 @@ static DecodeStatus DecodeT2SOImm(MCInst &Inst, unsigned Val,
 static DecodeStatus
 DecodeThumbBCCTargetOperand(MCInst &Inst, unsigned Val,
                             uint64_t Address, const void *Decoder){
-  if (!tryAddingSymbolicOperand(Address, Address + SignExtend32<8>(Val<<1) + 4,
+  if (!tryAddingSymbolicOperand(Address, Address + SignExtend32<9>(Val<<1) + 4,
                                 true, 2, Inst, Decoder))
-    Inst.addOperand(MCOperand::CreateImm(SignExtend32<8>(Val << 1)));
+    Inst.addOperand(MCOperand::CreateImm(SignExtend32<9>(Val << 1)));
   return MCDisassembler::Success;
 }
 
@@ -4198,9 +4198,9 @@ static DecodeStatus DecodeVMOVSRR(MCInst &Inst, unsigned Insn,
   DecodeStatus S = MCDisassembler::Success;
   unsigned Rt  = fieldFromInstruction32(Insn, 12, 4);
   unsigned Rt2 = fieldFromInstruction32(Insn, 16, 4);
-  unsigned Rm  = fieldFromInstruction32(Insn,  0, 4);
+  unsigned Rm  = fieldFromInstruction32(Insn,  5, 1);
   unsigned pred = fieldFromInstruction32(Insn, 28, 4);
-  Rm |= fieldFromInstruction32(Insn, 5, 1) << 4;
+  Rm |= fieldFromInstruction32(Insn, 0, 4) << 1;
 
   if (Rt == 0xF || Rt2 == 0xF || Rm == 0x1F)
     S = MCDisassembler::SoftFail;
@@ -4224,9 +4224,9 @@ static DecodeStatus DecodeVMOVRRS(MCInst &Inst, unsigned Insn,
   DecodeStatus S = MCDisassembler::Success;
   unsigned Rt  = fieldFromInstruction32(Insn, 12, 4);
   unsigned Rt2 = fieldFromInstruction32(Insn, 16, 4);
-  unsigned Rm  = fieldFromInstruction32(Insn,  0, 4);
+  unsigned Rm  = fieldFromInstruction32(Insn,  5, 1);
   unsigned pred = fieldFromInstruction32(Insn, 28, 4);
-  Rm |= fieldFromInstruction32(Insn, 5, 1) << 4;
+  Rm |= fieldFromInstruction32(Insn, 0, 4) << 1;
 
   if (Rt == 0xF || Rt2 == 0xF || Rm == 0x1F)
     S = MCDisassembler::SoftFail;

@@ -52,7 +52,6 @@ static cl::opt<bool> DisableHoisting("disable-spill-hoist", cl::Hidden,
 
 namespace {
 class InlineSpiller : public Spiller {
-  MachineFunctionPass &Pass;
   MachineFunction &MF;
   LiveIntervals &LIS;
   LiveStacks &LSS;
@@ -137,8 +136,7 @@ public:
   InlineSpiller(MachineFunctionPass &pass,
                 MachineFunction &mf,
                 VirtRegMap &vrm)
-    : Pass(pass),
-      MF(mf),
+    : MF(mf),
       LIS(pass.getAnalysis<LiveIntervals>()),
       LSS(pass.getAnalysis<LiveStacks>()),
       AA(&pass.getAnalysis<AliasAnalysis>()),
@@ -1083,6 +1081,10 @@ void InlineSpiller::insertReload(LiveInterval &NewLI,
                            MRI.getRegClass(NewLI.reg), &TRI);
   --MI; // Point to load instruction.
   SlotIndex LoadIdx = LIS.InsertMachineInstrInMaps(MI).getRegSlot();
+  // Some (out-of-tree) targets have EC reload instructions.
+  if (MachineOperand *MO = MI->findRegisterDefOperand(NewLI.reg))
+    if (MO->isEarlyClobber())
+      LoadIdx = LoadIdx.getRegSlot(true);
   DEBUG(dbgs() << "\treload:  " << LoadIdx << '\t' << *MI);
   VNInfo *LoadVNI = NewLI.getNextValue(LoadIdx, LIS.getVNInfoAllocator());
   NewLI.addRange(LiveRange(LoadIdx, Idx, LoadVNI));
@@ -1275,8 +1277,8 @@ void InlineSpiller::spill(LiveRangeEdit &edit) {
 
   DEBUG(dbgs() << "Inline spilling "
                << MRI.getRegClass(edit.getReg())->getName()
-               << ':' << edit.getParent() << "\nFrom original "
-               << LIS.getInterval(Original) << '\n');
+               << ':' << PrintReg(edit.getReg()) << ' ' << edit.getParent()
+               << "\nFrom original " << LIS.getInterval(Original) << '\n');
   assert(edit.getParent().isSpillable() &&
          "Attempting to spill already spilled value.");
   assert(DeadDefs.empty() && "Previous spill didn't remove dead defs");

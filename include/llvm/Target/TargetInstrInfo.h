@@ -320,7 +320,7 @@ public:
   /// being executed is given by Probability, and Confidence is a measure
   /// of our confidence that it will be properly predicted.
   virtual
-  bool isProfitableToIfCvt(MachineBasicBlock &MBB, unsigned NumCyles,
+  bool isProfitableToIfCvt(MachineBasicBlock &MBB, unsigned NumCycles,
                            unsigned ExtraPredCycles,
                            const BranchProbability &Probability) const {
     return false;
@@ -348,7 +348,7 @@ public:
   /// Probability, and Confidence is a measure of our confidence that it
   /// will be properly predicted.
   virtual bool
-  isProfitableToDupForIfCvt(MachineBasicBlock &MBB, unsigned NumCyles,
+  isProfitableToDupForIfCvt(MachineBasicBlock &MBB, unsigned NumCycles,
                             const BranchProbability &Probability) const {
     return false;
   }
@@ -367,6 +367,56 @@ public:
   virtual bool isProfitableToUnpredicate(MachineBasicBlock &TMBB,
                                          MachineBasicBlock &FMBB) const {
     return false;
+  }
+
+  /// canInsertSelect - Return true if it is possible to insert a select
+  /// instruction that chooses between TrueReg and FalseReg based on the
+  /// condition code in Cond.
+  ///
+  /// When successful, also return the latency in cycles from TrueReg,
+  /// FalseReg, and Cond to the destination register. The Cond latency should
+  /// compensate for a conditional branch being removed. For example, if a
+  /// conditional branch has a 3 cycle latency from the condition code read,
+  /// and a cmov instruction has a 2 cycle latency from the condition code
+  /// read, CondCycles should be returned as -1.
+  ///
+  /// @param MBB         Block where select instruction would be inserted.
+  /// @param Cond        Condition returned by AnalyzeBranch.
+  /// @param TrueReg     Virtual register to select when Cond is true.
+  /// @param FalseReg    Virtual register to select when Cond is false.
+  /// @param CondCycles  Latency from Cond+Branch to select output.
+  /// @param TrueCycles  Latency from TrueReg to select output.
+  /// @param FalseCycles Latency from FalseReg to select output.
+  virtual bool canInsertSelect(const MachineBasicBlock &MBB,
+                               const SmallVectorImpl<MachineOperand> &Cond,
+                               unsigned TrueReg, unsigned FalseReg,
+                               int &CondCycles,
+                               int &TrueCycles, int &FalseCycles) const {
+    return false;
+  }
+
+  /// insertSelect - Insert a select instruction into MBB before I that will
+  /// copy TrueReg to DstReg when Cond is true, and FalseReg to DstReg when
+  /// Cond is false.
+  ///
+  /// This function can only be called after canInsertSelect() returned true.
+  /// The condition in Cond comes from AnalyzeBranch, and it can be assumed
+  /// that the same flags or registers required by Cond are available at the
+  /// insertion point.
+  ///
+  /// @param MBB      Block where select instruction should be inserted.
+  /// @param I        Insertion point.
+  /// @param DL       Source location for debugging.
+  /// @param DstReg   Virtual register to be defined by select instruction.
+  /// @param Cond     Condition as computed by AnalyzeBranch.
+  /// @param TrueReg  Virtual register to copy when Cond is true.
+  /// @param FalseReg Virtual register to copy when Cons is false.
+  virtual void insertSelect(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator I, DebugLoc DL,
+                            unsigned DstReg,
+                            const SmallVectorImpl<MachineOperand> &Cond,
+                            unsigned TrueReg, unsigned FalseReg) const {
+    llvm_unreachable("Target didn't implement TargetInstrInfo::insertSelect!");
   }
 
   /// copyPhysReg - Emit instructions to copy a pair of physical registers.
@@ -623,19 +673,22 @@ public:
   CreateTargetPostRAHazardRecognizer(const InstrItineraryData*,
                                      const ScheduleDAG *DAG) const = 0;
 
-  /// AnalyzeCompare - For a comparison instruction, return the source register
-  /// in SrcReg and the value it compares against in CmpValue. Return true if
-  /// the comparison instruction can be analyzed.
-  virtual bool AnalyzeCompare(const MachineInstr *MI,
-                              unsigned &SrcReg, int &Mask, int &Value) const {
+  /// analyzeCompare - For a comparison instruction, return the source registers
+  /// in SrcReg and SrcReg2 if having two register operands, and the value it
+  /// compares against in CmpValue. Return true if the comparison instruction
+  /// can be analyzed.
+  virtual bool analyzeCompare(const MachineInstr *MI,
+                              unsigned &SrcReg, unsigned &SrcReg2,
+                              int &Mask, int &Value) const {
     return false;
   }
 
-  /// OptimizeCompareInstr - See if the comparison instruction can be converted
+  /// optimizeCompareInstr - See if the comparison instruction can be converted
   /// into something more efficient. E.g., on ARM most instructions can set the
   /// flags register, obviating the need for a separate CMP.
-  virtual bool OptimizeCompareInstr(MachineInstr *CmpInstr,
-                                    unsigned SrcReg, int Mask, int Value,
+  virtual bool optimizeCompareInstr(MachineInstr *CmpInstr,
+                                    unsigned SrcReg, unsigned SrcReg2,
+                                    int Mask, int Value,
                                     const MachineRegisterInfo *MRI) const {
     return false;
   }
@@ -648,9 +701,11 @@ public:
   }
 
   /// getNumMicroOps - Return the number of u-operations the given machine
-  /// instruction will be decoded to on the target cpu.
+  /// instruction will be decoded to on the target cpu. The itinerary's
+  /// IssueWidth is the number of microops that can be dispatched each
+  /// cycle. An instruction with zero microops takes no dispatch resources.
   virtual unsigned getNumMicroOps(const InstrItineraryData *ItinData,
-                                  const MachineInstr *MI) const;
+                                  const MachineInstr *MI) const = 0;
 
   /// isZeroCost - Return true for pseudo instructions that don't consume any
   /// machine resources in their current form. These are common cases that the
@@ -660,18 +715,45 @@ public:
     return Opcode <= TargetOpcode::COPY;
   }
 
+  virtual int getOperandLatency(const InstrItineraryData *ItinData,
+                                SDNode *DefNode, unsigned DefIdx,
+                                SDNode *UseNode, unsigned UseIdx) const = 0;
+
   /// getOperandLatency - Compute and return the use operand latency of a given
   /// pair of def and use.
   /// In most cases, the static scheduling itinerary was enough to determine the
   /// operand latency. But it may not be possible for instructions with variable
   /// number of defs / uses.
+  ///
+  /// This is a raw interface to the itinerary that may be directly overriden by
+  /// a target. Use computeOperandLatency to get the best estimate of latency.
   virtual int getOperandLatency(const InstrItineraryData *ItinData,
-                              const MachineInstr *DefMI, unsigned DefIdx,
-                              const MachineInstr *UseMI, unsigned UseIdx) const;
+                                const MachineInstr *DefMI, unsigned DefIdx,
+                                const MachineInstr *UseMI,
+                                unsigned UseIdx) const = 0;
 
-  virtual int getOperandLatency(const InstrItineraryData *ItinData,
-                                SDNode *DefNode, unsigned DefIdx,
-                                SDNode *UseNode, unsigned UseIdx) const = 0;
+  /// computeOperandLatency - Compute and return the latency of the given data
+  /// dependent def and use when the operand indices are already known.
+  ///
+  /// FindMin may be set to get the minimum vs. expected latency.
+  unsigned computeOperandLatency(const InstrItineraryData *ItinData,
+                                 const MachineInstr *DefMI, unsigned DefIdx,
+                                 const MachineInstr *UseMI, unsigned UseIdx,
+                                 bool FindMin = false) const;
+
+  /// computeOperandLatency - Compute and return the latency of the given data
+  /// dependent def and use. DefMI must be a valid def. UseMI may be NULL for
+  /// an unknown use. If the subtarget allows, this may or may not need to call
+  /// getOperandLatency().
+  ///
+  /// FindMin may be set to get the minimum vs. expected latency. Minimum
+  /// latency is used for scheduling groups, while expected latency is for
+  /// instruction cost and critical path.
+  unsigned computeOperandLatency(const InstrItineraryData *ItinData,
+                                 const TargetRegisterInfo *TRI,
+                                 const MachineInstr *DefMI,
+                                 const MachineInstr *UseMI,
+                                 unsigned Reg, bool FindMin) const;
 
   /// getOutputLatency - Compute and return the output dependency latency of a
   /// a given pair of defs which both target the same register. This is usually
@@ -685,12 +767,16 @@ public:
   /// getInstrLatency - Compute the instruction latency of a given instruction.
   /// If the instruction has higher cost when predicated, it's returned via
   /// PredCost.
-  virtual int getInstrLatency(const InstrItineraryData *ItinData,
-                              const MachineInstr *MI,
-                              unsigned *PredCost = 0) const;
+  virtual unsigned getInstrLatency(const InstrItineraryData *ItinData,
+                                   const MachineInstr *MI,
+                                   unsigned *PredCost = 0) const = 0;
 
   virtual int getInstrLatency(const InstrItineraryData *ItinData,
                               SDNode *Node) const = 0;
+
+  /// Return the default expected latency for a def based on it's opcode.
+  unsigned defaultDefLatency(const InstrItineraryData *ItinData,
+                             const MachineInstr *DefMI) const;
 
   /// isHighLatencyDef - Return true if this opcode has high latency to its
   /// result.
@@ -713,7 +799,7 @@ public:
   /// if the target considered it 'low'.
   virtual
   bool hasLowDefLatency(const InstrItineraryData *ItinData,
-                        const MachineInstr *DefMI, unsigned DefIdx) const;
+                        const MachineInstr *DefMI, unsigned DefIdx) const = 0;
 
   /// verifyInstruction - Perform target specific instruction verification.
   virtual
@@ -870,13 +956,29 @@ public:
   virtual bool isSchedulingBoundary(const MachineInstr *MI,
                                     const MachineBasicBlock *MBB,
                                     const MachineFunction &MF) const;
-  using TargetInstrInfo::getOperandLatency;
+
   virtual int getOperandLatency(const InstrItineraryData *ItinData,
                                 SDNode *DefNode, unsigned DefIdx,
                                 SDNode *UseNode, unsigned UseIdx) const;
-  using TargetInstrInfo::getInstrLatency;
+
   virtual int getInstrLatency(const InstrItineraryData *ItinData,
                               SDNode *Node) const;
+
+  virtual unsigned getNumMicroOps(const InstrItineraryData *ItinData,
+                                  const MachineInstr *MI) const;
+
+  virtual unsigned getInstrLatency(const InstrItineraryData *ItinData,
+                                   const MachineInstr *MI,
+                                   unsigned *PredCost = 0) const;
+
+  virtual
+  bool hasLowDefLatency(const InstrItineraryData *ItinData,
+                        const MachineInstr *DefMI, unsigned DefIdx) const;
+
+  virtual int getOperandLatency(const InstrItineraryData *ItinData,
+                                const MachineInstr *DefMI, unsigned DefIdx,
+                                const MachineInstr *UseMI,
+                                unsigned UseIdx) const;
 
   bool usePreRAHazardRecognizer() const;
 

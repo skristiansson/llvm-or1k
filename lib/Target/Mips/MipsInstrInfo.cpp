@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "MipsAnalyzeImmediate.h"
 #include "MipsInstrInfo.h"
 #include "MipsTargetMachine.h"
 #include "MipsMachineFunction.h"
@@ -232,6 +233,13 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
     .addMemOperand(MMO);
 }
 
+void MipsInstrInfo::ExpandRetRA(MachineBasicBlock &MBB,
+                                MachineBasicBlock::iterator I,
+                                unsigned Opc) const {
+  BuildMI(MBB, I, I->getDebugLoc(), TM.getInstrInfo()->get(Opc))
+    .addReg(Mips::RA);
+}
+
 void MipsInstrInfo::ExpandExtractElementF64(MachineBasicBlock &MBB,
                                           MachineBasicBlock::iterator I) const {
   const TargetInstrInfo *TII = TM.getInstrInfo();
@@ -240,9 +248,12 @@ void MipsInstrInfo::ExpandExtractElementF64(MachineBasicBlock &MBB,
   unsigned N = I->getOperand(2).getImm();
   const MCInstrDesc& Mfc1Tdd = TII->get(Mips::MFC1);
   DebugLoc dl = I->getDebugLoc();
-  const uint16_t* SubReg = TM.getRegisterInfo()->getSubRegisters(SrcReg);
 
-  BuildMI(MBB, I, dl, Mfc1Tdd, DstReg).addReg(*(SubReg + N));
+  assert(N < 2 && "Invalid immediate");
+  unsigned SubIdx = N ? Mips::sub_fpodd : Mips::sub_fpeven;
+  unsigned SubReg = TM.getRegisterInfo()->getSubReg(SrcReg, SubIdx);
+
+  BuildMI(MBB, I, dl, Mfc1Tdd, DstReg).addReg(SubReg);
 }
 
 void MipsInstrInfo::ExpandBuildPairF64(MachineBasicBlock &MBB,
@@ -252,13 +263,14 @@ void MipsInstrInfo::ExpandBuildPairF64(MachineBasicBlock &MBB,
   unsigned LoReg = I->getOperand(1).getReg(), HiReg = I->getOperand(2).getReg();
   const MCInstrDesc& Mtc1Tdd = TII->get(Mips::MTC1);
   DebugLoc dl = I->getDebugLoc();
-  const uint16_t* SubReg =
-    TM.getRegisterInfo()->getSubRegisters(DstReg);
+  const TargetRegisterInfo *TRI = TM.getRegisterInfo();
 
   // mtc1 Lo, $fp
   // mtc1 Hi, $fp + 1
-  BuildMI(MBB, I, dl, Mtc1Tdd, *SubReg).addReg(LoReg);
-  BuildMI(MBB, I, dl, Mtc1Tdd, *(SubReg + 1)).addReg(HiReg);
+  BuildMI(MBB, I, dl, Mtc1Tdd, TRI->getSubReg(DstReg, Mips::sub_fpeven))
+    .addReg(LoReg);
+  BuildMI(MBB, I, dl, Mtc1Tdd, TRI->getSubReg(DstReg, Mips::sub_fpodd))
+    .addReg(HiReg);
 }
 
 bool MipsInstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
@@ -267,6 +279,12 @@ bool MipsInstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
   switch(MI->getDesc().getOpcode()) {
   default:
     return false;
+  case Mips::RetRA:
+    ExpandRetRA(MBB, MI, Mips::RET);
+    break;
+  case Mips::RetRA16:
+    ExpandRetRA(MBB, MI, Mips::RET16);
+    break;
   case Mips::BuildPairF64:
     ExpandBuildPairF64(MBB, MI);
     break;
@@ -325,9 +343,9 @@ unsigned Mips::GetOppositeBranchOpc(unsigned Opc)
   }
 }
 
-static void AnalyzeCondBr(const MachineInstr* Inst, unsigned Opc,
+static void AnalyzeCondBr(const MachineInstr *Inst, unsigned Opc,
                           MachineBasicBlock *&BB,
-                          SmallVectorImpl<MachineOperand>& Cond) {
+                          SmallVectorImpl<MachineOperand> &Cond) {
   assert(GetAnalyzableBrOpc(Opc) && "Not an analyzable branch");
   int NumOp = Inst->getNumExplicitOperands();
 
@@ -501,3 +519,58 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const
   return false;
 }
 
+/// Return the number of bytes of code the specified instruction may be.
+unsigned MipsInstrInfo::GetInstSizeInBytes(const MachineInstr *MI) const {
+  switch (MI->getOpcode()) {
+  default:
+    return MI->getDesc().getSize();
+  case  TargetOpcode::INLINEASM: {       // Inline Asm: Variable size.
+    const MachineFunction *MF = MI->getParent()->getParent();
+    const char *AsmStr = MI->getOperand(0).getSymbolName();
+    return getInlineAsmLength(AsmStr, *MF->getTarget().getMCAsmInfo());
+  }
+  }
+}
+
+unsigned
+llvm::Mips::loadImmediate(int64_t Imm, bool IsN64, const TargetInstrInfo &TII,
+                          MachineBasicBlock& MBB,
+                          MachineBasicBlock::iterator II, DebugLoc DL,
+                          bool LastInstrIsADDiu,
+                          MipsAnalyzeImmediate::Inst *LastInst) {
+  MipsAnalyzeImmediate AnalyzeImm;
+  unsigned Size = IsN64 ? 64 : 32;
+  unsigned LUi = IsN64 ? Mips::LUi64 : Mips::LUi;
+  unsigned ZEROReg = IsN64 ? Mips::ZERO_64 : Mips::ZERO;
+  unsigned ATReg = IsN64 ? Mips::AT_64 : Mips::AT;
+
+  const MipsAnalyzeImmediate::InstSeq &Seq =
+    AnalyzeImm.Analyze(Imm, Size, LastInstrIsADDiu);
+  MipsAnalyzeImmediate::InstSeq::const_iterator Inst = Seq.begin();
+
+  if (LastInst && (Seq.size() == 1)) {
+    *LastInst = *Inst;
+    return 0;
+  }
+
+  // The first instruction can be a LUi, which is different from other
+  // instructions (ADDiu, ORI and SLL) in that it does not have a register
+  // operand.
+  if (Inst->Opc == LUi)
+    BuildMI(MBB, II, DL, TII.get(LUi), ATReg)
+      .addImm(SignExtend64<16>(Inst->ImmOpnd));
+  else
+    BuildMI(MBB, II, DL, TII.get(Inst->Opc), ATReg).addReg(ZEROReg)
+      .addImm(SignExtend64<16>(Inst->ImmOpnd));
+
+  // Build the remaining instructions in Seq. Skip the last instruction if
+  // LastInst is not 0.
+  for (++Inst; Inst != Seq.end() - !!LastInst; ++Inst)
+    BuildMI(MBB, II, DL, TII.get(Inst->Opc), ATReg).addReg(ATReg)
+      .addImm(SignExtend64<16>(Inst->ImmOpnd));
+
+  if (LastInst)
+    *LastInst = *Inst;
+
+  return Seq.size() - !!LastInst;
+}
