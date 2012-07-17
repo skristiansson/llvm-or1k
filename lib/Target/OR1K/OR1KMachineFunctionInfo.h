@@ -23,13 +23,25 @@ namespace llvm {
 class OR1KMachineFunctionInfo : public MachineFunctionInfo {
   virtual void anchor();
 
+  /// SRetReturnReg - OR1K ABI require that sret lowering includes
+  /// returning the value of the returned struct in a register. This field
+  /// holds the virtual register into which the sret argument is passed.
+  unsigned SRetReturnReg;
+
   /// VarArgsFrameIndex - FrameIndex for start of varargs area.
   int VarArgsFrameIndex;
 
 public:
-  OR1KMachineFunctionInfo() {}
+  OR1KMachineFunctionInfo() : SRetReturnReg(0),
+                              VarArgsFrameIndex(0) {}
 
-  explicit OR1KMachineFunctionInfo(MachineFunction &MF) {}
+  explicit OR1KMachineFunctionInfo(MachineFunction &MF)
+    : SRetReturnReg(0),
+      VarArgsFrameIndex(0) {}
+
+  unsigned getSRetReturnReg() const { return SRetReturnReg; }
+  void setSRetReturnReg(unsigned Reg) { SRetReturnReg = Reg; }
+
   int getVarArgsFrameIndex() const { return VarArgsFrameIndex; }
   void setVarArgsFrameIndex(int Index) { VarArgsFrameIndex = Index; }
 };

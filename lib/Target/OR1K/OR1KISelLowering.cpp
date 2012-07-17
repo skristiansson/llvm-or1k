@@ -446,6 +446,19 @@ OR1KTargetLowering::LowerCCCArguments(SDValue Chain,
     }
   }
 
+  // The OR1K ABI for returning structs by value requires that we copy
+  // the sret argument into r11 for the return. Save the argument into
+  // a virtual register so that we can access it from the return points.
+  if (MF.getFunction()->hasStructRetAttr()) {
+    unsigned Reg = OR1KMFI->getSRetReturnReg();
+    if (!Reg) {
+      Reg = MF.getRegInfo().createVirtualRegister(getRegClassFor(MVT::i32));
+      OR1KMFI->setSRetReturnReg(Reg);
+    }
+    SDValue Copy = DAG.getCopyToReg(DAG.getEntryNode(), dl, Reg, InVals[0]);
+    Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other, Copy, Chain);
+  }
+
   if (isVarArg) {
     // Record the frame index of the first variable argument
     // which is a value necessary to VASTART.
@@ -494,6 +507,25 @@ OR1KTargetLowering::LowerReturn(SDValue Chain,
     // Guarantee that all emitted copies are stuck together,
     // avoiding something bad.
     Flag = Chain.getValue(1);
+  }
+
+  // The OR1K ABI for returning structs by value requires that we copy
+  // the sret argument into r11 for the return. We saved the argument into
+  // a virtual register in the entry block, so now we copy the value out
+  // and into r11.
+  if (DAG.getMachineFunction().getFunction()->hasStructRetAttr()) {
+    MachineFunction &MF = DAG.getMachineFunction();
+    OR1KMachineFunctionInfo *OR1KMFI = MF.getInfo<OR1KMachineFunctionInfo>();
+    unsigned Reg = OR1KMFI->getSRetReturnReg();
+    assert(Reg &&
+           "SRetReturnReg should have been set in LowerFormalArguments().");
+    SDValue Val = DAG.getCopyFromReg(Chain, dl, Reg, getPointerTy());
+
+    Chain = DAG.getCopyToReg(Chain, dl, OR1K::R11, Val, Flag);
+    Flag = Chain.getValue(1);
+
+    // r11 now acts like a return value.
+    DAG.getMachineFunction().getRegInfo().addLiveOut(OR1K::R11);
   }
 
   unsigned Opc = OR1KISD::RET_FLAG;
