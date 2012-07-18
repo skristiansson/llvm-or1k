@@ -158,6 +158,8 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
   case ISD::CTTZ_ZERO_UNDEF:    return LowerCTTZ_ZERO_UNDEF(Op, DAG);
   case ISD::CTLZ:               // fall through
   case ISD::CTLZ_ZERO_UNDEF:    return LowerCTLZ(Op, DAG);
+  case ISD::RETURNADDR:         return LowerRETURNADDR(Op, DAG);
+  case ISD::FRAMEADDR:          return LowerFRAMEADDR(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -859,6 +861,46 @@ OR1KTargetLowering::LowerCTTZ_ZERO_UNDEF(SDValue Op,
   EVT VT = Op.getValueType();
   SDValue ff1 = DAG.getNode(OR1KISD::FF1, dl, VT, Op.getOperand(0));
   return DAG.getNode(ISD::SUB, dl, VT, ff1, DAG.getConstant(1, MVT::i32));
+}
+
+SDValue
+OR1KTargetLowering::LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const {
+  const TargetRegisterInfo *TRI = TM.getRegisterInfo();
+  MachineFunction &MF = DAG.getMachineFunction();
+  MachineFrameInfo *MFI = MF.getFrameInfo();
+  MFI->setReturnAddressIsTaken(true);
+
+  EVT VT = Op.getValueType();
+  DebugLoc dl = Op.getDebugLoc();
+  unsigned Depth = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
+  if (Depth) {
+    SDValue FrameAddr = LowerFRAMEADDR(Op, DAG);
+    SDValue Offset = DAG.getConstant(TD->getPointerSize(), MVT::i32);
+    return DAG.getLoad(VT, dl, DAG.getEntryNode(),
+                       DAG.getNode(ISD::ADD, dl, VT, FrameAddr, Offset),
+                       MachinePointerInfo(), false, false, false, 0);
+  }
+
+  // Return the link register, which contains the return address.
+  // Mark it an implicit live-in.
+  unsigned Reg = MF.addLiveIn(TRI->getRARegister(), getRegClassFor(MVT::i32));
+  return DAG.getCopyFromReg(DAG.getEntryNode(), dl, Reg, VT);
+}
+
+SDValue
+OR1KTargetLowering::LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const {
+  MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
+  MFI->setFrameAddressIsTaken(true);
+
+  EVT VT = Op.getValueType();
+  DebugLoc dl = Op.getDebugLoc();
+  unsigned Depth = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
+  SDValue FrameAddr = DAG.getCopyFromReg(DAG.getEntryNode(), dl, OR1K::R2, VT);
+  while (Depth--)
+    FrameAddr = DAG.getLoad(VT, dl, DAG.getEntryNode(), FrameAddr,
+                            MachinePointerInfo(),
+                            false, false, false, 0);
+  return FrameAddr;
 }
 
 const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
