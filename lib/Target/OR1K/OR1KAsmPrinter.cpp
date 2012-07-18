@@ -114,9 +114,16 @@ bool OR1KAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
 void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
   OR1KMCInstLower MCInstLowering(OutContext, *Mang, *this);
 
-  MCInst TmpInst;
-  MCInstLowering.Lower(MI, TmpInst);
-  OutStreamer.EmitInstruction(TmpInst);
+
+  MachineBasicBlock::const_instr_iterator I = MI;
+  MachineBasicBlock::const_instr_iterator E = MI->getParent()->instr_end();
+
+  do {
+    MCInst TmpInst;
+    MCInstLowering.Lower(I++, TmpInst);
+    OutStreamer.EmitInstruction(TmpInst);
+  } while ((I != E) && I->isInsideBundle());
+
 }
 
 /// isBlockOnlyReachableByFallthough - Return true if the basic block has
