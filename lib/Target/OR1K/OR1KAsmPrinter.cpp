@@ -103,9 +103,34 @@ bool OR1KAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                                      unsigned AsmVariant,
                                      const char *ExtraCode, raw_ostream &O) {
   // Does this asm operand have a single letter operand modifier?
-  if (ExtraCode && ExtraCode[0])
-    return true; // Unknown modifier.
+  if (ExtraCode && ExtraCode[0]) {
+    if (ExtraCode[1])
+      return true; // Unknown modifier.
 
+    switch (ExtraCode[0]) {
+    default:
+      return true; // Unknown modifier.
+    case 'H': // The highest-numbered register of a pair.
+      if (OpNo == 0)
+        return true;
+      const MachineOperand &FlagsOP = MI->getOperand(OpNo - 1);
+      if (!FlagsOP.isImm())
+        return true;
+      unsigned Flags = FlagsOP.getImm();
+      unsigned NumVals = InlineAsm::getNumOperandRegisters(Flags);
+      if (NumVals != 2)
+        return true;
+      unsigned RegOp = OpNo + 1;
+      if (RegOp >= MI->getNumOperands())
+        return true;
+      const MachineOperand &MO = MI->getOperand(RegOp);
+      if (!MO.isReg())
+        return true;
+      unsigned Reg = MO.getReg();
+      O << OR1KInstPrinter::getRegisterName(Reg);
+      return false;
+    }
+  }
   printOperand(MI, OpNo, O);
   return false;
 }
