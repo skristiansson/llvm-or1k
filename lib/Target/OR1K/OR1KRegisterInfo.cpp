@@ -35,7 +35,9 @@ OR1KRegisterInfo::OR1KRegisterInfo(const TargetInstrInfo &tii)
 
 const uint16_t*
 OR1KRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
-  return CSR_SaveList;
+  const TargetFrameLowering *TFI = MF->getTarget().getFrameLowering();
+
+  return TFI->hasFP(*MF) ? CSR_FP_SaveList : CSR_SaveList;
 }
 
 BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
