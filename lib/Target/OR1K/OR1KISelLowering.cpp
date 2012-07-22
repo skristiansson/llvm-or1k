@@ -137,8 +137,9 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setLoadExtAction(ISD::ZEXTLOAD,            MVT::i1,   Promote);
   setLoadExtAction(ISD::SEXTLOAD,            MVT::i1,   Promote);
 
-  setMinFunctionAlignment(4);
-  setPrefFunctionAlignment(4);
+  // Function alignments (log2)
+  setMinFunctionAlignment(2);
+  setPrefFunctionAlignment(2);
 
   maxStoresPerMemcpy = 16;
   maxStoresPerMemcpyOptSize = 8;
