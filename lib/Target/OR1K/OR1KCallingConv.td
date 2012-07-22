@@ -33,5 +33,5 @@ def CC_OR1K32 : CallingConv<[
   CCAssignToStack<4, 4>
 ]>;
 
-def CSR: CalleeSavedRegs<(add R30, R28, R26, R24, R20, R18, R16, R14, R2)>;
-def CSR_FP: CalleeSavedRegs<(add R30, R28, R26, R24, R20, R18, R16, R14)>;
+def CSR: CalleeSavedRegs<(add R30, R28, R26, R24, R22, R20, R18, R16, R14, R2)>;
+def CSR_FP: CalleeSavedRegs<(add R30, R28, R26, R24, R22, R20, R18, R16, R14)>;
