@@ -14,6 +14,7 @@
 #include "OR1K.h"
 #include "OR1KRegisterInfo.h"
 #include "OR1KSubtarget.h"
+#include "llvm/Function.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -50,6 +51,8 @@ BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
     Reserved.set(OR1K::R2);
   Reserved.set(OR1K::R9);
   Reserved.set(OR1K::R10);
+  if (hasBasePointer(MF))
+    Reserved.set(getBaseRegister());
   return Reserved;
 }
 
@@ -84,12 +87,21 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   int FrameIndex = MI.getOperand(i).getIndex();
 
-  // Addressable stack objects are accessed using neg. offsets from %fp
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex) +
                MI.getOperand(i+1).getImm();
 
-  if (!HasFP)
+  // Addressable stack objects are addressed using neg. offsets from fp
+  // or pos. offsets from sp/basepointer
+  if (!HasFP || (needsStackRealignment(MF) && FrameIndex >= 0))
     Offset += MF.getFrameInfo()->getStackSize();
+
+  unsigned FrameReg = getFrameRegister(MF);
+  if (FrameIndex >= 0) {
+    if (hasBasePointer(MF))
+      FrameReg = getBaseRegister();
+    else if (needsStackRealignment(MF))
+      FrameReg = OR1K::R1;
+  }
 
   // Replace frame index with a frame pointer reference.
   // If the offset is small enough to fit in the immediate field, directly
@@ -110,17 +122,35 @@ OR1KRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     // Reg = Reg + Sp
     MI.setDesc(TII.get(OR1K::ADD));
     MI.getOperand(i).ChangeToRegister(Reg, false, false, true);
-    MI.getOperand(i+1).ChangeToRegister((HasFP ? OR1K::R2 : OR1K::R1), false);
+    MI.getOperand(i+1).ChangeToRegister(FrameReg, false);
 
     return;
   }
 
-  MI.getOperand(i).ChangeToRegister((HasFP ? OR1K::R2 : OR1K::R1), false);
+  MI.getOperand(i).ChangeToRegister(FrameReg, false);
   MI.getOperand(i+1).ChangeToImmediate(Offset);
 }
 
 void OR1KRegisterInfo::
 processFunctionBeforeFrameFinalized(MachineFunction &MF) const {}
+
+bool OR1KRegisterInfo::hasBasePointer(const MachineFunction &MF) const {
+   const MachineFrameInfo *MFI = MF.getFrameInfo();
+   // When we need stack realignment and there are dynamic allocas, we can't
+   // reference off of the stack pointer, so we reserve a base pointer.
+   if (needsStackRealignment(MF) && MFI->hasVarSizedObjects())
+     return true;
+
+   return false;
+}
+
+bool OR1KRegisterInfo::needsStackRealignment(const MachineFunction &MF) const {
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const Function *F = MF.getFunction();
+  unsigned StackAlign = MF.getTarget().getFrameLowering()->getStackAlignment();
+  return ((MFI->getMaxAlignment() > StackAlign) ||
+          F->hasFnAttr(Attribute::StackAlignment));
+}
 
 unsigned OR1KRegisterInfo::getRARegister() const {
   return OR1K::R9;
@@ -130,6 +160,10 @@ unsigned OR1KRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
   return TFI->hasFP(MF) ? OR1K::R2 : OR1K::R1;
+}
+
+unsigned OR1KRegisterInfo::getBaseRegister() const {
+  return OR1K::R14;
 }
 
 unsigned OR1KRegisterInfo::getEHExceptionRegister() const {

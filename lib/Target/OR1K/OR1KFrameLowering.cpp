@@ -24,29 +24,35 @@ using namespace llvm;
 
 bool OR1KFrameLowering::hasFP(const MachineFunction &MF) const {
   const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const TargetRegisterInfo *TRI = MF.getTarget().getRegisterInfo();
 
   return (MF.getTarget().Options.DisableFramePointerElim(MF) ||
           MF.getFrameInfo()->hasVarSizedObjects() ||
-          MFI->isFrameAddressTaken());
+          MFI->isFrameAddressTaken() ||
+          TRI->needsStackRealignment(MF));
 }
 
 // determineFrameLayout - Determine the size of the frame and maximum call
 /// frame size.
 void OR1KFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   MachineFrameInfo *MFI = MF.getFrameInfo();
+  const TargetRegisterInfo *TRI = MF.getTarget().getRegisterInfo();
 
   // Get the number of bytes to allocate from the FrameInfo.
   unsigned FrameSize = MFI->getStackSize();
 
-  // Get the alignments provided by the target.
-  unsigned TargetAlign = MF.getTarget().getFrameLowering()->getStackAlignment();
+  // Get the alignment.
+  unsigned StackAlign = TRI->needsStackRealignment(MF) ?
+    MFI->getMaxAlignment() :
+    MF.getTarget().getFrameLowering()->getStackAlignment();
+
   // Get the maximum call frame size of all the calls.
   unsigned maxCallFrameSize = MFI->getMaxCallFrameSize();
 
   // If we have dynamic alloca then maxCallFrameSize needs to be aligned so
   // that allocations will be aligned.
   if (MFI->hasVarSizedObjects())
-    maxCallFrameSize = RoundUpToAlignment(maxCallFrameSize, TargetAlign);
+    maxCallFrameSize = RoundUpToAlignment(maxCallFrameSize, StackAlign);
 
   // Update maximum call frame size.
   MFI->setMaxCallFrameSize(maxCallFrameSize);
@@ -56,7 +62,7 @@ void OR1KFrameLowering::determineFrameLayout(MachineFunction &MF) const {
     FrameSize += maxCallFrameSize;
 
   // Make sure the frame is aligned.
-  FrameSize = RoundUpToAlignment(FrameSize, TargetAlign);
+  FrameSize = RoundUpToAlignment(FrameSize, StackAlign);
 
   // Update frame info.
   MFI->setStackSize(FrameSize);
@@ -93,6 +99,8 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   MachineFrameInfo *MFI    = MF.getFrameInfo();
   const OR1KInstrInfo &TII =
     *static_cast<const OR1KInstrInfo*>(MF.getTarget().getInstrInfo());
+  const OR1KRegisterInfo *TRI =
+    static_cast<const OR1KRegisterInfo*>(MF.getTarget().getRegisterInfo());
   MachineBasicBlock::iterator MBBI = MBB.begin();
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
@@ -119,6 +127,15 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
     // l.sw  stack_loc(r1), r2
     BuildMI(MBB, MBBI, DL, TII.get(OR1K::SW))
       .addReg(OR1K::R2).addReg(OR1K::R1).addImm(Offset);
+    Offset -= 4;
+
+    // In case of a base pointer, it need to be saved here
+    // before we start modifying it below.
+    // l.sw stack_loc(r1), basereg
+    if (TRI->hasBasePointer(MF)) {
+      BuildMI(MBB, MBBI, DL, TII.get(OR1K::SW))
+        .addReg(TRI->getBaseRegister()).addReg(OR1K::R1).addImm(Offset);
+    }
 
     // Set frame pointer to stack pointer
     // l.addi r2, r1, 0
@@ -126,20 +143,51 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
       .addReg(OR1K::R1).addImm(0);
   }
 
-  if (isInt<16>(StackSize)) {
+  // FIXME: Allocate a scratch register.
+  unsigned ScratchReg = OR1K::R13;
+  if (TRI->needsStackRealignment(MF)) {
+    assert(hasFP(MF) && "Stack realignment without FP not supported");
+    uint32_t AlignLog =  Log2_32(MFI->getMaxAlignment());
+    // Realign the stackpointer by masking out the lower
+    // bits, i.e. r1 <= (r1 - stacksize) & ~alignmask.
+    // Since the stack grows down, the resulting stack pointer
+    // will be rounded down in case the stack pointer came in unaligned.
+    if (isInt<16>(StackSize)) {
+      BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), ScratchReg)
+        .addReg(OR1K::R1).addImm(-StackSize);
+    } else {
+      BuildMI(MBB, MBBI, DL, TII.get(OR1K::MOVHI), ScratchReg)
+        .addImm((uint32_t)-StackSize >> 16);
+      BuildMI(MBB, MBBI, DL, TII.get(OR1K::ORI), ScratchReg)
+        .addReg(ScratchReg).addImm(-StackSize & 0xffffU);
+      BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADD), ScratchReg)
+        .addReg(ScratchReg).addReg(OR1K::R1);
+    }
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::SRL_ri), ScratchReg)
+      .addReg(ScratchReg).addImm(AlignLog);
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::SLL_ri), OR1K::R1)
+      .addReg(ScratchReg).addImm(AlignLog);
+  } else if (isInt<16>(StackSize)) {
     // Adjust stack : l.addi r1, r1, -imm
     if (StackSize) {
       BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADDI), OR1K::R1)
         .addReg(OR1K::R1).addImm(-StackSize);
     }
   } else {
-    // FIXME: allocate a register instead of just using r13
-    BuildMI(MBB, MBBI, DL, TII.get(OR1K::MOVHI), OR1K::R13)
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::MOVHI), ScratchReg)
       .addImm((uint32_t)-StackSize >> 16);
-    BuildMI(MBB, MBBI, DL, TII.get(OR1K::ORI), OR1K::R13)
-      .addReg(OR1K::R13).addImm(-StackSize & 0xffffU);
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::ORI), ScratchReg)
+      .addReg(ScratchReg).addImm(-StackSize & 0xffffU);
     BuildMI(MBB, MBBI, DL, TII.get(OR1K::ADD), OR1K::R1)
-      .addReg(OR1K::R1).addReg(OR1K::R13);
+      .addReg(OR1K::R1).addReg(ScratchReg);
+  }
+
+  // If a base pointer is needed, set it up here.
+  // Any variable sized objects will be located after this,
+  // so local objects can be adressed with the base pointer.
+  if (TRI->hasBasePointer(MF)) {
+    BuildMI(MBB, MBBI, DL, TII.get(OR1K::ORI), TRI->getBaseRegister())
+      .addReg(OR1K::R1).addImm(0);
   }
 
   if (MFI->hasVarSizedObjects()) {
@@ -153,11 +201,14 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
   MachineFrameInfo *MFI            = MF.getFrameInfo();
   const OR1KInstrInfo &TII =
     *static_cast<const OR1KInstrInfo*>(MF.getTarget().getInstrInfo());
+  const OR1KRegisterInfo *TRI =
+    static_cast<const OR1KRegisterInfo*>(MF.getTarget().getRegisterInfo());
 
   DebugLoc dl = MBBI->getDebugLoc();
 
   int FPOffset = MFI->adjustsStack() ? -8 : -4;
   int RAOffset = -4;
+  int BPOffset = FPOffset - 4;
 
   // Get the number of bytes from FrameInfo
   int StackSize = (int) MFI->getStackSize();
@@ -181,6 +232,12 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
     }
   }
 
+  // l.lwz basereg, stack_loc(r1)
+  if (TRI->hasBasePointer(MF)) {
+    BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), TRI->getBaseRegister())
+      .addReg(OR1K::R1).addImm(BPOffset);
+  }
+
   // l.lwz r9, stack_loc(r1)
   if (MFI->adjustsStack()) {
     BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), OR1K::R9)
@@ -193,6 +250,8 @@ processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
                                      RegScavenger *RS) const {
   MachineFrameInfo *MFI = MF.getFrameInfo();
   MachineRegisterInfo& MRI = MF.getRegInfo();
+  const OR1KRegisterInfo *TRI =
+    static_cast<const OR1KRegisterInfo*>(MF.getTarget().getRegisterInfo());
   int Offset = -4;
 
   if (MFI->adjustsStack()) {
@@ -202,6 +261,13 @@ processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
     Offset -= 4;
   }
 
-  if (hasFP(MF))
+  if (hasFP(MF)) {
     MFI->CreateFixedObject(4, Offset, true);
+    Offset -= 4;
+  }
+
+  if (TRI->hasBasePointer(MF)) {
+    MFI->CreateFixedObject(4, Offset, true);
+    MRI.setPhysRegUnused(TRI->getBaseRegister());
+  }
 }

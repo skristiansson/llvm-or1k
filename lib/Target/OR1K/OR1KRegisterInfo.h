@@ -45,9 +45,13 @@ struct OR1KRegisterInfo : public OR1KGenRegisterInfo {
 
   void processFunctionBeforeFrameFinalized(MachineFunction &MF) const;
 
+  bool hasBasePointer(const MachineFunction &MF) const;
+  bool needsStackRealignment(const MachineFunction &MF) const;
+
   // Debug information queries.
   unsigned getRARegister() const;
   unsigned getFrameRegister(const MachineFunction &MF) const;
+  unsigned getBaseRegister() const;
 
   // Exception handling queries.
   unsigned getEHExceptionRegister() const;
