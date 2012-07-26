@@ -148,10 +148,9 @@ def NoCmov       : Predicate<"!Subtarget.hasCmov()">;
 // -------------------------------------------------- //
 
 class SF_RR<bits<5> op2Val, string asmstr, PatLeaf Cond>
-        : InstRR<0x9, (outs), (ins GPR:$rA, GPR:$rB),
-                !strconcat(asmstr, "\t$rA, $rB"),
-                [(OR1Ksetflag GPR:$rA, GPR:$rB, Cond)]>
-{
+  : InstRR<0x9, (outs), (ins GPR:$rA, GPR:$rB),
+           !strconcat(asmstr, "\t$rA, $rB"),
+           [(OR1Ksetflag GPR:$rA, GPR:$rB, Cond)]> {
   bits<5> op2;
   bits<5> rA;
   bits<5> rB;
@@ -164,10 +163,9 @@ class SF_RR<bits<5> op2Val, string asmstr, PatLeaf Cond>
 }
 
 class SF_RI<bits<5> op2Val, string asmstr, PatLeaf Cond>
-        : InstRI<0xf, (outs), (ins GPR:$rA, s16imm:$imm),
-                !strconcat(asmstr, "i\t$rA, $imm"),
-                [(OR1Ksetflag GPR:$rA, immSExt16:$imm, Cond)]>
-{
+  : InstRI<0xf, (outs), (ins GPR:$rA, s16imm:$imm),
+           !strconcat(asmstr, "i\t$rA, $imm"),
+           [(OR1Ksetflag GPR:$rA, immSExt16:$imm, Cond)]> {
   bits<5> op2;
   bits<5> rA;
   bits<16> imm16;
@@ -179,8 +177,7 @@ class SF_RI<bits<5> op2Val, string asmstr, PatLeaf Cond>
   let op2 = op2Val;
 }
 
-multiclass SF<bits<5> op2Val, string asmstr, PatLeaf Cond>
-{
+multiclass SF<bits<5> op2Val, string asmstr, PatLeaf Cond> {
   def _rr : SF_RR<op2Val, asmstr, Cond>;
   def _ri : SF_RI<op2Val, asmstr, Cond>;
 }
@@ -203,10 +200,9 @@ defm SFLES : SF<0xd, "l.sfles", OR1K_CC_LE>;
 // -------------------------------------------------- //
 
 class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
-	: InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, s16imm:$imm16),
-		!strconcat(asmstr, "\t$rD, $rA, $imm16"),
-		[(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]>
-{
+  : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, s16imm:$imm16),
+           !strconcat(asmstr, "\t$rD, $rA, $imm16"),
+           [(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]> {
   bits<5> rD;
   bits<5> rA;
   bits<16> imm16;
@@ -217,10 +213,9 @@ class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
 }
 
 class ALU_RIz<bits<4> subOp, string asmstr, SDNode OpNode>
-        : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, symbolLo:$imm16),
-                !strconcat(asmstr, "\t$rD, $rA, $imm16"),
-                [(set GPR:$rD, (OpNode GPR:$rA, immZExt16:$imm16))]>
-{
+  : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, symbolLo:$imm16),
+           !strconcat(asmstr, "\t$rD, $rA, $imm16"),
+           [(set GPR:$rD, (OpNode GPR:$rA, immZExt16:$imm16))]> {
   bits<5> rD;
   bits<5> rA;
   bits<16> imm16;
@@ -244,10 +239,9 @@ let Predicates=[HasMul] in
 
 
 class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
-	: InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
-		!strconcat(asmstr, "\t$rD, $rA, $rB"),
-		[(set GPR:$rD, (OpNode GPR:$rA, GPR:$rB))]>
-{
+  : InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
+           !strconcat(asmstr, "\t$rD, $rA, $rB"),
+           [(set GPR:$rD, (OpNode GPR:$rA, GPR:$rB))]> {
   bits<5> rD;
   bits<5> rA;
   bits<5> rB;
@@ -291,10 +285,9 @@ let Predicates=[HasDiv] in {
 }
 
 class ALU2_RR<bits<2> subOp1, bits<4> subOp2, string asmstr, SDNode OpNode>
-      : InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA),
-               !strconcat(asmstr, "\t$rD, $rA"),
-               [(set GPR:$rD, (OpNode GPR:$rA))]>
-{
+  : InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA),
+           !strconcat(asmstr, "\t$rD, $rA"),
+           [(set GPR:$rD, (OpNode GPR:$rA))]> {
   bits<5> rD;
   bits<5> rA;
   bits<2> op2;
@@ -318,10 +311,9 @@ def FL1 : ALU2_RR<0x1, 0xf, "l.fl1", OR1Kfl1>;
 // -------------------------------------------------- //
 
 class SHIFT_RR<bits<2> op2Val, string asmstr, SDNode OpNode>
-	: InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
-		!strconcat(asmstr, "\t$rD, $rA, $rB"),
-		[(set GPR:$rD, (OpNode GPR:$rA, GPR:$rB))]>
-{
+  : InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
+           !strconcat(asmstr, "\t$rD, $rA, $rB"),
+           [(set GPR:$rD, (OpNode GPR:$rA, GPR:$rB))]> {
   bits<5> rD;
   bits<5> rA;
   bits<5> rB;
@@ -343,10 +335,9 @@ class SHIFT_RR<bits<2> op2Val, string asmstr, SDNode OpNode>
 }
 
 class SHIFT_RI<bits<2> op2Val, string asmstr, SDNode OpNode>
-	: InstRI<0xE, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm),
-		!strconcat(asmstr, "i\t$rD, $rA, $imm"),
-		[(set GPR:$rD, (OpNode GPR:$rA, immZExt6:$imm))]>
-{
+  : InstRI<0xE, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm),
+           !strconcat(asmstr, "i\t$rD, $rA, $imm"),
+           [(set GPR:$rD, (OpNode GPR:$rA, immZExt6:$imm))]> {
   bits<5> rD;
   bits<5> rA;
   bits<2> op2;
@@ -360,8 +351,7 @@ class SHIFT_RI<bits<2> op2Val, string asmstr, SDNode OpNode>
   let op2 = op2Val;
 }
 
-multiclass SHIFT<bits<2> op2Val, string asmstr, SDNode OpNode>
-{
+multiclass SHIFT<bits<2> op2Val, string asmstr, SDNode OpNode> {
   def _rr : SHIFT_RR<op2Val, asmstr, OpNode>;
   def _ri : SHIFT_RI<op2Val, asmstr, OpNode>;
 }
@@ -380,10 +370,9 @@ let Predicates=[HasRor] in
 // -------------------------------------------------- //
 
 class STORE<bits<4> subOp, string asmstring, PatFrag opNode>
-	: InstRR<subOp, (outs), (ins GPR:$rB, MEMri:$dst),
-		!strconcat(asmstring, "\t$dst, $rB"),
-		[(opNode (i32 GPR:$rB), ADDRri:$dst)]>
-{
+  : InstRR<subOp, (outs), (ins GPR:$rB, MEMri:$dst),
+          !strconcat(asmstring, "\t$dst, $rB"),
+          [(opNode (i32 GPR:$rB), ADDRri:$dst)]> {
   bits<5> rA;
   bits<5> rB;
   bits<16> imm16;
@@ -405,10 +394,9 @@ def SH : STORE<0x7, "l.sh", truncstorei16>;
 // -------------------------------------------------- //
 
 class LOAD<bits<4> subop, string asmstring, PatFrag opNode>
-	: InstRI<subop, (outs GPR:$rD), (ins MEMri:$src),
-		!strconcat(asmstring, "\t$rD, $src"),
-		[(set (i32 GPR:$rD), (opNode ADDRri:$src))]>
-{
+  : InstRI<subop, (outs GPR:$rD), (ins MEMri:$src),
+           !strconcat(asmstring, "\t$rD, $src"),
+           [(set (i32 GPR:$rD), (opNode ADDRri:$src))]> {
   bits<5> rD;
   bits<5> rA;
   bits<16> imm16;
@@ -434,32 +422,28 @@ def LHS : LOAD<0x6, "l.lhs", sextloadi16>;
 
 
 class BRANCH<bits<4> subOp, string asmstring, list<dag> pattern>
-        : InstBR<subOp, (outs), (ins brtarget:$dst),
-		!strconcat(asmstring, "\t$dst"), pattern>
-{
-  bits<26> imm26;
+  : InstBR<subOp, (outs), (ins brtarget:$dst),
+           !strconcat(asmstring, "\t$dst"), pattern> {
+  bits<26> dst;
 
-  let Inst{25-0} = imm26;
+  let Inst{25-0} = dst;
 
   let opcode = subOp;
 }
 
 class BRANCHL<bits<4> subOp, string asmstring>
-        : InstBR<subOp, (outs), (ins calltarget:$imm, variable_ops),
-		!strconcat(asmstring, "\t$imm"),
-		[]>
-{
-  bits<26> imm26;
+  : InstBR<subOp, (outs), (ins calltarget:$dst, variable_ops),
+           !strconcat(asmstring, "\t$dst"), []> {
+  bits<26> dst;
 
-  let Inst{25-0} = imm26;
+  let Inst{25-0} = dst;
 
   let opcode = subOp;
 }
 
 class BRANCH_R<bits<4> subOp, string asmstring, list<dag> pattern>
-        : InstBR<subOp, (outs), (ins GPR:$rB),
-		!strconcat(asmstring, "\t$rB"), pattern>
-{
+  : InstBR<subOp, (outs), (ins GPR:$rB),
+           !strconcat(asmstring, "\t$rB"), pattern> {
   bits<5> rB;
 
   let Inst{15-11} = rB;
@@ -468,10 +452,8 @@ class BRANCH_R<bits<4> subOp, string asmstring, list<dag> pattern>
 }
 
 class BRANCHL_R<bits<4> subOp, string asmstring>
-        : InstBR<subOp, (outs), (ins GPR:$rB, variable_ops),
-		!strconcat(asmstring, "\t$rB"),
-		[(call GPR:$rB)]>
-{
+  : InstBR<subOp, (outs), (ins GPR:$rB, variable_ops),
+           !strconcat(asmstring, "\t$rB"), [(call GPR:$rB)]> {
   bits<5> rB;
 
   let Inst{15-11} = rB;
@@ -521,9 +503,8 @@ def RFE :
 */
 
 class NOP_I<bits<2> op2Val, string asmstr>
-	: InstRI<0x5, (outs), (ins i16imm:$imm),
-		!strconcat(asmstr, "\t$imm"), []>
-{
+  : InstRI<0x5, (outs), (ins i16imm:$imm),
+           !strconcat(asmstr, "\t$imm"), []> {
   bits<2> op2;
   bits<16> imm16;
 
@@ -537,9 +518,9 @@ let neverHasSideEffects = 1 in
   def NOP : NOP_I<0x1, "l.nop">;
 
 let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
-  def RET  : InstBR<0x1, (outs), (ins),
-                    "l.jr\tr9",
-                    [(retflag)]>;
+  def RET : InstBR<0x1, (outs), (ins),
+                   "l.jr\tr9",
+                   [(retflag)]>;
 }
 
 // ADJCALLSTACKDOWN/UP implicitly use/def R1 because they may be expanded into
@@ -572,8 +553,7 @@ let Uses = [SR], usesCustomInserter = 1, Predicates = [NoCmov] in {
 
 class MOVHI_I : InstOR1K<(outs GPR:$rD), (ins symbolHi:$imm),
                          "l.movhi\t{$rD, $imm}",
-                         [(set GPR:$rD, i32hi16:$imm)]>
-{
+                         [(set GPR:$rD, i32hi16:$imm)]> {
   bits<16> imm16;
   let optype = 0;
   let opcode = 0x6;
@@ -582,7 +562,7 @@ class MOVHI_I : InstOR1K<(outs GPR:$rD), (ins symbolHi:$imm),
 }
 
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
-  def MOVHI    : MOVHI_I;
+  def MOVHI : MOVHI_I;
 }
 
 //===----------------------------------------------------------------------===//
