@@ -432,7 +432,7 @@ class BRANCH<bits<4> subOp, string asmstring, list<dag> pattern>
 }
 
 class BRANCHL<bits<4> subOp, string asmstring>
-  : InstBR<subOp, (outs), (ins calltarget:$dst, variable_ops),
+  : InstBR<subOp, (outs), (ins calltarget:$dst),
            !strconcat(asmstring, "\t$dst"), []> {
   bits<26> dst;
 
@@ -452,7 +452,7 @@ class BRANCH_R<bits<4> subOp, string asmstring, list<dag> pattern>
 }
 
 class BRANCHL_R<bits<4> subOp, string asmstring>
-  : InstBR<subOp, (outs), (ins GPR:$rB, variable_ops),
+  : InstBR<subOp, (outs), (ins GPR:$rB),
            !strconcat(asmstring, "\t$rB"), [(call GPR:$rB)]> {
   bits<5> rB;
 
