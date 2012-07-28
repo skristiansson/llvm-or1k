@@ -67,6 +67,8 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
 
   setOperationAction(ISD::GlobalAddress,     MVT::i32, Custom);
   setOperationAction(ISD::JumpTable,         MVT::i32, Custom);
+  setOperationAction(ISD::ConstantPool,      MVT::i32, Custom);
+  if (!TM.Options.UseSoftFloat)
 
   setOperationAction(ISD::DYNAMIC_STACKALLOC, MVT::i32,   Custom);
   setOperationAction(ISD::STACKSAVE,          MVT::Other, Expand);
@@ -150,6 +152,7 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
                                            SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
   case ISD::BR_CC:              return LowerBR_CC(Op, DAG);
+  case ISD::ConstantPool:       return LowerConstantPool(Op, DAG);
   case ISD::GlobalAddress:      return LowerGlobalAddress(Op, DAG);
   case ISD::JumpTable:          return LowerJumpTable(Op, DAG);
   case ISD::SELECT_CC:          return LowerSELECT_CC(Op, DAG);
@@ -917,6 +920,17 @@ const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   case OR1KISD::FF1:                return "OR1KISD::FF1";
   case OR1KISD::FL1:                return "OR1KISD::FL1";
   }
+}
+
+SDValue OR1KTargetLowering::LowerConstantPool(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  ConstantPoolSDNode *N = cast<ConstantPoolSDNode>(Op);
+  const Constant *C = N->getConstVal();
+
+  SDValue Result = DAG.getTargetConstantPool(C, MVT::i32, N->getAlignment(),
+                                             N->getOffset(), 0);
+  return DAG.getNode(OR1KISD::Wrapper, Op.getDebugLoc(),
+                     getPointerTy(), Result);
 }
 
 SDValue OR1KTargetLowering::LowerGlobalAddress(SDValue Op,

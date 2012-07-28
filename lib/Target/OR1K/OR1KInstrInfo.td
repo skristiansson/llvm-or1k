@@ -586,7 +586,7 @@ def : Pat<(call texternalsym:$dst), (JAL texternalsym:$dst)>;
 def : Pat<(extloadi8  ADDRri:$src), (i32 (LBZ ADDRri:$src))>;
 def : Pat<(extloadi16 ADDRri:$src), (i32 (LHZ ADDRri:$src))>;
 
-// GlobalAddress, ExternalSymbol, Jumptable
+// GlobalAddress, ExternalSymbol, Jumptable, ConstantPool
 def : Pat<(OR1KWrapper tglobaladdr:$dst),
           (ORI (MOVHI (tglobaladdr:$dst)), (tglobaladdr:$dst))>;
 def : Pat<(OR1KWrapper texternalsym:$dst),
@@ -595,3 +595,5 @@ def : Pat<(OR1KWrapper tblockaddress:$dst),
           (ORI (MOVHI (tblockaddress:$dst)), (tblockaddress:$dst))>;
 def : Pat<(OR1KWrapper tjumptable:$dst),
           (ORI (MOVHI (tjumptable:$dst)), (tjumptable:$dst))>;
+def : Pat<(OR1KWrapper tconstpool:$dst),
+          (ORI (MOVHI (tconstpool:$dst)), (tconstpool:$dst))>;

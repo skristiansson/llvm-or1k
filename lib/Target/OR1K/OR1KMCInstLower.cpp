@@ -62,6 +62,22 @@ GetJumpTableSymbol(const MachineOperand &MO) const {
   return Ctx.GetOrCreateSymbol(Name.str());
 }
 
+MCSymbol *OR1KMCInstLower::
+GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
+  SmallString<256> Name;
+  raw_svector_ostream(Name) << Printer.MAI->getPrivateGlobalPrefix() << "CPI"
+                            << Printer.getFunctionNumber() << '_'
+                            << MO.getIndex();
+
+  switch (MO.getTargetFlags()) {
+  default: llvm_unreachable("Unknown target flag on GV operand");
+  case 0: break;
+  }
+
+  // Create a symbol for the name.
+  return Ctx.GetOrCreateSymbol(Name.str());
+}
+
 MCOperand OR1KMCInstLower::
 LowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym) const {
   // FIXME: We would like an efficient form for this, so we don't have to do a
@@ -113,6 +129,9 @@ void OR1KMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
       break;
     case MachineOperand::MO_JumpTableIndex:
       MCOp = LowerSymbolOperand(MO, GetJumpTableSymbol(MO));
+      break;
+    case MachineOperand::MO_ConstantPoolIndex:
+      MCOp = LowerSymbolOperand(MO, GetConstantPoolIndexSymbol(MO));
       break;
     }
 

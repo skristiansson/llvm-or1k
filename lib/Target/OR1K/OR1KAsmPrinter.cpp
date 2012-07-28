@@ -92,6 +92,11 @@ void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
        << '_' << MO.getIndex();
      break;
 
+  case MachineOperand::MO_ConstantPoolIndex:
+    O << MAI->getPrivateGlobalPrefix() << "CPI" << getFunctionNumber()
+      << '_' << MO.getIndex();
+    return;
+
   default:
     llvm_unreachable("<unknown operand type>");
   }
