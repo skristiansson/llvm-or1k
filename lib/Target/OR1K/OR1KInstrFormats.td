@@ -49,6 +49,14 @@ class InstBI<bits<4> op, dag outs, dag ins, string asmstr, list<dag>pattern>
   let opcode = op;
 }
 
+// Floating point instructions
+class InstFRR<bits<8> op, dag outs, dag ins, string asmstr, list<dag> pattern>
+  : InstOR1K<outs, ins, asmstr, pattern> {
+  let optype = 0b11;
+  let opcode = 0b0010;
+  let Inst{7-0} = op;
+}
+
 // Pseudo instructions
 class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
   : InstOR1K<outs, ins, asmstr, pattern> {

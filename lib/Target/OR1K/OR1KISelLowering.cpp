@@ -46,6 +46,8 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
 
   // Set up the register classes.
   addRegisterClass(MVT::i32, &OR1K::GPRRegClass);
+  if (!TM.Options.UseSoftFloat)
+    addRegisterClass(MVT::f32, &OR1K::GPRRegClass);
 
   // Compute derived properties from the register classes
   computeRegisterProperties();
@@ -64,11 +66,13 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SELECT,            MVT::f32, Expand);
   setOperationAction(ISD::SELECT,            MVT::f64, Expand);
   setOperationAction(ISD::SELECT_CC,         MVT::i32, Custom);
+  setOperationAction(ISD::SELECT_CC,         MVT::f32, Custom);
 
   setOperationAction(ISD::GlobalAddress,     MVT::i32, Custom);
   setOperationAction(ISD::JumpTable,         MVT::i32, Custom);
   setOperationAction(ISD::ConstantPool,      MVT::i32, Custom);
   if (!TM.Options.UseSoftFloat)
+    setOperationAction(ISD::ConstantFP,       MVT::f32,   Legal);
 
   setOperationAction(ISD::DYNAMIC_STACKALLOC, MVT::i32,   Custom);
   setOperationAction(ISD::STACKSAVE,          MVT::Other, Expand);

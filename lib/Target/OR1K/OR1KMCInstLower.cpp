@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "OR1KMCInstLower.h"
+#include "llvm/Constants.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -112,6 +113,13 @@ void OR1KMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
       if (MO.isImplicit()) continue;
       MCOp = MCOperand::CreateReg(MO.getReg());
       break;
+    case MachineOperand::MO_FPImmediate: {
+     APFloat Val = MO.getFPImm()->getValueAPF();
+      // FP immediates are used only when setting GPRs, so they may be dealt
+      // with like regular immediates from this point on.
+      MCOp = MCOperand::CreateImm(*Val.bitcastToAPInt().getRawData());
+      break;
+    }
     case MachineOperand::MO_Immediate:
       MCOp = MCOperand::CreateImm(MO.getImm());
       break;

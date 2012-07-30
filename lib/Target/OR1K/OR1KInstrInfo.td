@@ -26,13 +26,15 @@ def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                           SDTCisVT<1, i32> ]>;
 def SDT_OR1KCall         : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
-def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, []>;
+def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, [SDTCisVT<0, i32>,
+                                                SDTCisInt<1>]>;
 def SDT_OR1KSelectCC     : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
                                                 SDTCisSameAs<1, 2>]>;
 def SDT_OR1KBrCC         : SDTypeProfile<0, 1, [SDTCisVT<0, OtherVT>]>;
 def SDT_OR1KWrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                 SDTCisPtrTy<0>]>;
-def SDT_OR1KAdjDynAlloc  : SDTypeProfile<1, 1, [SDTCisVT<0, i32>]>;
+def SDT_OR1KAdjDynAlloc  : SDTypeProfile<1, 1, [SDTCisVT<0, i32>,
+                                                SDTCisVT<1, i32>]>;
 
 def call            : SDNode<"OR1KISD::CALL", SDT_OR1KCall,
                              [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -199,10 +201,9 @@ defm SFLES : SF<0xd, "l.sfles", OR1K_CC_LE>;
 // ALU instructions
 // -------------------------------------------------- //
 
-class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
-  : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, s16imm:$imm16),
-           !strconcat(asmstr, "\t$rD, $rA, $imm16"),
-           [(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]> {
+class ALU_RI<bits<4> subOp, dag outs, dag ins, string asmstr,
+             list<dag> pattern>
+  : InstRI<subOp, outs, ins, asmstr, pattern> {
   bits<5> rD;
   bits<5> rA;
   bits<16> imm16;
@@ -211,19 +212,16 @@ class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
   let Inst{20-16} = rA;
   let Inst{15-0} = imm16;
 }
+
+class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
+  : ALU_RI<subOp, (outs GPR:$rD), (ins GPR:$rA, s16imm:$imm16),
+           !strconcat(asmstr, "\t$rD, $rA, $imm16"),
+           [(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]>;
 
 class ALU_RIz<bits<4> subOp, string asmstr, SDNode OpNode>
-  : InstRI<subOp, (outs GPR:$rD), (ins GPR:$rA, symbolLo:$imm16),
+  : ALU_RI<subOp, (outs GPR:$rD), (ins GPR:$rA, symbolLo:$imm16),
            !strconcat(asmstr, "\t$rD, $rA, $imm16"),
-           [(set GPR:$rD, (OpNode GPR:$rA, immZExt16:$imm16))]> {
-  bits<5> rD;
-  bits<5> rA;
-  bits<16> imm16;
-
-  let Inst{25-21} = rD;
-  let Inst{20-16} = rA;
-  let Inst{15-0} = imm16;
-}
+           [(set GPR:$rD, (OpNode GPR:$rA, immZExt16:$imm16))]>;
 
 let isAsCheapAsAMove = 1 in {
   def ADDI  : ALU_RIs<0x7, "l.addi", add>;
@@ -241,7 +239,7 @@ let Predicates=[HasMul] in
 class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
   : InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
            !strconcat(asmstr, "\t$rD, $rA, $rB"),
-           [(set GPR:$rD, (OpNode GPR:$rA, GPR:$rB))]> {
+           [(set GPR:$rD, (OpNode (i32 GPR:$rA), (i32 GPR:$rB)))]> {
   bits<5> rD;
   bits<5> rA;
   bits<5> rB;
@@ -369,10 +367,9 @@ let Predicates=[HasRor] in
 // STORE instructions
 // -------------------------------------------------- //
 
-class STORE<bits<4> subOp, string asmstring, PatFrag opNode>
+class STORE<bits<4> subOp, string asmstring, list<dag> pattern>
   : InstRR<subOp, (outs), (ins GPR:$rB, MEMri:$dst),
-          !strconcat(asmstring, "\t$dst, $rB"),
-          [(opNode (i32 GPR:$rB), ADDRri:$dst)]> {
+          !strconcat(asmstring, "\t$dst, $rB"), pattern> {
   bits<5> rA;
   bits<5> rB;
   bits<16> imm16;
@@ -383,20 +380,22 @@ class STORE<bits<4> subOp, string asmstring, PatFrag opNode>
   let Inst{10-0} = imm16{10-0};
 }
 
+class STOREi32<bits<4> subOp, string asmstring, PatFrag opNode>
+  : STORE<subOp, asmstring, [(opNode (i32 GPR:$rB), ADDRri:$dst)]>;
+
 
 //def SD : STORE<0x4, "l.sd">;
-def SW : STORE<0x5, "l.sw", store>;
-def SB : STORE<0x6, "l.sb", truncstorei8>;
-def SH : STORE<0x7, "l.sh", truncstorei16>;
+def SW : STOREi32<0x5, "l.sw", store>;
+def SB : STOREi32<0x6, "l.sb", truncstorei8>;
+def SH : STOREi32<0x7, "l.sh", truncstorei16>;
 
 // -------------------------------------------------- //
 // LOAD instructions
 // -------------------------------------------------- //
 
-class LOAD<bits<4> subop, string asmstring, PatFrag opNode>
+class LOAD<bits<4> subop, string asmstring, list<dag> pattern>
   : InstRI<subop, (outs GPR:$rD), (ins MEMri:$src),
-           !strconcat(asmstring, "\t$rD, $src"),
-           [(set (i32 GPR:$rD), (opNode ADDRri:$src))]> {
+           !strconcat(asmstring, "\t$rD, $src"), pattern> {
   bits<5> rD;
   bits<5> rA;
   bits<16> imm16;
@@ -406,14 +405,16 @@ class LOAD<bits<4> subop, string asmstring, PatFrag opNode>
   let Inst{15-0} = imm16;
 }
 
+class LOADi32<bits<4> subop, string asmstring, PatFrag opNode>
+  : LOAD<subop, asmstring, [(set (i32 GPR:$rD), (opNode ADDRri:$src))]>;
 
 //def LD : LOAD<0x0, "l.ld">;
-def LWZ : LOAD<0x1, "l.lwz", load>;
+def LWZ : LOADi32<0x1, "l.lwz", load>;
 //def LWS : LOAD<0x2, "l.lws", load>;
-def LBZ : LOAD<0x3, "l.lbz", zextloadi8>;
-def LBS : LOAD<0x4, "l.lbs", sextloadi8>;
-def LHZ : LOAD<0x5, "l.lhz", zextloadi16>;
-def LHS : LOAD<0x6, "l.lhs", sextloadi16>;
+def LBZ : LOADi32<0x3, "l.lbz", zextloadi8>;
+def LBS : LOADi32<0x4, "l.lbs", sextloadi8>;
+def LHZ : LOADi32<0x5, "l.lhz", zextloadi16>;
+def LHS : LOADi32<0x6, "l.lhs", sextloadi16>;
 
 
 // -------------------------------------------------- //
@@ -546,14 +547,13 @@ let Defs = [R1], Uses = [R1] in {
 let Uses = [SR], usesCustomInserter = 1, Predicates = [NoCmov] in {
   def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2),
                        "# Select PSEUDO",
-                       [(set GPR:$dst,
-                        (OR1Kselectcc GPR:$src, GPR:$src2))]>;
+                       [(set (i32 GPR:$dst),
+                        (OR1Kselectcc (i32 GPR:$src), (i32 GPR:$src2)))]>;
 }
 
 
-class MOVHI_I : InstOR1K<(outs GPR:$rD), (ins symbolHi:$imm),
-                         "l.movhi\t{$rD, $imm}",
-                         [(set GPR:$rD, i32hi16:$imm)]> {
+class MOVHI_I <dag outs, dag ins, list<dag> pattern>
+  : InstOR1K<outs, ins,  "l.movhi\t$rD, $imm", pattern> {
   bits<16> imm16;
   let optype = 0;
   let opcode = 0x6;
@@ -562,7 +562,8 @@ class MOVHI_I : InstOR1K<(outs GPR:$rD), (ins symbolHi:$imm),
 }
 
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
-  def MOVHI : MOVHI_I;
+  def MOVHI : MOVHI_I<(outs GPR:$rD), (ins symbolHi:$imm),
+                      [(set GPR:$rD, i32hi16:$imm)]>;
 }
 
 //===----------------------------------------------------------------------===//
@@ -570,10 +571,10 @@ let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
 //===----------------------------------------------------------------------===//
 
 // signed 16-bit immediate
-def : Pat<(i32 immSExt16:$imm), (ADDI R0, imm:$imm)>;
+def : Pat<(i32 immSExt16:$imm), (ADDI (i32 R0), imm:$imm)>;
 
 // unsigned 16-bit immediate
-def : Pat<(i32 immZExt16:$imm), (ORI R0, imm:$imm)>;
+def : Pat<(i32 immZExt16:$imm), (ORI (i32 R0), imm:$imm)>;
 
 // arbitrary immediate
 def : Pat<(i32 imm:$imm), (ORI (MOVHI (HI16 imm:$imm)), (LO16 imm:$imm))>;
@@ -597,3 +598,9 @@ def : Pat<(OR1KWrapper tjumptable:$dst),
           (ORI (MOVHI (tjumptable:$dst)), (tjumptable:$dst))>;
 def : Pat<(OR1KWrapper tconstpool:$dst),
           (ORI (MOVHI (tconstpool:$dst)), (tconstpool:$dst))>;
+
+//===----------------------------------------------------------------------===//
+// Floating Point Support
+//===----------------------------------------------------------------------===//
+
+include "OR1KInstrFPU.td"

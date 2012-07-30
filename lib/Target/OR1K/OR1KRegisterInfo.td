@@ -70,7 +70,7 @@ def SR : Register<"SR">;        // Supervisor Registor (contains flags)
 // FIXME: the register order should be defined in terms of the preferred
 // allocation order...
 //
-def GPR : RegisterClass<"OR1K", [i32], 32, (add R3, R4, R5, R6, R7,
+def GPR : RegisterClass<"OR1K", [i32,f32], 32, (add R3, R4, R5, R6, R7,
                                      R8,
                                      R12, R13, R14, R15,
                                      R16, R17, R18, R19, R20, R21, R22, R23,
