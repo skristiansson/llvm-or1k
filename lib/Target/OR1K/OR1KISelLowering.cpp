@@ -414,6 +414,7 @@ OR1KTargetLowering::LowerCCCArguments(SDValue Chain,
           llvm_unreachable(0);
         }
       case MVT::i32:
+      case MVT::f32:
         unsigned VReg = RegInfo.createVirtualRegister(&OR1K::GPRRegClass);
         RegInfo.addLiveIn(VA.getLocReg(), VReg);
         SDValue ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, RegVT);
