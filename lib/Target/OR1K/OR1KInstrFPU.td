@@ -51,6 +51,10 @@ class AluF<bits<8> subOp, string asmstr, SDNode OpNode>
 }
 
 def ADDrrf32 : AluF<0x00, "lf.add.s", fadd>;
+def SUBrrf32 : AluF<0x01, "lf.sub.s", fsub>;
+def MULrrf32 : AluF<0x02, "lf.mul.s", fmul>;
+def DIVrrf32 : AluF<0x03, "lf.div.s", fdiv>;
+def REMrrf32 : AluF<0x06, "lf.rem.s", frem>;
 
 //===----------------------------------------------------------------------===//
 // LOAD/STORE instructions
