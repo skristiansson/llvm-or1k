@@ -26,11 +26,10 @@ def SDT_OR1KCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_OR1KCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>,
                                           SDTCisVT<1, i32> ]>;
 def SDT_OR1KCall         : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
-def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, [SDTCisVT<0, i32>,
-                                                SDTCisInt<1>]>;
+def SDT_OR1KSetFlag      : SDTypeProfile<0, 3, [SDTCisSameAs<0, 1>]>;
 def SDT_OR1KSelectCC     : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
                                                 SDTCisSameAs<1, 2>]>;
-def SDT_OR1KBrCC         : SDTypeProfile<0, 1, [SDTCisVT<0, OtherVT>]>;
+def SDT_OR1KBrCC         : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>]>;
 def SDT_OR1KWrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                 SDTCisPtrTy<0>]>;
 def SDT_OR1KAdjDynAlloc  : SDTypeProfile<1, 1, [SDTCisVT<0, i32>,
@@ -136,6 +135,25 @@ def OR1K_CC_LTU : PatLeaf<(imm),
                   [{return (N->getZExtValue() == ISD::SETULT);}]>;
 def OR1K_CC_LEU : PatLeaf<(imm),
                   [{return (N->getZExtValue() == ISD::SETULE);}]>;
+def OR1K_CC_GTO : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETOGT);}]>;
+def OR1K_CC_GEO : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETOGE);}]>;
+def OR1K_CC_LTO : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETOLT);}]>;
+def OR1K_CC_LEO : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETOLE);}]>;
+def OR1K_CC_EQO : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETOEQ);}]>;
+def OR1K_CC_NEO : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETONE);}]>;
+def OR1K_CC_O   : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETO);}]>;
+def OR1K_CC_UO  : PatLeaf<(imm),
+                  [{return (N->getZExtValue() == ISD::SETUO);}]>;
+
+def OR1K_COND     : PatLeaf<(i32 0)>;
+def OR1K_COND_NEG : PatLeaf<(i32 1)>;
 
 // Feature support predicates
 def HasDiv       : Predicate<"Subtarget.hasDiv()">;
@@ -152,7 +170,7 @@ def NoCmov       : Predicate<"!Subtarget.hasCmov()">;
 class SF_RR<bits<5> op2Val, string asmstr, PatLeaf Cond>
   : InstRR<0x9, (outs), (ins GPR:$rA, GPR:$rB),
            !strconcat(asmstr, "\t$rA, $rB"),
-           [(OR1Ksetflag GPR:$rA, GPR:$rB, Cond)]> {
+           [(OR1Ksetflag (i32 GPR:$rA), (i32 GPR:$rB), Cond)]> {
   bits<5> op2;
   bits<5> rA;
   bits<5> rB;
@@ -167,7 +185,7 @@ class SF_RR<bits<5> op2Val, string asmstr, PatLeaf Cond>
 class SF_RI<bits<5> op2Val, string asmstr, PatLeaf Cond>
   : InstRI<0xf, (outs), (ins GPR:$rA, s16imm:$imm),
            !strconcat(asmstr, "i\t$rA, $imm"),
-           [(OR1Ksetflag GPR:$rA, immSExt16:$imm, Cond)]> {
+           [(OR1Ksetflag (i32 GPR:$rA), immSExt16:$imm, Cond)]> {
   bits<5> op2;
   bits<5> rA;
   bits<16> imm16;
@@ -234,12 +252,9 @@ let isAsCheapAsAMove = 1 in {
 let Predicates=[HasMul] in
   def MULI  : ALU_RIs<0xc, "l.muli", mul>;
 
-
-
-class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
+class ALU_RR<bits<4> subOp, string asmstr, list<dag> pattern>
   : InstRR<0x8, (outs GPR:$rD), (ins GPR:$rA, GPR:$rB),
-           !strconcat(asmstr, "\t$rD, $rA, $rB"),
-           [(set GPR:$rD, (OpNode (i32 GPR:$rA), (i32 GPR:$rB)))]> {
+           !strconcat(asmstr, "\t$rD, $rA, $rB"), pattern> {
   bits<5> rD;
   bits<5> rA;
   bits<5> rB;
@@ -257,29 +272,33 @@ class ALU_RR<bits<4> subOp, string asmstr, SDNode OpNode>
   let op3 = subOp;
 }
 
+class ALU1_RR<bits<4> subOp, string asmstr, SDNode OpNode>
+  : ALU_RR<subOp, asmstr,
+           [(set GPR:$rD, (OpNode (i32 GPR:$rA), (i32 GPR:$rB)))]>;
+
 let isAsCheapAsAMove = 1 in {
   let isCommutable=1 in {
-    def ADD  : ALU_RR<0x0, "l.add", add>;
-    def ADDC : ALU_RR<0x1, "l.addc", add>;
+    def ADD  : ALU1_RR<0x0, "l.add", add>;
+    def ADDC : ALU1_RR<0x1, "l.addc", add>;
   }
-  def SUB  : ALU_RR<0x2, "l.sub", sub>;
+  def SUB  : ALU1_RR<0x2, "l.sub", sub>;
   let isCommutable=1 in {
-    def AND  : ALU_RR<0x3, "l.and", and>;
-    def OR   : ALU_RR<0x4, "l.or", or>;
-    def XOR  : ALU_RR<0x5, "l.xor", xor>;
+    def AND  : ALU1_RR<0x3, "l.and", and>;
+    def OR   : ALU1_RR<0x4, "l.or", or>;
+    def XOR  : ALU1_RR<0x5, "l.xor", xor>;
  }
 }
 
 let Uses = [SR], Predicates = [HasCmov] in
-  def CMOV : ALU_RR<0xe, "l.cmov", OR1Kselectcc>;
+  def CMOV : ALU1_RR<0xe, "l.cmov", OR1Kselectcc>;
 
 let isCommutable=1, Predicates=[HasMul] in {
-  def MUL  : ALU_RR<0x6, "l.mul", mul>;
-  def MULU : ALU_RR<0xb, "l.mulu", mul>;
+  def MUL  : ALU1_RR<0x6, "l.mul", mul>;
+  def MULU : ALU1_RR<0xb, "l.mulu", mul>;
 }
 let Predicates=[HasDiv] in {
-  def DIV  : ALU_RR<0x9, "l.div", sdiv>;
-  def DIVU : ALU_RR<0xa, "l.divu", udiv>;
+  def DIV  : ALU1_RR<0x9, "l.div", sdiv>;
+  def DIVU : ALU1_RR<0xa, "l.divu", udiv>;
 }
 
 class ALU2_RR<bits<2> subOp1, bits<4> subOp2, string asmstr, SDNode OpNode>
@@ -471,8 +490,8 @@ let isBranch = 1, isTerminator = 1, hasDelaySlot=1 in {
     }
   }
   let Uses = [SR] in {
-    def BNF : BRANCH<0x2, "l.bnf", []>;
-    def BF  : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst)]>;
+    def BNF : BRANCH<0x2, "l.bnf", [(OR1Kbrcc bb:$dst, OR1K_COND_NEG)]>;
+    def BF  : BRANCH<0x3, "l.bf",  [(OR1Kbrcc bb:$dst, OR1K_COND)]>;
   }
 }
 
@@ -549,6 +568,11 @@ let Uses = [SR], usesCustomInserter = 1, Predicates = [NoCmov] in {
                        "# Select PSEUDO",
                        [(set (i32 GPR:$dst),
                         (OR1Kselectcc (i32 GPR:$src), (i32 GPR:$src2)))]>;
+
+  def Selectf32 : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2),
+                         "# Select PSEUDO",
+                         [(set (f32 GPR:$dst),
+                          (OR1Kselectcc (f32 GPR:$src), (f32 GPR:$src2)))]>;
 }
 
 

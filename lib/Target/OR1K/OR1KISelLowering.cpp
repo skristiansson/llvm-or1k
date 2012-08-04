@@ -55,6 +55,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setStackPointerRegisterToSaveRestore(OR1K::R1);
 
   setOperationAction(ISD::BR_CC,             MVT::i32, Custom);
+  setOperationAction(ISD::BR_CC,             MVT::f32, Custom);
   setOperationAction(ISD::BR_JT,             MVT::Other, Expand);
   setOperationAction(ISD::BRCOND,            MVT::Other, Expand);
   setOperationAction(ISD::SETCC,             MVT::i32, Expand);
@@ -142,6 +143,9 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setLoadExtAction(ISD::EXTLOAD,             MVT::i1,   Promote);
   setLoadExtAction(ISD::ZEXTLOAD,            MVT::i1,   Promote);
   setLoadExtAction(ISD::SEXTLOAD,            MVT::i1,   Promote);
+
+//  setCondCodeAction(ISD::SETO,               MVT::f32,  Custom);
+//  setCondCodeAction(ISD::SETUO,              MVT::f32,  Custom);
 
   // Function alignments (log2)
   setMinFunctionAlignment(2);
@@ -738,6 +742,50 @@ OR1KTargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
   return Chain;
 }
 
+/// NegateFCC - If LHS or RHS is a floating point operand, check
+/// if the condition code should be inverted, the operands swapped and
+/// the result negated. In other words, transform unordered compares to
+/// ordered. Returns true if a change occurred.
+static bool NegateFCC(SDValue &LHS, SDValue &RHS, ISD::CondCode &CC)
+{
+  if (!LHS.getValueType().isFloatingPoint() &&
+      !RHS.getValueType().isFloatingPoint())
+    return false;
+
+  switch (CC) {
+  default:
+    return false;
+  case ISD::SETUEQ:
+    // (qnan(a) || qnan(b) || a == b) => !(!qnan(a) && !qnan(b) && a != b)
+    CC = ISD::SETONE;
+    return true;
+  case ISD::SETUGT:
+    // (qnan(a) || qnan(b) || a > b) => !(!qnan(a) && !qnan(b) && a <= b)
+    CC = ISD::SETOLE;
+    std::swap(LHS, RHS);
+    return true;
+  case ISD::SETUGE:
+    // (qnan(a) || qnan(b) || a >= b) => !(!qnan(a) && !qnan(b) && a < b)
+    CC = ISD::SETOLT;
+    std::swap(LHS, RHS);
+    return true;
+  case ISD::SETULT:
+    // (qnan(a) || qnan(b) || a < b) => !(!qnan(a) && !qnan(b) && a >= b)
+    CC = ISD::SETOGE;
+    std::swap(LHS, RHS);
+    return true;
+  case ISD::SETULE:
+    // (qnan(a) || qnan(b) || a <= b) => !(!qnan(a) && !qnan(b) && a > b)
+    CC = ISD::SETOGT;
+    std::swap(LHS, RHS);
+    return true;
+  case ISD::SETUNE:
+    // (qnan(a) || qnan(b) || a != b) => !(!qnan(a) && !qnan(b) && a == b)
+    CC = ISD::SETOEQ;
+    return true;
+  }
+}
+
 SDValue OR1KTargetLowering::LowerBR_CC(SDValue Op,
                                        SelectionDAG &DAG) const {
   SDValue Chain  = Op.getOperand(0);
@@ -747,11 +795,29 @@ SDValue OR1KTargetLowering::LowerBR_CC(SDValue Op,
   SDValue Dest  = Op.getOperand(4);
   DebugLoc dl   = Op.getDebugLoc();
 
+  // FIXME: This could probably be done more efficiently
+  switch (CC) {
+  default:
+    break;
+  case ISD::SETO:
+    CC = ISD::SETOEQ;
+    // RHS = !qnan(LHS) ? RHS : LHS;
+    RHS = DAG.getSelectCC(dl, LHS, LHS, RHS, LHS, CC);
+    break;
+  case ISD::SETUO:
+    CC = ISD::SETUNE;
+    // RHS = qnan(LHS) ? LHS : RHS;
+    RHS = DAG.getSelectCC(dl, LHS, LHS, LHS, RHS, CC);
+    break;
+  }
+
+  SDValue Neg  = NegateFCC(LHS, RHS, CC) ? DAG.getConstant(1, MVT::i32) :
+                                           DAG.getConstant(0, MVT::i32);
   SDValue Flag = DAG.getNode(OR1KISD::SET_FLAG, dl, MVT::Glue,
                              LHS, RHS, DAG.getConstant(CC, MVT::i32));
 
   return DAG.getNode(OR1KISD::BR_CC, dl, Op.getValueType(),
-                     Chain, Dest, Flag);
+                     Chain, Dest, Neg, Flag);
 }
 
 SDValue OR1KTargetLowering::LowerSELECT_CC(SDValue Op,
@@ -762,6 +828,25 @@ SDValue OR1KTargetLowering::LowerSELECT_CC(SDValue Op,
   SDValue FalseV = Op.getOperand(3);
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
   DebugLoc dl    = Op.getDebugLoc();
+
+  // FIXME: This could probably be done more efficiently
+  switch (CC) {
+  default:
+    break;
+  case ISD::SETO:
+    CC = ISD::SETOEQ;
+    // RHS = !qnan(LHS) ? RHS : LHS;
+    RHS = DAG.getSelectCC(dl, LHS, LHS, RHS, LHS, CC);
+    break;
+  case ISD::SETUO:
+    CC = ISD::SETUNE;
+    // RHS = qnan(LHS) ? LHS : RHS;
+    RHS = DAG.getSelectCC(dl, LHS, LHS, LHS, RHS, CC);
+    break;
+  }
+
+  if (NegateFCC(LHS, RHS, CC))
+    std::swap(TrueV, FalseV);
 
   SDValue TargetCC = DAG.getConstant(CC, MVT::i32);
   SDValue Flag = DAG.getNode(OR1KISD::SET_FLAG, dl, MVT::Glue,
@@ -969,7 +1054,7 @@ OR1KTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
   const TargetInstrInfo &TII = *getTargetMachine().getInstrInfo();
   DebugLoc dl = MI->getDebugLoc();
 
-  assert((Opc == OR1K::Select) &&
+  assert((Opc == OR1K::Select || Opc == OR1K::Selectf32) &&
          "Unexpected instr type to insert");
 
   // To "insert" a SELECT instruction, we actually have to insert the diamond

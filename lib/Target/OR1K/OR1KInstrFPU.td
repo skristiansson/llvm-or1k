@@ -57,6 +57,40 @@ def DIVrrf32 : AluF<0x03, "lf.div.s", fdiv>;
 def REMrrf32 : AluF<0x06, "lf.rem.s", frem>;
 
 //===----------------------------------------------------------------------===//
+// Condition/SF instructions
+//===----------------------------------------------------------------------===//
+
+class SetFlagFRR<bits<8> subOp, string asmstr, PatLeaf Cond>
+  : InstFRR<subOp, (outs), (ins GPR:$rA, GPR:$rB),
+           !strconcat(asmstr, "\t$rA, $rB"),
+           [(OR1Ksetflag (f32 GPR:$rA), (f32 GPR:$rB), Cond)]> {
+  bits<5> rA;
+  bits<5> rB;
+
+  let Inst{20-16} = rA;
+  let Inst{15-11} = rB;
+}
+
+let Defs = [SR], hasSideEffects = 1 in {
+  def SFEQrrf32 : SetFlagFRR<0x08, "lf.sfeq.s", OR1K_CC_EQ>;
+  def SFNErrf32 : SetFlagFRR<0x09, "lf.sfne.s", OR1K_CC_NE>;
+  def SFGTrrf32 : SetFlagFRR<0x0a, "lf.sfgt.s", OR1K_CC_GT>;
+  def SFGErrf32 : SetFlagFRR<0x0b, "lf.sfge.s", OR1K_CC_GE>;
+  def SFLTrrf32 : SetFlagFRR<0x0c, "lf.sflt.s", OR1K_CC_LT>;
+  def SFLErrf32 : SetFlagFRR<0x0d, "lf.sfle.s", OR1K_CC_LE>;
+  def SFEQOrrf32 : SetFlagFRR<0x08, "lf.sfeq.s", OR1K_CC_EQO>;
+  def SFNEOrrf32 : SetFlagFRR<0x09, "lf.sfne.s", OR1K_CC_NEO>;
+  def SFGTOrrf32 : SetFlagFRR<0x0a, "lf.sfgt.s", OR1K_CC_GTO>;
+  def SFGEOrrf32 : SetFlagFRR<0x0b, "lf.sfge.s", OR1K_CC_GEO>;
+  def SFLTOrrf32 : SetFlagFRR<0x0c, "lf.sflt.s", OR1K_CC_LTO>;
+  def SFLEOrrf32 : SetFlagFRR<0x0d, "lf.sfle.s", OR1K_CC_LEO>;
+}
+
+let Uses = [SR], Predicates = [HasCmov] in
+  def CMOVf32 : ALU_RR<0xe, "l.cmov",
+           [(set GPR:$rD, (OR1Kselectcc (f32 GPR:$rA),(f32 GPR:$rB)))]>;
+
+//===----------------------------------------------------------------------===//
 // LOAD/STORE instructions
 //===----------------------------------------------------------------------===//
 
