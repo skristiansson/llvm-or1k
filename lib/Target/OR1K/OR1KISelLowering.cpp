@@ -132,8 +132,6 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setLoadExtAction(ISD::ZEXTLOAD,            MVT::i1,   Promote);
   setLoadExtAction(ISD::SEXTLOAD,            MVT::i1,   Promote);
 
-//  setCondCodeAction(ISD::SETO,               MVT::f32,  Custom);
-//  setCondCodeAction(ISD::SETUO,              MVT::f32,  Custom);
 
   // Function alignments (log2)
   setMinFunctionAlignment(2);
