@@ -57,6 +57,25 @@ def DIVrrf32 : AluF<0x03, "lf.div.s", fdiv>;
 def REMrrf32 : AluF<0x06, "lf.rem.s", frem>;
 
 //===----------------------------------------------------------------------===//
+// fp->int and int->fp conversion
+//===----------------------------------------------------------------------===//
+class ConvF<bits<8> subOp, string asmstr, list<dag> pattern>
+  : InstFRR<subOp, (outs GPR:$rD), (ins GPR:$rA),
+           !strconcat(asmstr, "\t$rD, $rA"), pattern> {
+  bits<5> rD;
+  bits<5> rA;
+
+  let Inst{25-21} = rD;
+  let Inst{20-16} = rA;
+  let Inst{15-11} = 0;
+}
+
+def ITOFf32 : ConvF<0x04, "lf.itof.s",
+                    [(set (f32 GPR:$rD), (sint_to_fp (i32 GPR:$rA)))]>;
+def FTOIf32 : ConvF<0x05, "lf.ftoi.s",
+                    [(set (i32 GPR:$rD), (fp_to_sint (f32 GPR:$rA)))]>;
+
+//===----------------------------------------------------------------------===//
 // Condition/SF instructions
 //===----------------------------------------------------------------------===//
 
