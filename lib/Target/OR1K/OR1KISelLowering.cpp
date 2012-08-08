@@ -59,13 +59,9 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::BR_JT,             MVT::Other, Expand);
   setOperationAction(ISD::BRCOND,            MVT::Other, Expand);
   setOperationAction(ISD::SETCC,             MVT::i32, Expand);
-  setOperationAction(ISD::SETCC,             MVT::i64, Expand);
   setOperationAction(ISD::SETCC,             MVT::f32, Expand);
-  setOperationAction(ISD::SETCC,             MVT::f64, Expand);
   setOperationAction(ISD::SELECT,            MVT::i32, Expand);
-  setOperationAction(ISD::SELECT,            MVT::i64, Expand);
   setOperationAction(ISD::SELECT,            MVT::f32, Expand);
-  setOperationAction(ISD::SELECT,            MVT::f64, Expand);
   setOperationAction(ISD::SELECT_CC,         MVT::i32, Custom);
   setOperationAction(ISD::SELECT_CC,         MVT::f32, Custom);
 
@@ -97,21 +93,13 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
     setOperationAction(ISD::MUL,             MVT::i32, Expand);
   }
   setOperationAction(ISD::MULHU,             MVT::i32, Expand);
-  setOperationAction(ISD::MULHU,             MVT::i64, Expand);
   setOperationAction(ISD::MULHU,             MVT::f32, Expand);
-  setOperationAction(ISD::MULHU,             MVT::f64, Expand);
   setOperationAction(ISD::MULHS,             MVT::i32, Expand);
-  setOperationAction(ISD::MULHS,             MVT::i64, Expand);
   setOperationAction(ISD::MULHS,             MVT::f32, Expand);
-  setOperationAction(ISD::MULHS,             MVT::f64, Expand);
   setOperationAction(ISD::UMUL_LOHI,         MVT::i32, Expand);
-  setOperationAction(ISD::UMUL_LOHI,         MVT::i64, Expand);
   setOperationAction(ISD::UMUL_LOHI,         MVT::f32, Expand);
-  setOperationAction(ISD::UMUL_LOHI,         MVT::f64, Expand);
   setOperationAction(ISD::SMUL_LOHI,         MVT::i32, Expand);
-  setOperationAction(ISD::SMUL_LOHI,         MVT::i64, Expand);
   setOperationAction(ISD::SMUL_LOHI,         MVT::f32, Expand);
-  setOperationAction(ISD::SMUL_LOHI,         MVT::f64, Expand);
 
   // FIXME: implement (with l.addc etc)
   setOperationAction(ISD::ADDC, MVT::i32, Expand);
