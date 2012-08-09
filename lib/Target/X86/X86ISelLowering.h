@@ -294,6 +294,14 @@ namespace llvm {
       // PMULUDQ - Vector multiply packed unsigned doubleword integers
       PMULUDQ,
 
+      // FMA nodes
+      FMADD,
+      FNMADD,
+      FMSUB,
+      FNMSUB,
+      FMADDSUB,
+      FMSUBADD,
+
       // VASTART_SAVE_XMM_REGS - Save xmm argument registers to the stack,
       // according to %al. An operator is needed so that this can be expanded
       // with control flow.
@@ -324,6 +332,10 @@ namespace llvm {
 
       // RDRAND - Get a random integer and indicate whether it is valid in CF.
       RDRAND,
+
+      // PCMP*STRI
+      PCMPISTRI,
+      PCMPESTRI,
 
       // ATOMADD64_DAG, ATOMSUB64_DAG, ATOMOR64_DAG, ATOMAND64_DAG,
       // ATOMXOR64_DAG, ATOMNAND64_DAG, ATOMSWAP64_DAG -
@@ -597,6 +609,12 @@ namespace llvm {
     virtual bool isZExtFree(Type *Ty1, Type *Ty2) const;
     virtual bool isZExtFree(EVT VT1, EVT VT2) const;
 
+    /// isFMAFasterThanMulAndAdd - Return true if an FMA operation is faster than
+    /// a pair of mul and add instructions. fmuladd intrinsics will be expanded to
+    /// FMAs when this method returns true (and FMAs are legal), otherwise fmuladd
+    /// is expanded to mul + add.
+    virtual bool isFMAFasterThanMulAndAdd(EVT) const { return true; }
+
     /// isNarrowingProfitable - Return true if it's profitable to narrow
     /// operations of type VT1 to VT2. e.g. on x86, it's profitable to narrow
     /// from i32 to i8 but not from i32 to i16.
@@ -656,7 +674,8 @@ namespace llvm {
 
     /// createFastISel - This method returns a target specific FastISel object,
     /// or null if the target does not support "fast" ISel.
-    virtual FastISel *createFastISel(FunctionLoweringInfo &funcInfo) const;
+    virtual FastISel *createFastISel(FunctionLoweringInfo &funcInfo,
+                                     const TargetLibraryInfo *libInfo) const;
 
     /// getStackCookieLocation - Return true if the target stores stack
     /// protector cookies at a fixed offset in some non-standard address
@@ -840,9 +859,9 @@ namespace llvm {
 
     virtual bool
     CanLowerReturn(CallingConv::ID CallConv, MachineFunction &MF,
-		   bool isVarArg,
-		   const SmallVectorImpl<ISD::OutputArg> &Outs,
-		   LLVMContext &Context) const;
+                   bool isVarArg,
+                   const SmallVectorImpl<ISD::OutputArg> &Outs,
+                   LLVMContext &Context) const;
 
     void ReplaceATOMIC_BINARY_64(SDNode *N, SmallVectorImpl<SDValue> &Results,
                                  SelectionDAG &DAG, unsigned NewOp) const;
@@ -933,7 +952,8 @@ namespace llvm {
   };
 
   namespace X86 {
-    FastISel *createFastISel(FunctionLoweringInfo &funcInfo);
+    FastISel *createFastISel(FunctionLoweringInfo &funcInfo,
+                             const TargetLibraryInfo *libInfo);
   }
 }
 

@@ -57,6 +57,12 @@ class MachineRegisterInfo {
   /// physical registers.
   MachineOperand **PhysRegUseDefLists;
 
+  /// Get the next element in the use-def chain.
+  static MachineOperand *getNextOperandForReg(const MachineOperand *MO) {
+    assert(MO && MO->isReg() && "This is not a register operand!");
+    return MO->Contents.Reg.Next;
+  }
+
   /// UsedPhysRegs - This is a bit vector that is computed and set by the
   /// register allocator, and must be kept up to date by passes that run after
   /// register allocation (though most don't modify this).  This is used
@@ -135,6 +141,9 @@ public:
   template<bool Uses, bool Defs, bool SkipDebug>
   class defusechain_iterator;
 
+  // Make it a friend so it can access getNextOperandForReg().
+  template<bool, bool, bool> friend class defusechain_iterator;
+
   /// reg_iterator/reg_begin/reg_end - Walk all defs and uses of the specified
   /// register.
   typedef defusechain_iterator<true,true,false> reg_iterator;
@@ -172,6 +181,15 @@ public:
   /// specified register (it may be live-in).
   bool def_empty(unsigned RegNo) const { return def_begin(RegNo) == def_end(); }
 
+  /// hasOneDef - Return true if there is exactly one instruction defining the
+  /// specified register.
+  bool hasOneDef(unsigned RegNo) const {
+    def_iterator DI = def_begin(RegNo);
+    if (DI == def_end())
+      return false;
+    return ++DI == def_end();
+  }
+
   /// use_iterator/use_begin/use_end - Walk all uses of the specified register.
   typedef defusechain_iterator<true,false,false> use_iterator;
   use_iterator use_begin(unsigned RegNo) const {
@@ -185,7 +203,12 @@ public:
 
   /// hasOneUse - Return true if there is exactly one instruction using the
   /// specified register.
-  bool hasOneUse(unsigned RegNo) const;
+  bool hasOneUse(unsigned RegNo) const {
+    use_iterator UI = use_begin(RegNo);
+    if (UI == use_end())
+      return false;
+    return ++UI == use_end();
+  }
 
   /// use_nodbg_iterator/use_nodbg_begin/use_nodbg_end - Walk all uses of the
   /// specified register, skipping those marked as Debug.
@@ -486,13 +509,13 @@ public:
     // Iterator traversal: forward iteration only
     defusechain_iterator &operator++() {          // Preincrement
       assert(Op && "Cannot increment end iterator!");
-      Op = Op->getNextOperandForReg();
+      Op = getNextOperandForReg(Op);
 
       // If this is an operand we don't care about, skip it.
       while (Op && ((!ReturnUses && Op->isUse()) ||
                     (!ReturnDefs && Op->isDef()) ||
                     (SkipDebug && Op->isDebug())))
-        Op = Op->getNextOperandForReg();
+        Op = getNextOperandForReg(Op);
 
       return *this;
     }

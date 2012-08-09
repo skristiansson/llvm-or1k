@@ -465,6 +465,18 @@ case "$enableval" in
   *) AC_MSG_ERROR([Invalid setting for --enable-libcpp. Use "yes" or "no"]) ;;
 esac
 
+dnl --enable-cxx11 : check whether or not to use -std=c++11 on the command line
+AC_ARG_ENABLE(cxx11,
+              AS_HELP_STRING([--enable-cxx11],
+                             [Use c++11 if available (default is NO)]),,
+                             enableval=default)
+case "$enableval" in
+  yes) AC_SUBST(ENABLE_CXX11,[1]) ;;
+  no)  AC_SUBST(ENABLE_CXX11,[0]) ;;
+  default) AC_SUBST(ENABLE_CXX11,[0]);;
+  *) AC_MSG_ERROR([Invalid setting for --enable-cxx11. Use "yes" or "no"]) ;;
+esac
+
 dnl --enable-optimized : check whether they want to do an optimized build:
 AC_ARG_ENABLE(optimized, AS_HELP_STRING(
  --enable-optimized,[Compile with optimizations enabled (default is NO)]),,enableval=$optimize)
@@ -491,6 +503,16 @@ if test ${enableval} = "yes" ; then
 else
   AC_SUBST(DISABLE_ASSERTIONS,[[DISABLE_ASSERTIONS=1]])
 fi
+
+dnl --enable-werror : check whether we want Werror on by default
+AC_ARG_ENABLE(werror,AS_HELP_STRING(
+  --enable-werror,[Compile with -Werror enabled (default is NO)]),, enableval="no")
+case "$enableval" in
+  yes) AC_SUBST(ENABLE_WERROR,[1]) ;;
+  no)  AC_SUBST(ENABLE_WERROR,[0]) ;;
+  default) AC_SUBST(ENABLE_WERROR,[0]);;
+  *) AC_MSG_ERROR([Invalid setting for --enable-werror. Use "yes" or "no"]) ;;
+esac
 
 dnl --enable-expensive-checks : check whether they want to turn on expensive debug checks:
 AC_ARG_ENABLE(expensive-checks,AS_HELP_STRING(
@@ -700,6 +722,17 @@ case "$enableval" in
   done
   ;;
 esac
+
+AC_ARG_ENABLE([experimental-targets],AS_HELP_STRING([--enable-experimental-targets],
+    [Build experimental host targets: disable or target1,target2,...
+     (default=disable)]),,
+    enableval=disable)
+
+if test ${enableval} != "disable"
+then
+  TARGETS_TO_BUILD="$enableval $TARGETS_TO_BUILD"
+fi
+
 AC_SUBST(TARGETS_TO_BUILD,$TARGETS_TO_BUILD)
 
 dnl Determine whether we are building LLVM support for the native architecture.
@@ -1285,6 +1318,23 @@ AC_ARG_WITH(intel-jitevents,
 AC_DEFINE_UNQUOTED([LLVM_USE_INTEL_JITEVENTS],$USE_INTEL_JITEVENTS,
                    [Define if we have the Intel JIT API runtime support library])
 
+dnl Check for libxml2
+dnl Right now we're just checking for the existence, we could also check for a
+dnl particular version via --version on xml2-config
+AC_CHECK_PROGS(XML2CONFIG, xml2-config)
+
+AC_MSG_CHECKING(for libxml2 includes)
+if test "x$XML2CONFIG" = "x"; then
+ AC_MSG_RESULT(xml2-config not found)
+else
+ LIBXML2_INC=`$XML2CONFIG --cflags`
+ AC_MSG_RESULT($LIBXML2_INC)
+ AC_CHECK_LIB(xml2, xmlReadFile,[AC_DEFINE([CLANG_HAVE_LIBXML],1,[Define if we have libxml2])
+                                LIBXML2_LIBS="-lxml2"])
+fi
+AC_SUBST(LIBXML2_LIBS)
+AC_SUBST(LIBXML2_INC)
+
 dnl===-----------------------------------------------------------------------===
 dnl===
 dnl=== SECTION 6: Check for header files
@@ -1543,6 +1593,8 @@ AC_DEFINE_UNQUOTED(LLVM_MANDIR, "$LLVM_MANDIR",
                    [Installation directory for man pages])
 AC_DEFINE_UNQUOTED(LLVM_CONFIGTIME, "$LLVM_CONFIGTIME",
                    [Time at which LLVM was configured])
+AC_DEFINE_UNQUOTED(LLVM_HOSTTRIPLE, "$host",
+                   [Host triple LLVM will be executed on])
 AC_DEFINE_UNQUOTED(LLVM_DEFAULT_TARGET_TRIPLE, "$target",
                    [Target triple LLVM will generate code for by default])
 

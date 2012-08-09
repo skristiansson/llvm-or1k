@@ -55,7 +55,7 @@ public:
 
   const MemoryBuffer& getBuffer() const { return *InputData; }
 
-  // Methods for type inquiry through isa, cast, and dyn_cast
+  // Methods for type inquiry through isa, cast and dyn_cast
   static inline bool classof(const Binary *v) {
     return (isa<ELFObjectFile<target_endianness, is64Bits> >(v)
             && classof(cast<ELFObjectFile<target_endianness, is64Bits> >(v)));
@@ -208,10 +208,9 @@ void RuntimeDyldELF::resolveX86_64Relocation(uint8_t *LocalAddress,
   case ELF::R_X86_64_32:
   case ELF::R_X86_64_32S: {
     Value += Addend;
-    // FIXME: Handle the possibility of this assertion failing
-    assert((Type == ELF::R_X86_64_32 && !(Value & 0xFFFFFFFF00000000ULL)) ||
-           (Type == ELF::R_X86_64_32S &&
-            (Value & 0xFFFFFFFF00000000ULL) == 0xFFFFFFFF00000000ULL));
+    assert((Type == ELF::R_X86_64_32 && (Value <= UINT32_MAX)) ||
+           (Type == ELF::R_X86_64_32S && 
+             ((int64_t)Value <= INT32_MAX && (int64_t)Value >= INT32_MIN)));
     uint32_t TruncatedAddr = (Value & 0xFFFFFFFF);
     uint32_t *Target = reinterpret_cast<uint32_t*>(LocalAddress);
     *Target = TruncatedAddr;
@@ -220,7 +219,7 @@ void RuntimeDyldELF::resolveX86_64Relocation(uint8_t *LocalAddress,
   case ELF::R_X86_64_PC32: {
     uint32_t *Placeholder = reinterpret_cast<uint32_t*>(LocalAddress);
     int64_t RealOffset = *Placeholder + Value + Addend - FinalAddress;
-    assert(RealOffset <= 214783647 && RealOffset >= -214783648);
+    assert(RealOffset <= INT32_MAX && RealOffset >= INT32_MIN);
     int32_t TruncOffset = (RealOffset & 0xFFFFFFFF);
     *Placeholder = TruncOffset;
     break;
@@ -248,7 +247,7 @@ void RuntimeDyldELF::resolveX86Relocation(uint8_t *LocalAddress,
     }
     default:
       // There are other relocation types, but it appears these are the
-      //  only ones currently used by the LLVM ELF object writer
+      // only ones currently used by the LLVM ELF object writer
       llvm_unreachable("Relocation type not implemented yet!");
       break;
   }

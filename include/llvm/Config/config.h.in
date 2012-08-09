@@ -6,6 +6,9 @@
 /* Bug report URL. */
 #undef BUG_REPORT_URL
 
+/* Define if we have libxml2 */
+#undef CLANG_HAVE_LIBXML
+
 /* Relative directory for resource files */
 #undef CLANG_RESOURCE_DIR
 
@@ -551,6 +554,9 @@
 
 /* Has gcc/MSVC atomic intrinsics */
 #undef LLVM_HAS_ATOMICS
+
+/* Host triple LLVM will be executed on */
+#undef LLVM_HOSTTRIPLE
 
 /* Installation directory for include files */
 #undef LLVM_INCLUDEDIR

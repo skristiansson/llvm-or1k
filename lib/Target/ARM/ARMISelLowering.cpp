@@ -1041,8 +1041,9 @@ const TargetRegisterClass *ARMTargetLowering::getRegClassFor(EVT VT) const {
 
 // Create a fast isel object.
 FastISel *
-ARMTargetLowering::createFastISel(FunctionLoweringInfo &funcInfo) const {
-  return ARM::createFastISel(funcInfo);
+ARMTargetLowering::createFastISel(FunctionLoweringInfo &funcInfo,
+                                  const TargetLibraryInfo *libInfo) const {
+  return ARM::createFastISel(funcInfo, libInfo);
 }
 
 /// getMaximalGlobalOffset - Returns the maximal possible offset which can
@@ -1171,6 +1172,8 @@ CCAssignFn *ARMTargetLowering::CCAssignFnForNode(CallingConv::ID CC,
     return (Return ? RetCC_ARM_AAPCS : CC_ARM_AAPCS);
   case CallingConv::ARM_APCS:
     return (Return ? RetCC_ARM_APCS : CC_ARM_APCS);
+  case CallingConv::GHC:
+    return (Return ? RetCC_ARM_APCS : CC_ARM_APCS_GHC);
   }
 }
 
@@ -4271,6 +4274,10 @@ SDValue ARMTargetLowering::ReconstructShuffle(SDValue Op,
 
     // Record this extraction against the appropriate vector if possible...
     SDValue SourceVec = V.getOperand(0);
+    // If the element number isn't a constant, we can't effectively
+    // analyze what's going on.
+    if (!isa<ConstantSDNode>(V.getOperand(1)))
+      return SDValue();
     unsigned EltNo = cast<ConstantSDNode>(V.getOperand(1))->getZExtValue();
     bool FoundSource = false;
     for (unsigned j = 0; j < SourceVecs.size(); ++j) {
@@ -6859,7 +6866,7 @@ ARMTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     RSBBB->addSuccessor(SinkBB);
 
     // insert a cmp at the end of BB
-    AddDefaultPred(BuildMI(BB, dl, 
+    AddDefaultPred(BuildMI(BB, dl,
                            TII->get(isThumb2 ? ARM::t2CMPri : ARM::CMPri))
                    .addReg(ABSSrcReg).addImm(0));
 
@@ -7678,7 +7685,7 @@ static SDValue PerformSTORECombine(SDNode *N,
   if (St->isVolatile())
     return SDValue();
 
-  // Optimize trunc store (of multiple scalars) to shuffle and store.  First, 
+  // Optimize trunc store (of multiple scalars) to shuffle and store.  First,
   // pack all of the elements in one place.  Next, store to memory in fewer
   // chunks.
   SDValue StVal = St->getValue();
@@ -9046,12 +9053,19 @@ bool ARMTargetLowering::isLegalICmpImmediate(int64_t Imm) const {
   return Imm >= 0 && Imm <= 255;
 }
 
-/// isLegalAddImmediate - Return true if the specified immediate is legal
-/// add immediate, that is the target has add instructions which can add
-/// a register with the immediate without having to materialize the
+/// isLegalAddImmediate - Return true if the specified immediate is a legal add
+/// *or sub* immediate, that is the target has add or sub instructions which can
+/// add a register with the immediate without having to materialize the
 /// immediate into a register.
 bool ARMTargetLowering::isLegalAddImmediate(int64_t Imm) const {
-  return ARM_AM::getSOImmVal(Imm) != -1;
+  // Same encoding for add/sub, just flip the sign.
+  int64_t AbsImm = llvm::abs64(Imm);
+  if (!Subtarget->isThumb())
+    return ARM_AM::getSOImmVal(AbsImm) != -1;
+  if (Subtarget->isThumb2())
+    return ARM_AM::getT2SOImmVal(AbsImm) != -1;
+  // Thumb1 only has 8-bit unsigned immediate.
+  return AbsImm >= 0 && AbsImm <= 255;
 }
 
 static bool getARMIndexedAddressParts(SDNode *Ptr, EVT VT,

@@ -35,6 +35,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetData.h"
+#include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include <memory>
 using namespace llvm;
@@ -211,6 +212,11 @@ FuseFPOps("fp-contract",
 static cl::opt<bool>
 DontPlaceZerosInBSS("nozero-initialized-in-bss",
   cl::desc("Don't place zero-initialized symbols into bss section"),
+  cl::init(false));
+
+static cl::opt<bool>
+DisableSimplifyLibCalls("disable-simplify-libcalls",
+  cl::desc("Disable simplify-libcalls"),
   cl::init(false));
 
 static cl::opt<bool>
@@ -479,13 +485,19 @@ int main(int argc, char **argv) {
       TheTriple.isMacOSXVersionLT(10, 6))
     Target.setMCUseLoc(false);
 
-  // Figure out where we are going to send the output...
+  // Figure out where we are going to send the output.
   OwningPtr<tool_output_file> Out
     (GetOutputStream(TheTarget->getName(), TheTriple.getOS(), argv[0]));
   if (!Out) return 1;
 
   // Build up all of the passes that we want to do to the module.
   PassManager PM;
+
+  // Add an appropriate TargetLibraryInfo pass for the module's triple.
+  TargetLibraryInfo *TLI = new TargetLibraryInfo(TheTriple);
+  if (DisableSimplifyLibCalls)
+    TLI->disableAllFunctions();
+  PM.add(TLI);
 
   // Add the target data from the target machine, if it exists, or the module.
   if (const TargetData *TD = Target.getTargetData())

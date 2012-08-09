@@ -64,7 +64,7 @@ static const AllocFnsTy AllocationFnData[] = {
   {"realloc",             ReallocLike, 2, 1,  -1},
   {"reallocf",            ReallocLike, 2, 1,  -1},
   {"strdup",              StrDupLike,  1, -1, -1},
-  {"strndup",             StrDupLike,  2, -1, -1}
+  {"strndup",             StrDupLike,  2, 1,  -1}
 };
 
 
@@ -414,8 +414,21 @@ SizeOffsetType ObjectSizeOffsetVisitor::visitCallSite(CallSite CS) {
 
   // handle strdup-like functions separately
   if (FnData->AllocTy == StrDupLike) {
-    // TODO
-    return unknown();
+    APInt Size(IntTyBits, GetStringLength(CS.getArgument(0)));
+    if (!Size)
+      return unknown();
+
+    // strndup limits strlen
+    if (FnData->FstParam > 0) {
+      ConstantInt *Arg= dyn_cast<ConstantInt>(CS.getArgument(FnData->FstParam));
+      if (!Arg)
+        return unknown();
+
+      APInt MaxSize = Arg->getValue().zextOrSelf(IntTyBits);
+      if (Size.ugt(MaxSize))
+        Size = MaxSize + 1;
+    }
+    return std::make_pair(Size, Zero);
   }
 
   ConstantInt *Arg = dyn_cast<ConstantInt>(CS.getArgument(FnData->FstParam));
@@ -493,6 +506,10 @@ SizeOffsetType ObjectSizeOffsetVisitor::visitPHINode(PHINode&) {
 }
 
 SizeOffsetType ObjectSizeOffsetVisitor::visitSelectInst(SelectInst &I) {
+  // ignore malformed self-looping selects
+  if (I.getTrueValue() == &I || I.getFalseValue() == &I)
+    return unknown();
+
   SizeOffsetType TrueSide  = compute(I.getTrueValue());
   SizeOffsetType FalseSide = compute(I.getFalseValue());
   if (bothKnown(TrueSide) && bothKnown(FalseSide) && TrueSide == FalseSide)
@@ -645,7 +662,7 @@ ObjectSizeOffsetEvaluator::visitGEPOperator(GEPOperator &GEP) {
   if (!bothKnown(PtrData))
     return unknown();
 
-  Value *Offset = EmitGEPOffset(&Builder, *TD, &GEP);
+  Value *Offset = EmitGEPOffset(&Builder, *TD, &GEP, /*NoAssumptions=*/true);
   Offset = Builder.CreateAdd(PtrData.second, Offset);
   return std::make_pair(PtrData.first, Offset);
 }
@@ -698,6 +715,10 @@ SizeOffsetEvalType ObjectSizeOffsetEvaluator::visitPHINode(PHINode &PHI) {
 }
 
 SizeOffsetEvalType ObjectSizeOffsetEvaluator::visitSelectInst(SelectInst &I) {
+  // ignore malformed self-looping selects
+  if (I.getTrueValue() == &I || I.getFalseValue() == &I)
+    return unknown();
+
   SizeOffsetEvalType TrueSide  = compute_(I.getTrueValue());
   SizeOffsetEvalType FalseSide = compute_(I.getFalseValue());
 

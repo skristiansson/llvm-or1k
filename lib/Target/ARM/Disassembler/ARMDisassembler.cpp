@@ -603,7 +603,7 @@ static bool tryAddingSymbolicOperand(uint64_t Address, int32_t Value,
 /// These can often be values in a literal pool near the Address of the
 /// instruction.  The Address of the instruction and its immediate Value are
 /// used as a possible literal pool entry.  The SymbolLookUp call back will
-/// return the name of a symbol referenced by the the literal pool's entry if
+/// return the name of a symbol referenced by the literal pool's entry if
 /// the referenced address is that of a symbol.  Or it will return a pointer to
 /// a literal 'C' string if the referenced address of the literal pool's entry
 /// is an address into a section with 'C' string literals.
@@ -3151,9 +3151,14 @@ static DecodeStatus DecodeT2LoadShift(MCInst &Inst, unsigned Insn,
 
 static DecodeStatus DecodeT2Imm8S4(MCInst &Inst, unsigned Val,
                            uint64_t Address, const void *Decoder) {
-  int imm = Val & 0xFF;
-  if (!(Val & 0x100)) imm *= -1;
-  Inst.addOperand(MCOperand::CreateImm(imm << 2));
+  if (Val == 0)
+    Inst.addOperand(MCOperand::CreateImm(INT32_MIN));
+  else {
+    int imm = Val & 0xFF;
+
+    if (!(Val & 0x100)) imm *= -1;
+    Inst.addOperand(MCOperand::CreateImm(imm << 2));
+  }
 
   return MCDisassembler::Success;
 }
@@ -3494,19 +3499,8 @@ static DecodeStatus DecodeThumbBLTargetOperand(MCInst &Inst, unsigned Val,
 
 static DecodeStatus DecodeMemBarrierOption(MCInst &Inst, unsigned Val,
                                    uint64_t Address, const void *Decoder) {
-  switch (Val) {
-  default:
+  if (Val & ~0xf)
     return MCDisassembler::Fail;
-  case 0xF: // SY
-  case 0xE: // ST
-  case 0xB: // ISH
-  case 0xA: // ISHST
-  case 0x7: // NSH
-  case 0x6: // NSHST
-  case 0x3: // OSH
-  case 0x2: // OSHST
-    break;
-  }
 
   Inst.addOperand(MCOperand::CreateImm(Val));
   return MCDisassembler::Success;

@@ -357,13 +357,7 @@ public:
   /// @brief Check if this APInt has an N-bits unsigned integer value.
   bool isIntN(unsigned N) const {
     assert(N && "N == 0 ???");
-    if (N >= getBitWidth())
-      return true;
-
-    if (isSingleWord())
-      return isUIntN(N, VAL);
-    return APInt(N, makeArrayRef(pVal, getNumWords())).zext(getBitWidth())
-      == (*this);
+    return getActiveBits() <= N;
   }
 
   /// @brief Check if this APInt has an N-bits signed integer value.
@@ -1123,7 +1117,7 @@ public:
     else {
       // Set all the bits in all the words.
       for (unsigned i = 0; i < getNumWords(); ++i)
-	pVal[i] = -1ULL;
+        pVal[i] = -1ULL;
     }
     // Clear the unused ones
     clearUnusedBits();
