@@ -60,6 +60,8 @@ namespace {
 void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
                                   raw_ostream &O, const char *Modifier) {
   const MachineOperand &MO = MI->getOperand(OpNum);
+  unsigned TF = MO.getTargetFlags();
+
   switch (MO.getType()) {
   case MachineOperand::MO_Register:
     O << OR1KInstPrinter::getRegisterName(MO.getReg());
@@ -74,7 +76,10 @@ void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
     break;
 
   case MachineOperand::MO_GlobalAddress:
-    O << *Mang->getSymbol(MO.getGlobal());
+    if (TF == OR1KII::MO_PLT)
+      O << "plt(" << *Mang->getSymbol(MO.getGlobal()) << ")";
+    else
+      O << *Mang->getSymbol(MO.getGlobal());
     break;
 
   case MachineOperand::MO_BlockAddress: {
@@ -84,7 +89,10 @@ void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
    }
 
    case MachineOperand::MO_ExternalSymbol:
-     O << *GetExternalSymbolSymbol(MO.getSymbolName());
+     if (TF == OR1KII::MO_PLT)
+       O << "plt(" << *GetExternalSymbolSymbol(MO.getSymbolName()) << ")";
+     else
+       O << *GetExternalSymbolSymbol(MO.getSymbolName());
      break;
 
    case MachineOperand::MO_JumpTableIndex:

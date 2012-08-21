@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "OR1KMCInstLower.h"
+#include "MCTargetDesc/OR1KBaseInfo.h"
 #include "llvm/Constants.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -31,7 +32,9 @@ MCSymbol *OR1KMCInstLower::
 GetGlobalAddressSymbol(const MachineOperand &MO) const {
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
-  case 0:  break;
+  case OR1KII::MO_NO_FLAG:
+  case OR1KII::MO_PLT:
+    break;
   }
 
   return Printer.Mang->getSymbol(MO.getGlobal());
@@ -41,7 +44,9 @@ MCSymbol *OR1KMCInstLower::
 GetExternalSymbolSymbol(const MachineOperand &MO) const {
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
-  case 0:  break;
+  case OR1KII::MO_NO_FLAG:
+  case OR1KII::MO_PLT:
+    break;
   }
 
   return Printer.GetExternalSymbolSymbol(MO.getSymbolName());
@@ -81,14 +86,15 @@ GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
 
 MCOperand OR1KMCInstLower::
 LowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym) const {
-  // FIXME: We would like an efficient form for this, so we don't have to do a
-  // lot of extra uniquing.
-  const MCExpr *Expr = MCSymbolRefExpr::Create(Sym, Ctx);
+  MCSymbolRefExpr::VariantKind Kind;
 
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
-  case 0: break;
+  case OR1KII::MO_NO_FLAG: Kind = MCSymbolRefExpr::VK_None; break;
+  case OR1KII::MO_PLT:     Kind = MCSymbolRefExpr::VK_OR1K_PLT; break;
   }
+
+  const MCExpr *Expr = MCSymbolRefExpr::Create(Sym, Kind, Ctx);
 
   if (!MO.isJTI() && MO.getOffset())
     Expr = MCBinaryExpr::CreateAdd(Expr,

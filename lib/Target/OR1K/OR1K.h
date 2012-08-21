@@ -14,7 +14,7 @@
 
 #ifndef TARGET_OR1K_H
 #define TARGET_OR1K_H
-
+#include "MCTargetDesc/OR1KBaseInfo.h"
 #include "MCTargetDesc/OR1KMCTargetDesc.h"
 #include "llvm/Target/TargetMachine.h"
 

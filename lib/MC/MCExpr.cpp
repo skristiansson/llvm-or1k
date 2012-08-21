@@ -44,7 +44,8 @@ void MCExpr::print(raw_ostream &OS) const {
     bool UseParens = Sym.getName()[0] == '$';
 
     if (SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_HA16 ||
-        SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_LO16) {
+        SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_LO16 ||
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_PLT) {
       OS << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
       UseParens = true;
     }
@@ -64,7 +65,8 @@ void MCExpr::print(raw_ostream &OS) const {
       OS << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
     else if (SRE.getKind() != MCSymbolRefExpr::VK_None &&
              SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_HA16 &&
-             SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_LO16)
+             SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_LO16 &&
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_PLT)
       OS << '@' << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
 
     return;
@@ -224,6 +226,7 @@ StringRef MCSymbolRefExpr::getVariantKindName(VariantKind Kind) {
   case VK_Mips_GOT_OFST: return "GOT_OFST";
   case VK_Mips_HIGHER:   return "HIGHER";
   case VK_Mips_HIGHEST:  return "HIGHEST";
+  case VK_OR1K_PLT: return "plt";
   }
   llvm_unreachable("Invalid variant kind");
 }
