@@ -13,10 +13,10 @@ TARGET = OR1K
 
 # Make sure that tblgen is run, first thing.
 BUILT_SOURCES = OR1KGenRegisterInfo.inc OR1KGenInstrInfo.inc \
-		OR1KGenAsmWriter.inc OR1KGenDAGISel.inc \
+		OR1KGenAsmWriter.inc OR1KGenAsmMatcher.inc OR1KGenDAGISel.inc \
 		OR1KGenSubtargetInfo.inc OR1KGenCallingConv.inc
 
-DIRS = InstPrinter TargetInfo MCTargetDesc
+DIRS = AsmParser InstPrinter TargetInfo MCTargetDesc
 
 include $(LEVEL)/Makefile.common
 

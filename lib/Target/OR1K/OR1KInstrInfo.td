@@ -550,27 +550,27 @@ let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
 // sub / add which can clobber R1.
 let Defs = [R1], Uses = [R1] in {
 def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
-                              "#ADJCALLSTACKDOWN",
+                              "#ADJCALLSTACKDOWN $amt",
                               [(callseq_start timm:$amt)]>;
 def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
-                              "#ADJCALLSTACKUP",
+                              "#ADJCALLSTACKUP $amt1 $amt2",
                               [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
 let Defs = [R1], Uses = [R1] in {
   def ADJDYNALLOC : Pseudo<(outs GPR:$dst), (ins GPR:$src),
-                    "#ADJDYNALLOC",
+                    "#ADJDYNALLOC $dst $src",
                     [(set GPR:$dst, (OR1Kadjdynalloc GPR:$src))]>;
 }
 
 let Uses = [SR], usesCustomInserter = 1, Predicates = [NoCmov] in {
   def Select : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2),
-                       "# Select PSEUDO",
+                       "# Select PSEUDO $dst $src $src2",
                        [(set (i32 GPR:$dst),
                         (OR1Kselectcc (i32 GPR:$src), (i32 GPR:$src2)))]>;
 
   def Selectf32 : Pseudo<(outs GPR:$dst), (ins GPR:$src, GPR:$src2),
-                         "# Select PSEUDO",
+                         "# Select PSEUDO $dst $src $src2",
                          [(set (f32 GPR:$dst),
                           (OR1Kselectcc (f32 GPR:$src), (f32 GPR:$src2)))]>;
 }
