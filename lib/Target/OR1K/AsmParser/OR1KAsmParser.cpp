@@ -307,7 +307,6 @@ ParseInstruction(StringRef Name, SMLoc NameLoc,
   // First operand is token for instruction
   // FIXME: Can we have a more efficient implementation of this?
   size_t dotLoc = Name.find('.');
-  const char * a = Name.substr(0,dotLoc).str().c_str();
   Operands.push_back(OR1KOperand::CreateToken(Name.substr(0,dotLoc),NameLoc));
   if (dotLoc < Name.size()) {
     size_t dotLoc2 = Name.rfind('.');
