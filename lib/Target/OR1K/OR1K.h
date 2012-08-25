@@ -32,6 +32,10 @@ FunctionPass *createOR1KISelDag(OR1KTargetMachine &TM);
 /// with useful instructions or nop's
 FunctionPass *createOR1KDelaySlotFillerPass(OR1KTargetMachine &TM);
 
+/// createOR1KGlobalBaseRegPass - This pass initializes a global base
+/// register for PIC on OR1K.
+FunctionPass* createOR1KGlobalBaseRegPass();
+
 extern Target TheOR1KTarget;
 } // end namespace llvm;
 

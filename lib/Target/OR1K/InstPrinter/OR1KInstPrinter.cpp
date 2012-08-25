@@ -59,27 +59,27 @@ void OR1KInstPrinter::printMemOperand(const MCInst *MI, int OpNo,
 
 void OR1KInstPrinter::printS16ImmOperand(const MCInst *MI, unsigned OpNo,
                                          raw_ostream &O) {
-  O << (int16_t)MI->getOperand(OpNo).getImm();
+  const MCOperand &Op = MI->getOperand(OpNo);
+  assert(Op.isImm() && "Immediate operand not an immediate");
+  O << (int16_t)Op.getImm();
 }
 
-void OR1KInstPrinter::printSymbolLo(const MCInst *MI, unsigned OpNo,
-                                    raw_ostream &O) {
-  if (MI->getOperand(OpNo).isExpr()) {
-    O << "lo(";
-    printOperand(MI, OpNo, O);
-    O << ')';
-  } else {
-    printOperand(MI, OpNo, O);
-  }
-}
-
-void OR1KInstPrinter::printSymbolHi(const MCInst *MI, unsigned OpNo,
+void OR1KInstPrinter::printGotPcHi(const MCInst *MI, unsigned OpNo,
                                    raw_ostream &O) {
-  if (MI->getOperand(OpNo).isExpr()) {
-    O << "hi(";
-    printOperand(MI, OpNo, O);
-    O << ')';
-  } else {
-    printOperand(MI, OpNo, O);
-  }
+  const MCOperand &Op = MI->getOperand(OpNo);
+  assert(Op.isExpr() && "Not an expression");
+
+  O << "gotpchi(";
+  printOperand(MI, OpNo, O);
+  O << ')';
+}
+
+void OR1KInstPrinter::printGotPcLo(const MCInst *MI, unsigned OpNo,
+                                   raw_ostream &O) {
+  const MCOperand &Op = MI->getOperand(OpNo);
+  assert(Op.isExpr() && "Not an expression");
+
+  O << "gotpclo(";
+  printOperand(MI, OpNo, O);
+  O << ')';
 }

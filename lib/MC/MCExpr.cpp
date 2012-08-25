@@ -45,7 +45,13 @@ void MCExpr::print(raw_ostream &OS) const {
 
     if (SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_HA16 ||
         SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_LO16 ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_PLT) {
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_ABS_HI ||
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_ABS_LO ||
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_PLT ||
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTPCHI ||
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTPCLO ||
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTOFFHI ||
+        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTOFFLO) {
       OS << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
       UseParens = true;
     }
@@ -66,7 +72,13 @@ void MCExpr::print(raw_ostream &OS) const {
     else if (SRE.getKind() != MCSymbolRefExpr::VK_None &&
              SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_HA16 &&
              SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_LO16 &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_PLT)
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_ABS_HI &&
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_ABS_LO &&
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_PLT &&
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTPCHI &&
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTPCLO &&
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTOFFHI &&
+             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTOFFLO)
       OS << '@' << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
 
     return;
@@ -226,7 +238,13 @@ StringRef MCSymbolRefExpr::getVariantKindName(VariantKind Kind) {
   case VK_Mips_GOT_OFST: return "GOT_OFST";
   case VK_Mips_HIGHER:   return "HIGHER";
   case VK_Mips_HIGHEST:  return "HIGHEST";
+  case VK_OR1K_ABS_HI: return "hi";
+  case VK_OR1K_ABS_LO: return "lo";
   case VK_OR1K_PLT: return "plt";
+  case VK_OR1K_GOTPCHI: return "gotpchi";
+  case VK_OR1K_GOTPCLO: return "gotpclo";
+  case VK_OR1K_GOTOFFHI: return "gotoffhi";
+  case VK_OR1K_GOTOFFLO: return "gotofflo";
   }
   llvm_unreachable("Invalid variant kind");
 }

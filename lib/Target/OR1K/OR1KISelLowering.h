@@ -49,7 +49,11 @@ namespace llvm {
 
       /// Find First 1 and Find Last 1 - used to implement CTTZ and CTLZ
       FF1,
-      FL1
+      FL1,
+
+      // Get the Higher/Lower 16 bits from a 32-bit immediate
+      HI,
+      LO
     };
   }
 

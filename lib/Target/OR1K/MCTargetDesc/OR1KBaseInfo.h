@@ -32,10 +32,10 @@ namespace OR1KII {
 
     MO_NO_FLAG,
 
-    /// MO_GOT_ABSOLUTE_ADDRESS - On a symbol operand, this represents a
-    /// relocation of:
-    ///    SYMBOL_LABEL + [. - PICBASELABEL]
-    MO_GOT_ABSOLUTE_ADDRESS,
+    /// MO_ABS_HI/LO - Represents the hi or low part of an absolute symbol
+    /// address.
+    MO_ABS_HI,
+    MO_ABS_LO,
 
     /// MO_PIC_BASE_OFFSET - On a symbol operand this indicates that the
     /// immediate should get the value of the symbol minus the PIC base label:

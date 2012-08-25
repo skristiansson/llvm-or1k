@@ -33,7 +33,13 @@ GetGlobalAddressSymbol(const MachineOperand &MO) const {
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
   case OR1KII::MO_NO_FLAG:
+  case OR1KII::MO_ABS_HI:
+  case OR1KII::MO_ABS_LO:
   case OR1KII::MO_PLT:
+  case OR1KII::MO_GOTPCHI:
+  case OR1KII::MO_GOTPCLO:
+  case OR1KII::MO_GOTOFFHI:
+  case OR1KII::MO_GOTOFFLO:
     break;
   }
 
@@ -45,7 +51,13 @@ GetExternalSymbolSymbol(const MachineOperand &MO) const {
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
   case OR1KII::MO_NO_FLAG:
+  case OR1KII::MO_ABS_HI:
+  case OR1KII::MO_ABS_LO:
   case OR1KII::MO_PLT:
+  case OR1KII::MO_GOTPCHI:
+  case OR1KII::MO_GOTPCLO:
+  case OR1KII::MO_GOTOFFHI:
+  case OR1KII::MO_GOTOFFLO:
     break;
   }
 
@@ -61,7 +73,15 @@ GetJumpTableSymbol(const MachineOperand &MO) const {
 
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
-  case 0: break;
+  case OR1KII::MO_NO_FLAG:
+  case OR1KII::MO_ABS_HI:
+  case OR1KII::MO_ABS_LO:
+  case OR1KII::MO_PLT:
+  case OR1KII::MO_GOTPCHI:
+  case OR1KII::MO_GOTPCLO:
+  case OR1KII::MO_GOTOFFHI:
+  case OR1KII::MO_GOTOFFLO:
+    break;
   }
 
   // Create a symbol for the name.
@@ -77,7 +97,15 @@ GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
 
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
-  case 0: break;
+  case OR1KII::MO_NO_FLAG:
+  case OR1KII::MO_ABS_HI:
+  case OR1KII::MO_ABS_LO:
+  case OR1KII::MO_PLT:
+  case OR1KII::MO_GOTPCHI:
+  case OR1KII::MO_GOTPCLO:
+  case OR1KII::MO_GOTOFFHI:
+  case OR1KII::MO_GOTOFFLO:
+    break;
   }
 
   // Create a symbol for the name.
@@ -90,8 +118,14 @@ LowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym) const {
 
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
-  case OR1KII::MO_NO_FLAG: Kind = MCSymbolRefExpr::VK_None; break;
-  case OR1KII::MO_PLT:     Kind = MCSymbolRefExpr::VK_OR1K_PLT; break;
+  case OR1KII::MO_NO_FLAG:  Kind = MCSymbolRefExpr::VK_None; break;
+  case OR1KII::MO_ABS_HI:   Kind = MCSymbolRefExpr::VK_OR1K_ABS_HI; break;
+  case OR1KII::MO_ABS_LO:   Kind = MCSymbolRefExpr::VK_OR1K_ABS_LO; break;
+  case OR1KII::MO_PLT:      Kind = MCSymbolRefExpr::VK_OR1K_PLT; break;
+  case OR1KII::MO_GOTPCHI:  Kind = MCSymbolRefExpr::VK_OR1K_GOTPCHI; break;
+  case OR1KII::MO_GOTPCLO:  Kind = MCSymbolRefExpr::VK_OR1K_GOTPCLO; break;
+  case OR1KII::MO_GOTOFFHI: Kind = MCSymbolRefExpr::VK_OR1K_GOTOFFHI; break;
+  case OR1KII::MO_GOTOFFLO: Kind = MCSymbolRefExpr::VK_OR1K_GOTOFFLO; break;
   }
 
   const MCExpr *Expr = MCSymbolRefExpr::Create(Sym, Kind, Ctx);

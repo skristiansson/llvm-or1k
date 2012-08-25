@@ -322,6 +322,12 @@ static bool CC_OR1K32_VarArg(unsigned ValNo, MVT ValVT,
   return false;
 }
 
+static SDValue getGlobalReg(SelectionDAG &DAG, EVT Ty) {
+  OR1KMachineFunctionInfo *MFI =
+    DAG.getMachineFunction().getInfo<OR1KMachineFunctionInfo>();
+  return DAG.getRegister(MFI->getGlobalBaseReg(), Ty);
+}
+
 SDValue
 OR1KTargetLowering::LowerFormalArguments(SDValue Chain,
                                          CallingConv::ID CallConv,
@@ -557,6 +563,7 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
                  getTargetMachine(), ArgLocs, *DAG.getContext());
   GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee);
   MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
+  bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
 
   NumFixedArgs = 0;
   if (isVarArg && G) {
@@ -653,10 +660,20 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
     Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
                         &MemOpChains[0], MemOpChains.size());
 
+  SDValue InFlag;
+  // .plt stubs expects a pointer to GOT in r16, so insert a copy
+  // from the global base reg to it
+  if (IsPIC) {
+    unsigned GPReg = OR1K::R16;
+    Chain = DAG.getCopyToReg(Chain, dl, GPReg,
+                             getGlobalReg(DAG, getPointerTy()), InFlag);
+    InFlag = Chain.getValue(1);
+    DAG.getMachineFunction().getRegInfo().addLiveOut(GPReg);
+  }
+
   // Build a sequence of copy-to-reg nodes chained together with token chain and
   // flag operands which copy the outgoing args into registers.  The InFlag in
   // necessary since all emitted instructions must be stuck together.
-  SDValue InFlag;
   for (unsigned i = 0, e = RegsToPass.size(); i != e; ++i) {
     Chain = DAG.getCopyToReg(Chain, dl, RegsToPass[i].first,
                              RegsToPass[i].second, InFlag);
@@ -666,8 +683,7 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
   // If the callee is a GlobalAddress node (quite common, every direct call is)
   // turn it into a TargetGlobalAddress node so that legalize doesn't hack it.
   // Likewise ExternalSymbol -> TargetExternalSymbol.
-  bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
-  unsigned char OpFlag = IsPIC ? OR1KII::MO_PLT : OR1KII::MO_NO_FLAG;
+  uint8_t OpFlag = IsPIC ? OR1KII::MO_PLT : OR1KII::MO_NO_FLAG;
   if (G) {
     Callee = DAG.getTargetGlobalAddress(G->getGlobal(), dl, getPointerTy(), 0,
                                         OpFlag);
@@ -1002,41 +1018,73 @@ const char *OR1KTargetLowering::getTargetNodeName(unsigned Opcode) const {
   case OR1KISD::Wrapper:            return "OR1KISD::Wrapper";
   case OR1KISD::FF1:                return "OR1KISD::FF1";
   case OR1KISD::FL1:                return "OR1KISD::FL1";
+  case OR1KISD::HI:                 return "OR1KISD::HI";
+  case OR1KISD::LO:                 return "OR1KISD::LO";
   }
 }
 
 SDValue OR1KTargetLowering::LowerConstantPool(SDValue Op,
                                               SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
   ConstantPoolSDNode *N = cast<ConstantPoolSDNode>(Op);
   const Constant *C = N->getConstVal();
+  bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
+  uint8_t OpFlagHi = IsPIC ? OR1KII::MO_GOTOFFHI : OR1KII::MO_ABS_HI;
+  uint8_t OpFlagLo = IsPIC ? OR1KII::MO_GOTOFFLO : OR1KII::MO_ABS_LO;
 
-  SDValue Result = DAG.getTargetConstantPool(C, MVT::i32, N->getAlignment(),
-                                             N->getOffset(), 0);
-  return DAG.getNode(OR1KISD::Wrapper, Op.getDebugLoc(),
-                     getPointerTy(), Result);
+  SDValue Hi = DAG.getTargetConstantPool(C, MVT::i32, N->getAlignment(),
+                                         N->getOffset(), OpFlagHi);
+  SDValue Lo = DAG.getTargetConstantPool(C, MVT::i32, N->getAlignment(),
+                                         N->getOffset(), OpFlagLo);
+  Hi = DAG.getNode(OR1KISD::HI, dl, MVT::i32, Hi);
+  Lo = DAG.getNode(OR1KISD::LO, dl, MVT::i32, Lo);
+  SDValue Result = DAG.getNode(ISD::OR, dl, MVT::i32, Hi, Lo);
+  if (IsPIC)
+    Result = DAG.getNode(ISD::ADD, dl, MVT::i32, Result,
+                         getGlobalReg(DAG, MVT::i32));
+  return Result;
 }
 
 SDValue OR1KTargetLowering::LowerGlobalAddress(SDValue Op,
                                                SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
   const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
   int64_t Offset = cast<GlobalAddressSDNode>(Op)->getOffset();
+  bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
+  uint8_t OpFlagHi = IsPIC ? OR1KII::MO_GOTOFFHI : OR1KII::MO_ABS_HI;
+  uint8_t OpFlagLo = IsPIC ? OR1KII::MO_GOTOFFLO : OR1KII::MO_ABS_LO;
 
   // Create the TargetGlobalAddress node, folding in the constant offset.
-  SDValue Result = DAG.getTargetGlobalAddress(GV, Op.getDebugLoc(),
-                                              getPointerTy(), Offset);
-  return DAG.getNode(OR1KISD::Wrapper, Op.getDebugLoc(),
-                     getPointerTy(), Result);
+  SDValue Hi = DAG.getTargetGlobalAddress(GV, dl, getPointerTy(),Offset,
+                                          OpFlagHi);
+  SDValue Lo = DAG.getTargetGlobalAddress(GV, dl, getPointerTy(), Offset,
+                                          OpFlagLo);
+  Hi = DAG.getNode(OR1KISD::HI, dl, MVT::i32, Hi);
+  Lo = DAG.getNode(OR1KISD::LO, dl, MVT::i32, Lo);
+  SDValue Result = DAG.getNode(ISD::OR, dl, MVT::i32, Hi, Lo);
+  if (IsPIC)
+    Result = DAG.getNode(ISD::ADD, dl, MVT::i32, Result,
+                         getGlobalReg(DAG, MVT::i32));
+  return Result;
 }
 
 SDValue OR1KTargetLowering::LowerJumpTable(SDValue Op,
                                            SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
   JumpTableSDNode *JT = cast<JumpTableSDNode>(Op);
-  unsigned char OpFlag = 0;
+  bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
+  uint8_t OpFlagHi = IsPIC ? OR1KII::MO_GOTOFFHI : OR1KII::MO_ABS_HI;
+  uint8_t OpFlagLo = IsPIC ? OR1KII::MO_GOTOFFLO : OR1KII::MO_ABS_LO;
 
-  SDValue Result = DAG.getTargetJumpTable(JT->getIndex(), getPointerTy(),
-                                          OpFlag);
-  return DAG.getNode(OR1KISD::Wrapper, Op.getDebugLoc(),
-                     getPointerTy(), Result);
+  SDValue Hi = DAG.getTargetJumpTable(JT->getIndex(), getPointerTy(), OpFlagHi);
+  SDValue Lo = DAG.getTargetJumpTable(JT->getIndex(), getPointerTy(), OpFlagLo);
+  Hi = DAG.getNode(OR1KISD::HI, dl, MVT::i32, Hi);
+  Lo = DAG.getNode(OR1KISD::LO, dl, MVT::i32, Lo);
+  SDValue Result = DAG.getNode(ISD::OR, dl, MVT::i32, Hi, Lo);
+  if (IsPIC)
+    Result = DAG.getNode(ISD::ADD, dl, MVT::i32, Result,
+                         getGlobalReg(DAG, MVT::i32));
+  return Result;
 }
 
 MachineBasicBlock*

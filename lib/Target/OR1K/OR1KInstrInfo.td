@@ -51,6 +51,8 @@ def OR1Kbrcc        : SDNode<"OR1KISD::BR_CC", SDT_OR1KBrCC,
 def OR1Kselectcc    : SDNode<"OR1KISD::SELECT_CC", SDT_OR1KSelectCC,
                               [SDNPInGlue]>;
 def OR1KWrapper     : SDNode<"OR1KISD::Wrapper", SDT_OR1KWrapper>;
+def OR1KHi          : SDNode<"OR1KISD::HI", SDTIntUnaryOp>;
+def OR1KLo          : SDNode<"OR1KISD::LO", SDTIntUnaryOp>;
 def OR1Kadjdynalloc : SDNode<"OR1KISD::ADJDYNALLOC", SDT_OR1KAdjDynAlloc>;
 def OR1Kff1         : SDNode<"OR1KISD::FF1", SDTIntUnaryOp>;
 def OR1Kfl1         : SDNode<"OR1KISD::FL1", SDTIntUnaryOp>;
@@ -107,11 +109,11 @@ def MEMri : Operand<i32> {
   let MIOperandInfo = (ops GPR, i32imm);
 }
 
-def symbolHi: Operand<i32> {
-  let PrintMethod = "printSymbolHi";
+def gotPcHi: Operand<i32> {
+  let PrintMethod = "printGotPcHi";
 }
-def symbolLo: Operand<i32> {
-  let PrintMethod = "printSymbolLo";
+def gotPcLo: Operand<i32> {
+  let PrintMethod = "printGotPcLo";
 }
 
 // Conditional code predicates - used for pattern matching for SF instructions
@@ -237,7 +239,7 @@ class ALU_RIs<bits<4> subOp, string asmstr, SDNode OpNode>
            [(set GPR:$rD, (OpNode GPR:$rA, immSExt16:$imm16))]>;
 
 class ALU_RIz<bits<4> subOp, string asmstr, SDNode OpNode>
-  : ALU_RI<subOp, (outs GPR:$rD), (ins GPR:$rA, symbolLo:$imm16),
+  : ALU_RI<subOp, (outs GPR:$rD), (ins GPR:$rA, i32imm:$imm16),
            !strconcat(asmstr, "\t$rD, $rA, $imm16"),
            [(set GPR:$rD, (OpNode GPR:$rA, immZExt16:$imm16))]>;
 
@@ -576,6 +578,10 @@ let Uses = [SR], usesCustomInserter = 1, Predicates = [NoCmov] in {
 }
 
 
+// PIC base construction.
+let neverHasSideEffects = 1, isNotDuplicable = 1, Defs = [R9] in
+  def GETPC : Pseudo<(outs), (ins i32imm:$label), "", []>;
+
 class MOVHI_I <dag outs, dag ins, list<dag> pattern>
   : InstOR1K<outs, ins,  "l.movhi\t$rD, $imm", pattern> {
   bits<16> imm16;
@@ -586,9 +592,16 @@ class MOVHI_I <dag outs, dag ins, list<dag> pattern>
 }
 
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
-  def MOVHI : MOVHI_I<(outs GPR:$rD), (ins symbolHi:$imm),
+  def MOVHI : MOVHI_I<(outs GPR:$rD), (ins i32imm:$imm),
                       [(set GPR:$rD, i32hi16:$imm)]>;
 }
+
+// FIXME: Ugh, those are just to get gotpchi/lo() printing,
+// need to find a better way to solve this
+def MOVHI_GOTPCHI : MOVHI_I<(outs GPR:$rD), (ins gotPcHi:$imm), []>;
+
+def ORI_GOTPCLO : ALU_RI<0xa, (outs GPR:$rD), (ins GPR:$rA, gotPcLo:$imm16),
+                         "l.ori\t$rD, $rA, $imm16", []>;
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns
@@ -612,17 +625,27 @@ def : Pat<(extloadi8  ADDRri:$src), (i32 (LBZ ADDRri:$src))>;
 def : Pat<(extloadi16 ADDRri:$src), (i32 (LHZ ADDRri:$src))>;
 
 // GlobalAddress, ExternalSymbol, Jumptable, ConstantPool
-def : Pat<(OR1KWrapper tglobaladdr:$dst),
-          (ORI (MOVHI (tglobaladdr:$dst)), (tglobaladdr:$dst))>;
-def : Pat<(OR1KWrapper texternalsym:$dst),
-          (ORI (MOVHI (texternalsym:$dst)), (texternalsym:$dst))>;
-def : Pat<(OR1KWrapper tblockaddress:$dst),
-          (ORI (MOVHI (tblockaddress:$dst)), (tblockaddress:$dst))>;
-def : Pat<(OR1KWrapper tjumptable:$dst),
-          (ORI (MOVHI (tjumptable:$dst)), (tjumptable:$dst))>;
-def : Pat<(OR1KWrapper tconstpool:$dst),
-          (ORI (MOVHI (tconstpool:$dst)), (tconstpool:$dst))>;
+def : Pat<(OR1KHi tglobaladdr:$dst), (MOVHI tglobaladdr:$dst)>;
+def : Pat<(OR1KLo tglobaladdr:$dst), (ORI (i32 R0), tglobaladdr:$dst)>;
+def : Pat<(OR1KHi texternalsym:$dst), (MOVHI texternalsym:$dst)>;
+def : Pat<(OR1KLo texternalsym:$dst), (ORI (i32 R0), texternalsym:$dst)>;
+def : Pat<(OR1KHi tblockaddress:$dst), (MOVHI tblockaddress:$dst)>;
+def : Pat<(OR1KLo tblockaddress:$dst), (ORI (i32 R0), tblockaddress:$dst)>;
+def : Pat<(OR1KHi tjumptable:$dst), (MOVHI tjumptable:$dst)>;
+def : Pat<(OR1KLo tjumptable:$dst), (ORI (i32 R0), tjumptable:$dst)>;
+def : Pat<(OR1KHi tconstpool:$dst), (MOVHI tconstpool:$dst)>;
+def : Pat<(OR1KLo tconstpool:$dst), (ORI (i32 R0), tconstpool:$dst)>;
 
+def : Pat<(or GPR:$hi, (OR1KLo tglobaladdr:$lo)),
+          (ORI GPR:$hi, tglobaladdr:$lo)>;
+def : Pat<(or GPR:$hi, (OR1KLo texternalsym:$lo)),
+          (ORI GPR:$hi, texternalsym:$lo)>;
+def : Pat<(or GPR:$hi, (OR1KLo tblockaddress:$lo)),
+          (ORI GPR:$hi, tblockaddress:$lo)>;
+def : Pat<(or GPR:$hi, (OR1KLo tjumptable:$lo)),
+          (ORI GPR:$hi, tjumptable:$lo)>;
+def : Pat<(or GPR:$hi, (OR1KLo tconstpool:$lo)),
+          (ORI GPR:$hi, tconstpool:$lo)>;
 //===----------------------------------------------------------------------===//
 // Floating Point Support
 //===----------------------------------------------------------------------===//
