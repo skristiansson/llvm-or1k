@@ -54,6 +54,8 @@ namespace {
     void EmitInstruction(const MachineInstr *MI);
     virtual bool isBlockOnlyReachableByFallthrough(const MachineBasicBlock*
                                                    MBB) const;
+  private:
+    void customEmitInstruction(const MachineInstr *MI);
   };
 } // end of anonymous namespace
 
@@ -149,7 +151,7 @@ bool OR1KAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
 }
 
 //===----------------------------------------------------------------------===//
-void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
+void OR1KAsmPrinter::customEmitInstruction(const MachineInstr *MI) {
   OR1KMCInstLower MCInstLowering(OutContext, *Mang, *this);
 
   switch (MI->getOpcode()) {
@@ -217,15 +219,19 @@ void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
   }
   }
 
+  MCInst TmpInst;
+  MCInstLowering.Lower(MI, TmpInst);
+  OutStreamer.EmitInstruction(TmpInst);
+}
+
+void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
+
   MachineBasicBlock::const_instr_iterator I = MI;
   MachineBasicBlock::const_instr_iterator E = MI->getParent()->instr_end();
 
   do {
-    MCInst TmpInst;
-    MCInstLowering.Lower(I++, TmpInst);
-    OutStreamer.EmitInstruction(TmpInst);
+    customEmitInstruction(I++);
   } while ((I != E) && I->isInsideBundle());
-
 }
 
 /// isBlockOnlyReachableByFallthough - Return true if the basic block has
