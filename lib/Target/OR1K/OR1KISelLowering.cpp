@@ -668,7 +668,6 @@ OR1KTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
     Chain = DAG.getCopyToReg(Chain, dl, GPReg,
                              getGlobalReg(DAG, getPointerTy()), InFlag);
     InFlag = Chain.getValue(1);
-    DAG.getMachineFunction().getRegInfo().addLiveOut(GPReg);
   }
 
   // Build a sequence of copy-to-reg nodes chained together with token chain and
