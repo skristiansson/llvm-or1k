@@ -153,11 +153,22 @@ bool OR1KAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
 //===----------------------------------------------------------------------===//
 void OR1KAsmPrinter::customEmitInstruction(const MachineInstr *MI) {
   OR1KMCInstLower MCInstLowering(OutContext, *Mang, *this);
+  unsigned Opcode = MI->getOpcode();
 
-  switch (MI->getOpcode()) {
+  switch (Opcode) {
   default: break;
-  case OR1K::MOVHI_GOTPCHI:
-  case OR1K::ORI_GOTPCLO: {
+  case OR1K::MOVHI:
+  case OR1K::ORI: {
+    MCSymbolRefExpr::VariantKind Kind = MCSymbolRefExpr::VK_None;
+    if (Opcode == OR1K::MOVHI &&
+        MI->getOperand(1).getTargetFlags() == OR1KII::MO_GOTPCHI)
+      Kind = MCSymbolRefExpr::VK_OR1K_GOTPCHI;
+    else if (Opcode == OR1K::ORI &&
+             MI->getOperand(2).getTargetFlags() == OR1KII::MO_GOTPCLO)
+      Kind = MCSymbolRefExpr::VK_OR1K_GOTPCLO;
+    else
+      break;
+
     // We want to print something like:
     //   MYGLOBAL + (. - PICBASE)
     // However, we can't generate a ".", so just emit a new label here and refer
@@ -170,19 +181,20 @@ void OR1KAsmPrinter::customEmitInstruction(const MachineInstr *MI) {
     OutStreamer.EmitLabel(DotSym);
 
     // Now that we have emitted the label, lower the complex operand expression.
-    MachineOperand MO = (MI->getOpcode() == OR1K::MOVHI_GOTPCHI) ?
+    MachineOperand MO = (MI->getOpcode() == OR1K::MOVHI) ?
       MI->getOperand(1) : MI->getOperand(2);
     MCSymbol *OpSym = MCInstLowering.GetExternalSymbolSymbol(MO);
 
     DotExpr = MCBinaryExpr::CreateSub(DotExpr, PICBase, OutContext);
 
-    DotExpr = MCBinaryExpr::CreateAdd(MCSymbolRefExpr::Create(OpSym,OutContext),
-                                          DotExpr, OutContext);
+    DotExpr = MCBinaryExpr::CreateAdd(MCSymbolRefExpr::Create(OpSym, Kind,
+                                                              OutContext),
+                                      DotExpr, OutContext);
 
     MCInst TmpInst;
     TmpInst.setOpcode(MI->getOpcode());
     TmpInst.addOperand(MCOperand::CreateReg(MI->getOperand(0).getReg()));
-    if (MI->getOpcode() == OR1K::ORI_GOTPCLO)
+    if (MI->getOpcode() == OR1K::ORI)
       TmpInst.addOperand(MCOperand::CreateReg(MI->getOperand(1).getReg()));
     TmpInst.addOperand(MCOperand::CreateExpr(DotExpr));
     OutStreamer.EmitInstruction(TmpInst);

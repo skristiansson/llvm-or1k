@@ -14,9 +14,10 @@
 #define DEBUG_TYPE "asm-printer"
 #include "OR1K.h"
 #include "OR1KInstPrinter.h"
-#include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
+#include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 using namespace llvm;
@@ -31,6 +32,27 @@ void OR1KInstPrinter::printInst(const MCInst *MI, raw_ostream &O,
   printAnnotation(O, Annot);
 }
 
+static void printExpr(const MCExpr *Expr, raw_ostream &O) {
+  const MCSymbolRefExpr *SRE;
+
+  if (const MCBinaryExpr *BE = dyn_cast<MCBinaryExpr>(Expr))
+    SRE = dyn_cast<MCSymbolRefExpr>(BE->getLHS());
+  else
+    SRE = dyn_cast<MCSymbolRefExpr>(Expr);
+  assert(SRE && "Unexpected MCExpr type.");
+
+  MCSymbolRefExpr::VariantKind Kind = SRE->getKind();
+
+  if (Kind == MCSymbolRefExpr::VK_None) {
+    O << *Expr;
+    return;
+  }
+
+  O <<  MCSymbolRefExpr::getVariantKindName(Kind) << "(";
+  O << *Expr;
+  O << ")";
+}
+
 void OR1KInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
                                    raw_ostream &O, const char *Modifier) {
   assert((Modifier == 0 || Modifier[0] == 0) && "No modifiers supported");
@@ -40,8 +62,8 @@ void OR1KInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   } else if (Op.isImm()) {
     O << (int32_t)Op.getImm();
   } else {
-    assert(Op.isExpr() && "Unknown operand in printOperand");
-    O << *Op.getExpr();
+    assert(Op.isExpr() && "Expected an expression");
+    printExpr(Op.getExpr(), O);
   }
 }
 
@@ -62,24 +84,4 @@ void OR1KInstPrinter::printS16ImmOperand(const MCInst *MI, unsigned OpNo,
   const MCOperand &Op = MI->getOperand(OpNo);
   assert(Op.isImm() && "Immediate operand not an immediate");
   O << (int16_t)Op.getImm();
-}
-
-void OR1KInstPrinter::printGotPcHi(const MCInst *MI, unsigned OpNo,
-                                   raw_ostream &O) {
-  const MCOperand &Op = MI->getOperand(OpNo);
-  assert(Op.isExpr() && "Not an expression");
-
-  O << "gotpchi(";
-  printOperand(MI, OpNo, O);
-  O << ')';
-}
-
-void OR1KInstPrinter::printGotPcLo(const MCInst *MI, unsigned OpNo,
-                                   raw_ostream &O) {
-  const MCOperand &Op = MI->getOperand(OpNo);
-  assert(Op.isExpr() && "Not an expression");
-
-  O << "gotpclo(";
-  printOperand(MI, OpNo, O);
-  O << ')';
 }

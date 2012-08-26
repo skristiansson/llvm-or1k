@@ -43,15 +43,15 @@ void MCExpr::print(raw_ostream &OS) const {
     // absolute names.
     bool UseParens = Sym.getName()[0] == '$';
 
+    // FIXME: how does mips avoid printing @getVariantKindName?
+    if (SRE.getKind() >= MCSymbolRefExpr::VK_OR1K_ABS_HI &&
+        SRE.getKind() <= MCSymbolRefExpr::VK_OR1K_GOTOFFLO) {
+      OS << Sym;
+      return;
+    }
+
     if (SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_HA16 ||
-        SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_LO16 ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_ABS_HI ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_ABS_LO ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_PLT ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTPCHI ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTPCLO ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTOFFHI ||
-        SRE.getKind() == MCSymbolRefExpr::VK_OR1K_GOTOFFLO) {
+        SRE.getKind() == MCSymbolRefExpr::VK_PPC_DARWIN_LO16) {
       OS << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
       UseParens = true;
     }
@@ -71,14 +71,7 @@ void MCExpr::print(raw_ostream &OS) const {
       OS << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
     else if (SRE.getKind() != MCSymbolRefExpr::VK_None &&
              SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_HA16 &&
-             SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_LO16 &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_ABS_HI &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_ABS_LO &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_PLT &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTPCHI &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTPCLO &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTOFFHI &&
-             SRE.getKind() != MCSymbolRefExpr::VK_OR1K_GOTOFFLO)
+             SRE.getKind() != MCSymbolRefExpr::VK_PPC_DARWIN_LO16)
       OS << '@' << MCSymbolRefExpr::getVariantKindName(SRE.getKind());
 
     return;

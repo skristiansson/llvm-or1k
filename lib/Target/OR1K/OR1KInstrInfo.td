@@ -109,13 +109,6 @@ def MEMri : Operand<i32> {
   let MIOperandInfo = (ops GPR, i32imm);
 }
 
-def gotPcHi: Operand<i32> {
-  let PrintMethod = "printGotPcHi";
-}
-def gotPcLo: Operand<i32> {
-  let PrintMethod = "printGotPcLo";
-}
-
 // Conditional code predicates - used for pattern matching for SF instructions
 def OR1K_CC_EQ  : PatLeaf<(imm),
                   [{return (N->getZExtValue() == ISD::SETEQ);}]>;
@@ -595,13 +588,6 @@ let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
   def MOVHI : MOVHI_I<(outs GPR:$rD), (ins i32imm:$imm),
                       [(set GPR:$rD, i32hi16:$imm)]>;
 }
-
-// FIXME: Ugh, those are just to get gotpchi/lo() printing,
-// need to find a better way to solve this
-def MOVHI_GOTPCHI : MOVHI_I<(outs GPR:$rD), (ins gotPcHi:$imm), []>;
-
-def ORI_GOTPCLO : ALU_RI<0xa, (outs GPR:$rD), (ins GPR:$rA, gotPcLo:$imm16),
-                         "l.ori\t$rD, $rA, $imm16", []>;
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns

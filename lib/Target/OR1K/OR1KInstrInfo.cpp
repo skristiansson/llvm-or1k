@@ -214,10 +214,12 @@ namespace {
       // l.ori   r16, r16, gotpclo(_GLOBAL_OFFSET_TABLE_+(.-.piclabel))
       // l.add   r16, r9, r16
       // where: r16 = GlobaleBaseReg and r9 = PC
-      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::MOVHI_GOTPCHI), Scratch1)
-        .addExternalSymbol("_GLOBAL_OFFSET_TABLE_");
-      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::ORI_GOTPCLO), Scratch2)
-        .addReg(Scratch1).addExternalSymbol("_GLOBAL_OFFSET_TABLE_");
+      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::MOVHI), Scratch1)
+        .addExternalSymbol("_GLOBAL_OFFSET_TABLE_",
+                           OR1KII::MO_GOTPCHI);
+      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::ORI), Scratch2)
+        .addReg(Scratch1).addExternalSymbol("_GLOBAL_OFFSET_TABLE_",
+                                            OR1KII::MO_GOTPCLO);
       BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::ADD), GlobalBaseReg)
         .addReg(OR1K::R9).addReg(Scratch2);
       return true;
