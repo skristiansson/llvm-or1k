@@ -103,6 +103,8 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
     static_cast<const OR1KRegisterInfo*>(MF.getTarget().getRegisterInfo());
   MachineBasicBlock::iterator MBBI = MBB.begin();
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  bool IsPIC = MF.getTarget().getRelocationModel() == Reloc::PIC_;
+  bool HasRA = MFI->adjustsStack() || IsPIC;
 
   // Determine the correct frame layout
   determineFrameLayout(MF);
@@ -111,12 +113,12 @@ void OR1KFrameLowering::emitPrologue(MachineFunction &MF) const {
   unsigned StackSize = MFI->getStackSize();
 
   // No need to allocate space on the stack.
-  if (StackSize == 0 && !MFI->adjustsStack()) return;
+  if (StackSize == 0 && !HasRA) return;
 
   int Offset = -4;
 
   // l.sw  stack_lock(r1), r9
-  if (MFI->adjustsStack()) {
+  if (HasRA) {
     BuildMI(MBB, MBBI, DL, TII.get(OR1K::SW))
       .addReg(OR1K::R9).addReg(OR1K::R1).addImm(Offset);
     Offset -= 4;
@@ -203,10 +205,11 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
     *static_cast<const OR1KInstrInfo*>(MF.getTarget().getInstrInfo());
   const OR1KRegisterInfo *TRI =
     static_cast<const OR1KRegisterInfo*>(MF.getTarget().getRegisterInfo());
-
+  bool IsPIC = MF.getTarget().getRelocationModel() == Reloc::PIC_;
+  bool HasRA = MFI->adjustsStack() || IsPIC;
   DebugLoc dl = MBBI->getDebugLoc();
 
-  int FPOffset = MFI->adjustsStack() ? -8 : -4;
+  int FPOffset = HasRA ? -8 : -4;
   int RAOffset = -4;
   int BPOffset = FPOffset - 4;
 
@@ -239,7 +242,7 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
   }
 
   // l.lwz r9, stack_loc(r1)
-  if (MFI->adjustsStack()) {
+  if (HasRA) {
     BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), OR1K::R9)
       .addReg(OR1K::R1).addImm(RAOffset);
   }
@@ -252,9 +255,11 @@ processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
   MachineRegisterInfo& MRI = MF.getRegInfo();
   const OR1KRegisterInfo *TRI =
     static_cast<const OR1KRegisterInfo*>(MF.getTarget().getRegisterInfo());
+  bool IsPIC = MF.getTarget().getRelocationModel() == Reloc::PIC_;
+
   int Offset = -4;
 
-  if (MFI->adjustsStack()) {
+  if (MFI->adjustsStack() || IsPIC) {
     MFI->CreateFixedObject(4, Offset, true);
     // Mark unused since we will save it manually in the prologue
     MRI.setPhysRegUnused(OR1K::R9);
