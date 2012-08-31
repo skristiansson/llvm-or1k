@@ -196,7 +196,18 @@ public:
     VK_Mips_GPOFF_LO,
     VK_Mips_GOT_DISP,
     VK_Mips_GOT_PAGE,
-    VK_Mips_GOT_OFST
+    VK_Mips_GOT_OFST,
+    VK_Mips_HIGHER,
+    VK_Mips_HIGHEST,
+
+    // OR1K specific value kinds
+    VK_OR1K_ABS_HI,
+    VK_OR1K_ABS_LO,
+    VK_OR1K_PLT,
+    VK_OR1K_GOTPCHI,
+    VK_OR1K_GOTPCLO,
+    VK_OR1K_GOTOFFHI,
+    VK_OR1K_GOTOFFLO
   };
 
 private:

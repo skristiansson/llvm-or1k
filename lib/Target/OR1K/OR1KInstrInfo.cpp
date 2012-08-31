@@ -15,6 +15,8 @@
 #include "OR1K.h"
 #include "OR1KMachineFunctionInfo.h"
 #include "OR1KSubtarget.h"
+#include "OR1KTargetMachine.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -171,3 +173,69 @@ unsigned OR1KInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
   return Count;
 }
 
+namespace {
+  /// CGBR - Create Global Base Reg pass. This initializes the PIC
+  /// global base register for OR1K.
+  struct CGBR : public MachineFunctionPass {
+    static char ID;
+    CGBR() : MachineFunctionPass(ID) {}
+
+    virtual bool runOnMachineFunction(MachineFunction &MF) {
+      const OR1KTargetMachine *TM =
+        static_cast<const OR1KTargetMachine *>(&MF.getTarget());
+
+      // Only emit a global base reg in PIC mode.
+      if (TM->getRelocationModel() != Reloc::PIC_)
+        return false;
+
+      OR1KMachineFunctionInfo *OR1KFI = MF.getInfo<OR1KMachineFunctionInfo>();
+      unsigned GlobalBaseReg = OR1KFI->getGlobalBaseReg();
+
+      // If we didn't need a GlobalBaseReg, don't insert code.
+      if (GlobalBaseReg == 0)
+        return false;
+
+      // Insert the set of GlobalBaseReg into the first MBB of the function
+      MachineBasicBlock &FirstMBB = MF.front();
+      MachineBasicBlock::iterator MBBI = FirstMBB.begin();
+      DebugLoc DL = FirstMBB.findDebugLoc(MBBI);
+      MachineRegisterInfo &RegInfo = MF.getRegInfo();
+      const OR1KInstrInfo *TII = TM->getInstrInfo();
+
+      // This is needed to keep the representation in SSA form
+      unsigned Scratch1 = RegInfo.createVirtualRegister(&OR1K::GPRRegClass);
+      unsigned Scratch2 = RegInfo.createVirtualRegister(&OR1K::GPRRegClass);
+
+      // Insert GETPC pseudo instruction, will be transformed into a l.jal
+      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::GETPC)).addImm(0);
+
+      // Generate:
+      // l.movhi r16, gotpchi(_GLOBAL_OFFSET_TABLE_+(.-piclabel))
+      // l.ori   r16, r16, gotpclo(_GLOBAL_OFFSET_TABLE_+(.-.piclabel))
+      // l.add   r16, r9, r16
+      // where: r16 = GlobaleBaseReg and r9 = PC
+      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::MOVHI), Scratch1)
+        .addExternalSymbol("_GLOBAL_OFFSET_TABLE_",
+                           OR1KII::MO_GOTPCHI);
+      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::ORI), Scratch2)
+        .addReg(Scratch1).addExternalSymbol("_GLOBAL_OFFSET_TABLE_",
+                                            OR1KII::MO_GOTPCLO);
+      BuildMI(FirstMBB, MBBI, DL, TII->get(OR1K::ADD), GlobalBaseReg)
+        .addReg(OR1K::R9).addReg(Scratch2);
+      return true;
+    }
+
+    virtual const char *getPassName() const {
+      return "OR1K PIC Global Base Reg Initialization";
+    }
+
+    virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+      AU.setPreservesCFG();
+      MachineFunctionPass::getAnalysisUsage(AU);
+    }
+  };
+}
+
+char CGBR::ID = 0;
+FunctionPass*
+llvm::createOR1KGlobalBaseRegPass() { return new CGBR(); }

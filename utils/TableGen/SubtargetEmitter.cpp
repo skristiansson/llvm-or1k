@@ -564,7 +564,7 @@ EmitItineraries(raw_ostream &OS,
   }
 }
 
-// Emit either the the value defined in the TableGen Record, or the default
+// Emit either the value defined in the TableGen Record, or the default
 // value defined in the C++ header. The Record is null if the processor does not
 // define a model.
 void SubtargetEmitter::EmitProcessorProp(raw_ostream &OS, const Record *R,
@@ -590,6 +590,7 @@ void SubtargetEmitter::EmitProcessorModels(raw_ostream &OS) {
     EmitProcessorProp(OS, PI->ModelDef, "MinLatency", ',');
     EmitProcessorProp(OS, PI->ModelDef, "LoadLatency", ',');
     EmitProcessorProp(OS, PI->ModelDef, "HighLatency", ',');
+    EmitProcessorProp(OS, PI->ModelDef, "MispredictPenalty", ',');
     if (SchedModels.hasItineraryClasses())
       OS << "  " << PI->ItinsDef->getName();
     else

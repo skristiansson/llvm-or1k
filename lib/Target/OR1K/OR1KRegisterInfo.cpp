@@ -51,6 +51,7 @@ BitVector OR1KRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
     Reserved.set(OR1K::R2);
   Reserved.set(OR1K::R9);
   Reserved.set(OR1K::R10);
+  Reserved.set(OR1K::R16); // Global pointer
   if (hasBasePointer(MF))
     Reserved.set(getBaseRegister());
   return Reserved;

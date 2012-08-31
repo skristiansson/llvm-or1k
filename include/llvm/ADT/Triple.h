@@ -99,7 +99,8 @@ public:
     Minix,
     RTEMS,
     NativeClient,
-    CNK         // BG/P Compute-Node Kernel
+    CNK,         // BG/P Compute-Node Kernel
+    Bitrig
   };
   enum EnvironmentType {
     UnknownEnvironment,
@@ -272,7 +273,7 @@ public:
   /// compatibility, which handles supporting skewed version numbering schemes
   /// used by the "darwin" triples.
   unsigned isMacOSXVersionLT(unsigned Major, unsigned Minor = 0,
-			     unsigned Micro = 0) const {
+                             unsigned Micro = 0) const {
     assert(isMacOSX() && "Not an OS X triple!");
 
     // If this is OS X, expect a sane version number.

@@ -54,12 +54,16 @@ namespace {
     void EmitInstruction(const MachineInstr *MI);
     virtual bool isBlockOnlyReachableByFallthrough(const MachineBasicBlock*
                                                    MBB) const;
+  private:
+    void customEmitInstruction(const MachineInstr *MI);
   };
 } // end of anonymous namespace
 
 void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
                                   raw_ostream &O, const char *Modifier) {
   const MachineOperand &MO = MI->getOperand(OpNum);
+  unsigned TF = MO.getTargetFlags();
+
   switch (MO.getType()) {
   case MachineOperand::MO_Register:
     O << OR1KInstPrinter::getRegisterName(MO.getReg());
@@ -74,7 +78,10 @@ void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
     break;
 
   case MachineOperand::MO_GlobalAddress:
-    O << *Mang->getSymbol(MO.getGlobal());
+    if (TF == OR1KII::MO_PLT)
+      O << "plt(" << *Mang->getSymbol(MO.getGlobal()) << ")";
+    else
+      O << *Mang->getSymbol(MO.getGlobal());
     break;
 
   case MachineOperand::MO_BlockAddress: {
@@ -84,7 +91,10 @@ void OR1KAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
    }
 
    case MachineOperand::MO_ExternalSymbol:
-     O << *GetExternalSymbolSymbol(MO.getSymbolName());
+     if (TF == OR1KII::MO_PLT)
+       O << "plt(" << *GetExternalSymbolSymbol(MO.getSymbolName()) << ")";
+     else
+       O << *GetExternalSymbolSymbol(MO.getSymbolName());
      break;
 
    case MachineOperand::MO_JumpTableIndex:
@@ -141,19 +151,99 @@ bool OR1KAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
 }
 
 //===----------------------------------------------------------------------===//
-void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
+void OR1KAsmPrinter::customEmitInstruction(const MachineInstr *MI) {
   OR1KMCInstLower MCInstLowering(OutContext, *Mang, *this);
+  unsigned Opcode = MI->getOpcode();
 
+  switch (Opcode) {
+  default: break;
+  case OR1K::MOVHI:
+  case OR1K::ORI: {
+    MCSymbolRefExpr::VariantKind Kind = MCSymbolRefExpr::VK_None;
+    if (Opcode == OR1K::MOVHI &&
+        MI->getOperand(1).getTargetFlags() == OR1KII::MO_GOTPCHI)
+      Kind = MCSymbolRefExpr::VK_OR1K_GOTPCHI;
+    else if (Opcode == OR1K::ORI &&
+             MI->getOperand(2).getTargetFlags() == OR1KII::MO_GOTPCLO)
+      Kind = MCSymbolRefExpr::VK_OR1K_GOTPCLO;
+    else
+      break;
+
+    // We want to print something like:
+    //   MYGLOBAL + (. - PICBASE)
+    // However, we can't generate a ".", so just emit a new label here and refer
+    // to it.
+    MCSymbol *DotSym = OutContext.CreateTempSymbol();
+    const MCExpr *DotExpr = MCSymbolRefExpr::Create(DotSym, OutContext);
+    const MCExpr *PICBase =
+      MCSymbolRefExpr::Create(MF->getPICBaseSymbol(), OutContext);
+
+    OutStreamer.EmitLabel(DotSym);
+
+    // Now that we have emitted the label, lower the complex operand expression.
+    MachineOperand MO = (MI->getOpcode() == OR1K::MOVHI) ?
+      MI->getOperand(1) : MI->getOperand(2);
+    MCSymbol *OpSym = MCInstLowering.GetExternalSymbolSymbol(MO);
+
+    DotExpr = MCBinaryExpr::CreateSub(DotExpr, PICBase, OutContext);
+
+    DotExpr = MCBinaryExpr::CreateAdd(MCSymbolRefExpr::Create(OpSym, Kind,
+                                                              OutContext),
+                                      DotExpr, OutContext);
+
+    MCInst TmpInst;
+    TmpInst.setOpcode(MI->getOpcode());
+    TmpInst.addOperand(MCOperand::CreateReg(MI->getOperand(0).getReg()));
+    if (MI->getOpcode() == OR1K::ORI)
+      TmpInst.addOperand(MCOperand::CreateReg(MI->getOperand(1).getReg()));
+    TmpInst.addOperand(MCOperand::CreateExpr(DotExpr));
+    OutStreamer.EmitInstruction(TmpInst);
+    return;
+  }
+
+  case OR1K::GETPC: {
+    MCInst TmpInst;
+    // This is a pseudo op for a two instruction sequence with a label, which
+    // looks like:
+    //     l.jal .L1$pb
+    //     l.nop
+    // .L1$pb:
+
+    // Emit the call.
+    MCSymbol *PICBase = MF->getPICBaseSymbol();
+    TmpInst.setOpcode(OR1K::JAL);
+    // FIXME: We would like an efficient form for this, so we don't have to do a
+    // lot of extra uniquing.
+    TmpInst.addOperand(MCOperand::CreateExpr(
+                         MCSymbolRefExpr::Create(PICBase,OutContext)));
+    OutStreamer.EmitInstruction(TmpInst);
+
+    // Emit delay-slot nop
+    // FIXME: omit on no-delay-slot targets
+    TmpInst.setOpcode(OR1K::NOP);
+    TmpInst.getOperand(0) = MCOperand::CreateImm(0);
+    OutStreamer.EmitInstruction(TmpInst);
+
+    // Emit the label.
+    OutStreamer.EmitLabel(PICBase);
+
+    return;
+  }
+  }
+
+  MCInst TmpInst;
+  MCInstLowering.Lower(MI, TmpInst);
+  OutStreamer.EmitInstruction(TmpInst);
+}
+
+void OR1KAsmPrinter::EmitInstruction(const MachineInstr *MI) {
 
   MachineBasicBlock::const_instr_iterator I = MI;
   MachineBasicBlock::const_instr_iterator E = MI->getParent()->instr_end();
 
   do {
-    MCInst TmpInst;
-    MCInstLowering.Lower(I++, TmpInst);
-    OutStreamer.EmitInstruction(TmpInst);
+    customEmitInstruction(I++);
   } while ((I != E) && I->isInsideBundle());
-
 }
 
 /// isBlockOnlyReachableByFallthough - Return true if the basic block has

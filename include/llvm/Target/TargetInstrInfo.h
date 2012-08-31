@@ -14,6 +14,7 @@
 #ifndef LLVM_TARGET_TARGETINSTRINFO_H
 #define LLVM_TARGET_TARGETINSTRINFO_H
 
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/CodeGen/DFAPacketizer.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -27,6 +28,7 @@ class MachineMemOperand;
 class MachineRegisterInfo;
 class MDNode;
 class MCInst;
+class MCSchedModel;
 class SDNode;
 class ScheduleHazardRecognizer;
 class SelectionDAG;
@@ -693,6 +695,20 @@ public:
     return false;
   }
 
+  /// optimizeLoadInstr - Try to remove the load by folding it to a register
+  /// operand at the use. We fold the load instructions if and only if the
+  /// def and use are in the same BB. We only look at one load and see
+  /// whether it can be folded into MI. FoldAsLoadDefReg is the virtual register
+  /// defined by the load we are trying to fold. DefMI returns the machine
+  /// instruction that defines FoldAsLoadDefReg, and the function returns
+  /// the machine instruction generated due to folding.
+  virtual MachineInstr* optimizeLoadInstr(MachineInstr *MI,
+                        const MachineRegisterInfo *MRI,
+                        unsigned &FoldAsLoadDefReg,
+                        MachineInstr *&DefMI) const {
+    return 0;
+  }
+
   /// FoldImmediate - 'Reg' is known to be defined by a move immediate
   /// instruction, try to fold the immediate into the use instruction.
   virtual bool FoldImmediate(MachineInstr *UseMI, MachineInstr *DefMI,
@@ -775,7 +791,7 @@ public:
                               SDNode *Node) const = 0;
 
   /// Return the default expected latency for a def based on it's opcode.
-  unsigned defaultDefLatency(const InstrItineraryData *ItinData,
+  unsigned defaultDefLatency(const MCSchedModel *SchedModel,
                              const MachineInstr *DefMI) const;
 
   /// isHighLatencyDef - Return true if this opcode has high latency to its

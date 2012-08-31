@@ -103,6 +103,9 @@ unsigned MipsELFObjectWriter::GetRelocType(const MCValue &Target,
   case FK_Data_4:
     Type = ELF::R_MIPS_32;
     break;
+  case FK_Data_8:
+    Type = ELF::R_MIPS_64;
+    break;
   case FK_GPRel_4:
     Type = ELF::R_MIPS_GPREL32;
     break;
@@ -168,6 +171,12 @@ unsigned MipsELFObjectWriter::GetRelocType(const MCValue &Target,
     Type = setRType((unsigned)ELF::R_MIPS_GPREL16, Type);
     Type = setRType2((unsigned)ELF::R_MIPS_SUB, Type);
     Type = setRType3((unsigned)ELF::R_MIPS_LO16, Type);
+    break;
+  case Mips::fixup_Mips_HIGHER:
+    Type = ELF::R_MIPS_HIGHER;
+    break;
+  case Mips::fixup_Mips_HIGHEST:
+    Type = ELF::R_MIPS_HIGHEST;
     break;
   }
   return Type;
