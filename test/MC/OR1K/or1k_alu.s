@@ -1,138 +1,70 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
 
     l.add r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} ADD
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x00,0x18,0x22,0xe0]
 
-    l.addi r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} ADDI
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.addi r3, r4, 2
+# CHECK: # encoding: [0x02,0x00,0x64,0x9c]
 
     l.and r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} AND
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x03,0x18,0x22,0xe0]
 
-    l.andi r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} ANDI
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.andi r3, r4, 2
+# CHECK: # encoding: [0x02,0x00,0x64,0xa4]
 
     l.div r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} DIV
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x09,0x18,0x22,0xe0]
 
     l.divu r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} DIVU
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x0a,0x18,0x22,0xe0]
 
     l.movhi r1, 2
-# CHECK: <MCInst #{{[0-9]+}} MOVHI
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:2>>
+# CHECK: # encoding: [0x02,0x00,0x20,0x18]
 
     l.mul r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} MUL
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x06,0x18,0x22,0xe0]
 
-    l.muli r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} MULI
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.muli r3, r4, 2
+# CHECK: # encoding: [0x02,0x00,0x64,0xb0]
 
-    l.mulu r3, r4, r5
-# CHECK: <MCInst #{{[0-9]+}} MULU
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Reg:6>>
+    l.mulu r1, r2, r3
+# CHECK: # encoding: [0x0b,0x18,0x22,0xe0]
 
     l.or r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} OR
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x04,0x18,0x22,0xe0]
 
-    l.ori r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} ORI
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.ori r3, r4, 2
+# CHECK: # encoding: [0x02,0x00,0x64,0xa8]
 
     l.ror r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} ROR
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0xc8,0x18,0x22,0xe0]
 
-    l.rori r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} ROR_ri
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.rori r3, r4, 2
+# CHECK: # encoding: [0xc2,0x00,0x64,0xb8]
 
     l.sll r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} SLL
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x08,0x18,0x22,0xe0]
 
-    l.slli r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} SLL_ri
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.slli r3, r4, 2
+# CHECK: # encoding: [0x02,0x00,0x64,0xb8]
 
     l.sra r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} SRA
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x88,0x18,0x22,0xe0]
 
-    l.srai r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} SRA_ri
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.srai r3, r4, 2
+# CHECK: # encoding: [0x82,0x00,0x64,0xb8]
 
     l.srl r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} SRL
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x48,0x18,0x22,0xe0]
 
-    l.srli r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} SRL_ri
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.srli r3, r4, 2
+# CHECK: # encoding: [0x42,0x00,0x64,0xb8]
 
     l.sub r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} SUB
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x02,0x18,0x22,0xe0]
 
     l.xor r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} XOR
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x05,0x18,0x22,0xe0]
 
-    l.xori r3, r4, 0
-# CHECK: <MCInst #{{[0-9]+}} XORI
-# CHECK-NEXT: <MCOperand Reg:4>
-# CHECK-NEXT: <MCOperand Reg:5>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.xori r3, r4, 2
+# CHECK: # encoding: [0x02,0x00,0x64,0xac]

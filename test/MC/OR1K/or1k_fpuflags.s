@@ -1,31 +1,19 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
 
     lf.sfeq.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFEQ
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x08,0x10,0x01,0xc8]
 
     lf.sfge.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFGEOrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x0b,0x10,0x01,0xc8]
 
     lf.sfgt.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFGTOrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x0a,0x10,0x01,0xc8]
 
     lf.sfle.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFLEOrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x0d,0x10,0x01,0xc8]
 
     lf.sflt.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFLTOrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x0c,0x10,0x01,0xc8]
 
     lf.sfne.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFNE
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x09,0x10,0x01,0xc8]

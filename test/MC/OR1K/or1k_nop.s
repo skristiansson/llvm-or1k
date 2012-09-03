@@ -1,5 +1,4 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
 
     l.nop 1
-# CHECK: <MCInst #{{[0-9]+}} NOP
-# CHECK-NEXT: <MCOperand Imm:1>
+# CHECK: # encoding: [0x01,0x00,0x00,0x15]

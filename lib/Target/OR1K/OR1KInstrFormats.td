@@ -61,4 +61,5 @@ class InstFRR<bits<8> op, dag outs, dag ins, string asmstr, list<dag> pattern>
 class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
   : InstOR1K<outs, ins, asmstr, pattern> {
   let Inst{15-0} = 0;
+  let isPseudo = 1;
 }

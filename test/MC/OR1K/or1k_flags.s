@@ -1,101 +1,61 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
 
     l.sfeq r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFEQ
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x01,0xe4]
 
     l.sfeqi r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFEQ_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x01,0xbc]
 
     l.sfges r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFGES
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x61,0xe5]
 
     l.sfgesi r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFGES_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x61,0xbd]
 
     l.sfgeu r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFGEU
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x61,0xe4]
 
     l.sfgeui r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFGEU_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x61,0xbc]
 
     l.sfgts r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFGTS_rr
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x41,0xe5]
 
     l.sfgtsi r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFGTS_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x41,0xbd]
 
     l.sfgtu r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFGTU_rr
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x41,0xe4]
 
     l.sfgtui r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFGTU_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x41,0xbc]
 
     l.sfles r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFLES
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0xa1,0xe5]
 
     l.sflesi r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFLES_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0xa1,0xbd]
 
     l.sfleu r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFLEU
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0xa1,0xe4]
 
     l.sfleui r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFLEU_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0xa1,0xbc]
 
     l.sflts r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFLTS_rr
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x81,0xe5]
 
     l.sfltsi r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFLTS_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x81,0xbd]
 
     l.sfltu r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFLTU_rr
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x81,0xe4]
 
     l.sfltui r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFLTU_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x81,0xbc]
 
     l.sfne r1, r2
-# CHECK: <MCInst #{{[0-9]+}} SFNE
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x21,0xe4]
 
     l.sfnei r1, 3
-# CHECK: <MCInst #{{[0-9]+}} SFNE_ri
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Imm:3>>
+# CHECK: # encoding: [0x03,0x00,0x21,0xbc]

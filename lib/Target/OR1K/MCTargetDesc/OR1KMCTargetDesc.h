@@ -15,9 +15,19 @@
 #define OR1KMCTARGETDESC_H
 
 namespace llvm {
+class MCCodeEmitter;
+class MCContext;
+class MCInstrInfo;
+class MCRegisterInfo;
+class MCSubtargetInfo;
 class Target;
 
 extern Target TheOR1KTarget;
+
+MCCodeEmitter *createOR1KMCCodeEmitter(const MCInstrInfo &MCII,
+                                       const MCRegisterInfo &MRI,
+                                       const MCSubtargetInfo &STI,
+                                       MCContext &Ctx);
 
 } // End llvm namespace
 

@@ -1,19 +1,10 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
 
-    l.sb 0(r2), r1
-# CHECK: <MCInst #{{[0-9]+}} SB
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.sb 4(r2), r1
+# CHECK: # encoding: [0x04,0x08,0x02,0xd8]
 
-    l.sh 0(r2), r1
-# CHECK: <MCInst #{{[0-9]+}} SH
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.sh 4(r2), r1
+# CHECK: # encoding: [0x04,0x08,0x02,0xdc]
 
-    l.sw 0(r2), r1
-# CHECK: <MCInst #{{[0-9]+}} SW
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.sw 4(r2), r1
+# CHECK: # encoding: [0x04,0x08,0x02,0xd4]

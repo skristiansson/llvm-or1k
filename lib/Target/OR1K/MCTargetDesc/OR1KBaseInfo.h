@@ -63,5 +63,44 @@ namespace OR1KII {
     MO_PLT
   };
 }
+
+static inline unsigned getOR1KRegisterNumbering(unsigned Reg) {
+  switch(Reg) {
+    case OR1K::R0  : return 0;
+    case OR1K::R1  : return 1;
+    case OR1K::R2  : return 2;
+    case OR1K::R3  : return 3;
+    case OR1K::R4  : return 4;
+    case OR1K::R5  : return 5;
+    case OR1K::R6  : return 6;
+    case OR1K::R7  : return 7;
+    case OR1K::R8  : return 8;
+    case OR1K::R9  : return 9;
+    case OR1K::R10 : return 10;
+    case OR1K::R11 : return 11;
+    case OR1K::R12 : return 12;
+    case OR1K::R13 : return 13;
+    case OR1K::R14 : return 14;
+    case OR1K::R15 : return 15;
+    case OR1K::R16 : return 16;
+    case OR1K::R17 : return 17;
+    case OR1K::R18 : return 18;
+    case OR1K::R19 : return 19;
+    case OR1K::R20 : return 20;
+    case OR1K::R21 : return 21;
+    case OR1K::R22 : return 22;
+    case OR1K::R23 : return 23;
+    case OR1K::R24 : return 24;
+    case OR1K::R25 : return 25;
+    case OR1K::R26 : return 26;
+    case OR1K::R27 : return 27;
+    case OR1K::R28 : return 28;
+    case OR1K::R29 : return 29;
+    case OR1K::R30 : return 30;
+    case OR1K::R31 : return 31;
+    default: llvm_unreachable("Unknown register number!");
+  }
+}
+
 }
 #endif

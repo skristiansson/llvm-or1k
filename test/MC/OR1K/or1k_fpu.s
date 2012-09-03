@@ -1,41 +1,22 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
 
     lf.add.s r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} ADDrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x00,0x18,0x22,0xc8]
 
     lf.div.s r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} DIVrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x03,0x18,0x22,0xc8]
 
     lf.ftoi.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} FTOIf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x05,0x00,0x22,0xc8]
 
     lf.itof.s r1, r2
-# CHECK: <MCInst #{{[0-9]+}} ITOFf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x04,0x00,0x22,0xc8]
 
     lf.mul.s r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} MULrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x02,0x18,0x22,0xc8]
 
     lf.rem.s r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} REMrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x06,0x18,0x22,0xc8]
 
     lf.sub.s r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} SUBrrf32
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x01,0x18,0x22,0xc8]

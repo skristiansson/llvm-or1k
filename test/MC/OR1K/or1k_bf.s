@@ -1,31 +1,22 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k --show-encoding %s | FileCheck %s
 
-    l.bf 0
-# CHECK: <MCInst #{{[0-9]+}} BF
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.bf 2048
+# CHECK: # encoding: [0x00,0x08,0x00,0x10]
 
-    l.bnf 0
-# CHECK: <MCInst #{{[0-9]+}} BNF
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.bnf 2048
+# CHECK: # encoding: [0x00,0x08,0x00,0x0c]
 
     l.cmov r1, r2, r3
-# CHECK: <MCInst #{{[0-9]+}} CMOV
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Reg:4>>
+# CHECK: # encoding: [0x0e,0x18,0x22,0xe0]
 
-    l.j 0
-# CHECK: <MCInst #{{[0-9]+}} J
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.j 2048
+# CHECK: # encoding: [0x00,0x08,0x00,0x00]
 
-    l.jal 0
-# CHECK: <MCInst #{{[0-9]+}} JAL
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.jal 2048
+# CHECK: # encoding: [0x00,0x08,0x00,0x04]
 
     l.jalr r2
-# CHECK: <MCInst #{{[0-9]+}} JALR
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x00,0x48]
 
     l.jr r2
-# CHECK: <MCInst #{{[0-9]+}} JR
-# CHECK-NEXT: <MCOperand Reg:3>>
+# CHECK: # encoding: [0x00,0x10,0x00,0x44]

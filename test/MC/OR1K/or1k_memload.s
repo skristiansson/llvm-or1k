@@ -1,31 +1,16 @@
-# RUN: llvm-mc -arch=or1k -show-inst %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
 
-    l.lbs r1, 0(r2)
-# CHECK: <MCInst #{{[0-9]+}} LBS
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.lbs r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x90]
 
-    l.lbz r1, 0(r2)
-# CHECK: <MCInst #{{[0-9]+}} LBZ
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.lbz r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x8c]
 
-    l.lhs r1, 0(r2)
-# CHECK: <MCInst #{{[0-9]+}} LHS
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.lhs r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x98]
 
-    l.lhz r1, 0(r2)
-# CHECK: <MCInst #{{[0-9]+}} LHZ
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.lhz r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x94]
 
-    l.lwz r1, 0(r2)
-# CHECK: <MCInst #{{[0-9]+}} LWZ
-# CHECK-NEXT: <MCOperand Reg:2>
-# CHECK-NEXT: <MCOperand Reg:3>
-# CHECK-NEXT: <MCOperand Imm:0>>
+    l.lwz r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x84]

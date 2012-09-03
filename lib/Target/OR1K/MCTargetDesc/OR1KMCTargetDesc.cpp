@@ -88,6 +88,10 @@ extern "C" void LLVMInitializeOR1KTargetMC() {
   TargetRegistry::RegisterMCSubtargetInfo(TheOR1KTarget,
                                           createOR1KMCSubtargetInfo);
 
+  // Register the MC code emitter
+  TargetRegistry::RegisterMCCodeEmitter(TheOR1KTarget,
+                                        llvm::createOR1KMCCodeEmitter);
+
   // Register the MCInstPrinter.
   TargetRegistry::RegisterMCInstPrinter(TheOR1KTarget,
                                         createOR1KMCInstPrinter);
