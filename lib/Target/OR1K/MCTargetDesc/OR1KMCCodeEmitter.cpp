@@ -32,11 +32,13 @@ class OR1KMCCodeEmitter : public MCCodeEmitter {
   OR1KMCCodeEmitter(const OR1KMCCodeEmitter &); // DO NOT IMPLEMENT
   void operator=(const OR1KMCCodeEmitter &); // DO NOT IMPLEMENT
   const MCInstrInfo &MCII;
+  const MCSubtargetInfo &STI;
+  MCContext &Ctx;
 
 public:
   OR1KMCCodeEmitter(const MCInstrInfo &mcii, const MCSubtargetInfo &sti,
                     MCContext &ctx)
-    : MCII(mcii) {
+    : MCII(mcii), STI(sti), Ctx(ctx) {
     }
 
   ~OR1KMCCodeEmitter() {}

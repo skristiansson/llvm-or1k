@@ -1,4 +1,4 @@
-# RUN: llvm-mc -arch=or1k --show-encoding %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -mattr=cmov --show-encoding %s | FileCheck %s
 
     l.bf 2048
 # CHECK: # encoding: [0x00,0x08,0x00,0x10]

@@ -10,8 +10,11 @@
 class InstOR1K<dag outs, dag ins, string asmstr, list<dag> pattern>
   : Instruction {
   field bits<32> Inst;
+  field bits<32> SoftFail = 0;
+  let Size = 4;
 
   let Namespace = "OR1K";
+  let DecoderNamespace = "OR1K";
 
   bits<2> optype;
   bits<4> opcode;

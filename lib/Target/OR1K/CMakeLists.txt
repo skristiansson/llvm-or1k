@@ -8,6 +8,8 @@ tablegen(LLVM OR1KGenCodeEmitter.inc -gen-emitter)
 tablegen(LLVM OR1KGenDAGISel.inc -gen-dag-isel)
 tablegen(LLVM OR1KGenCallingConv.inc -gen-callingconv)
 tablegen(LLVM OR1KGenSubtargetInfo.inc -gen-subtarget)
+tablegen(LLVM OR1KGenDisassemblerTables.inc -gen-disassembler)
+tablegen(LLVM OR1KGenEDInfo.inc -gen-enhanced-disassembly-info)
 add_public_tablegen_target(OR1KCommonTableGen)
 
 add_llvm_target(OR1KCodeGen
@@ -26,6 +28,7 @@ add_llvm_target(OR1KCodeGen
   )
 
 add_subdirectory(InstPrinter)
+add_subdirectory(Disassembler)
 add_subdirectory(TargetInfo)
 add_subdirectory(MCTargetDesc)
 add_subdirectory(AsmParser)

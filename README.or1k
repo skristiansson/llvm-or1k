@@ -17,6 +17,7 @@ Run tests
 ---------
 make check
 make TESTSUITE=CodeGen/OR1K check
+make TESTSUITE=MC/OR1K check
 
 or
 

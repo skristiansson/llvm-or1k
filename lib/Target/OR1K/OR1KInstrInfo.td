@@ -107,6 +107,7 @@ def ADDRri : ComplexPattern<i32, 2, "SelectAddr", [frameindex], []>;
 def MEMri : Operand<i32> {
   let PrintMethod = "printMemOperand";
   let EncoderMethod = "getMemoryOpValue";
+  let DecoderMethod = "DecodeMemoryValue";
   let MIOperandInfo = (ops GPR, i32imm);
 }
 
@@ -152,11 +153,16 @@ def OR1K_COND     : PatLeaf<(i32 0)>;
 def OR1K_COND_NEG : PatLeaf<(i32 1)>;
 
 // Feature support predicates
-def HasDiv       : Predicate<"Subtarget.hasDiv()">;
-def HasMul       : Predicate<"Subtarget.hasMul()">;
-def HasRor       : Predicate<"Subtarget.hasRor()">;
-def HasCmov      : Predicate<"Subtarget.hasCmov()">;
-def NoCmov       : Predicate<"!Subtarget.hasCmov()">;
+def HasDiv       : Predicate<"Subtarget.hasDiv()">,
+                   AssemblerPredicate<"FeatureDiv">;
+def HasMul       : Predicate<"Subtarget.hasMul()">,
+                   AssemblerPredicate<"FeatureMul">;
+def HasRor       : Predicate<"Subtarget.hasRor()">,
+                   AssemblerPredicate<"FeatureRor">;
+def HasCmov      : Predicate<"Subtarget.hasCmov()">,
+                   AssemblerPredicate<"FeatureCmov">;
+def NoCmov       : Predicate<"!Subtarget.hasCmov()">,
+                   AssemblerPredicate<"!FeatureCmov">;
 
 
 // -------------------------------------------------- //
@@ -519,10 +525,10 @@ class NOP_I<bits<2> op2Val, string asmstr>
   : InstBI<0x5, (outs), (ins i16imm:$imm),
            !strconcat(asmstr, "\t$imm"), []> {
   bits<2> op2;
-  bits<16> imm16;
+  bits<16> imm;
 
   let Inst{25-24} = op2;
-  let Inst{15-0} = imm16;
+  let Inst{15-0} = imm;
 
   let op2 = op2Val;
 }
@@ -530,7 +536,8 @@ class NOP_I<bits<2> op2Val, string asmstr>
 let neverHasSideEffects = 1 in
   def NOP : NOP_I<0x1, "l.nop">;
 
-let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1 in {
+// FIXME: Do not use isCodeGenOnly = 1 to resolve conflicts
+let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1, isCodeGenOnly = 1 in {
   def RET : InstBR<0x1, (outs), (ins),
                    "l.jr\tr9",
                    [(retflag)]>;

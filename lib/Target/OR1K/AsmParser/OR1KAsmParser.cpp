@@ -12,6 +12,7 @@
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/MC/MCTargetAsmParser.h"
 #include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -24,6 +25,7 @@ class OR1KAsmParser : public MCTargetAsmParser {
   MCAsmParser &Parser;
   MCAsmParser &getParser() const { return Parser; }
   MCAsmLexer &getLexer() const { return Parser.getLexer(); }
+  MCSubtargetInfo &STI;
 
   bool MatchAndEmitInstruction(SMLoc IDLoc,
                                SmallVectorImpl<MCParsedAsmOperand*> &Operands,
@@ -48,7 +50,8 @@ class OR1KAsmParser : public MCTargetAsmParser {
 
 public:
   OR1KAsmParser(MCSubtargetInfo &sti, MCAsmParser &_Parser)
-    : MCTargetAsmParser(), Parser(_Parser) {
+    : MCTargetAsmParser(), Parser(_Parser), STI(sti) {
+      setAvailableFeatures(ComputeAvailableFeatures(STI.getFeatureBits()));
   }
 
 };

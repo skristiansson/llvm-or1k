@@ -1,4 +1,4 @@
-# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
+# RUN: llvm-mc -arch=or1k -mattr=mul,div,ror -show-encoding %s | FileCheck %s
 
     l.add r1, r2, r3
 # CHECK: # encoding: [0x00,0x18,0x22,0xe0]
