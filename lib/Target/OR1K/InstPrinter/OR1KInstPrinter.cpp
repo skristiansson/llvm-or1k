@@ -72,8 +72,12 @@ void OR1KInstPrinter::printMemOperand(const MCInst *MI, int OpNo,
   const MCOperand &RegOp = MI->getOperand(OpNo);
   const MCOperand &OffsetOp = MI->getOperand(OpNo+1);
   // offset
-  assert(OffsetOp.isImm() && "Offset operand not an immediate");
-  O << OffsetOp.getImm();
+  if (OffsetOp.isImm()) {
+    O << OffsetOp.getImm();
+  } else {
+    assert(OffsetOp.isExpr() && "Expected an expression");
+    printExpr(OffsetOp.getExpr(), O);
+  }
   // register
   assert(RegOp.isReg() && "Register operand not a register");
   O  << "(" << getRegisterName(RegOp.getReg()) << ")";

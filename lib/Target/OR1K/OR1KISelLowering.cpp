@@ -1050,11 +1050,19 @@ SDValue OR1KTargetLowering::LowerGlobalAddress(SDValue Op,
   const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
   int64_t Offset = cast<GlobalAddressSDNode>(Op)->getOffset();
   bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
+
+  // Load GlobalAddress from GOT
+  if (IsPIC && !GV->hasLocalLinkage() && !GV->hasHiddenVisibility()) {
+    SDValue GA = DAG.getTargetGlobalAddress(GV, dl, getPointerTy(), Offset,
+                                            OR1KII::MO_GOT);
+    return DAG.getLoad(getPointerTy(), dl, DAG.getEntryNode(), GA,
+                       MachinePointerInfo(), false, false, false, 0);
+  }
+
   uint8_t OpFlagHi = IsPIC ? OR1KII::MO_GOTOFFHI : OR1KII::MO_ABS_HI;
   uint8_t OpFlagLo = IsPIC ? OR1KII::MO_GOTOFFLO : OR1KII::MO_ABS_LO;
-
   // Create the TargetGlobalAddress node, folding in the constant offset.
-  SDValue Hi = DAG.getTargetGlobalAddress(GV, dl, getPointerTy(),Offset,
+  SDValue Hi = DAG.getTargetGlobalAddress(GV, dl, getPointerTy(), Offset,
                                           OpFlagHi);
   SDValue Lo = DAG.getTargetGlobalAddress(GV, dl, getPointerTy(), Offset,
                                           OpFlagLo);
