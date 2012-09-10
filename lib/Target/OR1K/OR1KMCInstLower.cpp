@@ -40,6 +40,7 @@ GetGlobalAddressSymbol(const MachineOperand &MO) const {
   case OR1KII::MO_GOTPCLO:
   case OR1KII::MO_GOTOFFHI:
   case OR1KII::MO_GOTOFFLO:
+  case OR1KII::MO_GOT:
     break;
   }
 
@@ -58,6 +59,7 @@ GetExternalSymbolSymbol(const MachineOperand &MO) const {
   case OR1KII::MO_GOTPCLO:
   case OR1KII::MO_GOTOFFHI:
   case OR1KII::MO_GOTOFFLO:
+  case OR1KII::MO_GOT:
     break;
   }
 
@@ -81,6 +83,7 @@ GetJumpTableSymbol(const MachineOperand &MO) const {
   case OR1KII::MO_GOTPCLO:
   case OR1KII::MO_GOTOFFHI:
   case OR1KII::MO_GOTOFFLO:
+  case OR1KII::MO_GOT:
     break;
   }
 
@@ -105,6 +108,7 @@ GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
   case OR1KII::MO_GOTPCLO:
   case OR1KII::MO_GOTOFFHI:
   case OR1KII::MO_GOTOFFLO:
+  case OR1KII::MO_GOT:
     break;
   }
 
@@ -126,6 +130,7 @@ LowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym) const {
   case OR1KII::MO_GOTPCLO:  Kind = MCSymbolRefExpr::VK_OR1K_GOTPCLO; break;
   case OR1KII::MO_GOTOFFHI: Kind = MCSymbolRefExpr::VK_OR1K_GOTOFFHI; break;
   case OR1KII::MO_GOTOFFLO: Kind = MCSymbolRefExpr::VK_OR1K_GOTOFFLO; break;
+  case OR1KII::MO_GOT:      Kind = MCSymbolRefExpr::VK_OR1K_GOT; break;
   }
 
   const MCExpr *Expr = MCSymbolRefExpr::Create(Sym, Kind, Ctx);
