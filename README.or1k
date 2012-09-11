@@ -28,3 +28,4 @@ TODO (not a complete list)
 - Handle unconditional branches in AnalyzeBranch
 - Floating point support
 - Integrated assembler support
+- Relocations

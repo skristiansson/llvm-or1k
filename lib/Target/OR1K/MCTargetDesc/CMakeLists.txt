@@ -1,7 +1,8 @@
 add_llvm_library(LLVMOR1KDesc
-  OR1KMCTargetDesc.cpp
+  OR1KAsmBackend.cpp
   OR1KMCAsmInfo.cpp
   OR1KMCCodeEmitter.cpp
+  OR1KMCTargetDesc.cpp
   )
 
 add_dependencies(LLVMOR1KDesc OR1KCommonTableGen)

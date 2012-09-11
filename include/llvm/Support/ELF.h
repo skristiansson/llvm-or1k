@@ -765,6 +765,17 @@ enum {
   R_HEX_TPREL_11_X        =  85
 };
 
+// ELF Relocation Types for OpenRISC 1000
+enum {
+  R_OR32_NONE     = 0,
+  R_OR32_32       = 1,
+  R_OR32_16       = 2,
+  R_OR32_8        = 3,
+  R_OR32_CONST    = 4,
+  R_OR32_CONSTH   = 5,
+  R_OR32_JUMPTARG = 6
+};
+
 // Section header.
 struct Elf32_Shdr {
   Elf32_Word sh_name;      // Section name (index into string table)

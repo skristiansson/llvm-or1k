@@ -17,6 +17,7 @@
 #include "llvm/MC/MCCodeGenInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
+#include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -59,6 +60,25 @@ static MCCodeGenInfo *createOR1KMCCodeGenInfo(StringRef TT, Reloc::Model RM,
   return X;
 }
 
+static MCStreamer *createOR1KMCStreamer(const Target &T, StringRef TT,
+                                    MCContext &Ctx, MCAsmBackend &MAB,
+                                    raw_ostream &_OS,
+                                    MCCodeEmitter *_Emitter,
+                                    bool RelaxAll,
+                                    bool NoExecStack) {
+  Triple TheTriple(TT);
+
+  if (TheTriple.isOSDarwin()) {
+    llvm_unreachable("OR1K does not support Darwin MACH-O format");
+  }
+
+  if (TheTriple.isOSWindows()) {
+    llvm_unreachable("OR1K does not support Windows COFF format");
+  }
+
+  return createELFStreamer(Ctx, MAB, _OS, _Emitter, RelaxAll, NoExecStack);
+}
+
 static MCInstPrinter *createOR1KMCInstPrinter(const Target &T,
                                               unsigned SyntaxVariant,
                                               const MCAsmInfo &MAI,
@@ -91,6 +111,15 @@ extern "C" void LLVMInitializeOR1KTargetMC() {
   // Register the MC code emitter
   TargetRegistry::RegisterMCCodeEmitter(TheOR1KTarget,
                                         llvm::createOR1KMCCodeEmitter);
+
+  // Register the ASM Backend
+  TargetRegistry::RegisterMCAsmBackend(TheOR1KTarget,
+                                       createOR1KAsmBackend);
+
+  // Register the object streamer
+  TargetRegistry::RegisterMCObjectStreamer(TheOR1KTarget,
+                                           createOR1KMCStreamer);
+
 
   // Register the MCInstPrinter.
   TargetRegistry::RegisterMCInstPrinter(TheOR1KTarget,
