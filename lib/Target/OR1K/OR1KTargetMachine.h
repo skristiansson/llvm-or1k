@@ -20,6 +20,7 @@
 #include "OR1KSelectionDAGInfo.h"
 //#include "OR1KIntrinsicInfo.h"
 #include "OR1KFrameLowering.h"
+#include "OR1KELFWriterInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameLowering.h"
@@ -34,6 +35,7 @@ namespace llvm {
     OR1KTargetLowering  TLInfo;
     OR1KSelectionDAGInfo TSInfo;
     OR1KFrameLowering   FrameLowering;
+    OR1KELFWriterInfo   ELFWriterInfo;
 /*    OR1KIntrinsicInfo IntrinsicInfo;*/
   public:
     OR1KTargetMachine(const Target &T, StringRef TT,
@@ -62,6 +64,9 @@ namespace llvm {
 
     virtual const OR1KSelectionDAGInfo* getSelectionDAGInfo() const
     { return &TSInfo; }
+
+    virtual const OR1KELFWriterInfo *getELFWriterInfo() const
+    { return &ELFWriterInfo; }
 
 
 /*    const TargetIntrinsicInfo *getIntrinsicInfo() const

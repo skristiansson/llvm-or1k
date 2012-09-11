@@ -17,6 +17,7 @@ Run tests
 ---------
 make check
 make TESTSUITE=CodeGen/OR1K check
+make TESTSUITE=MC/OR1K check
 
 or
 
@@ -27,3 +28,4 @@ TODO (not a complete list)
 - Handle unconditional branches in AnalyzeBranch
 - Floating point support
 - Integrated assembler support
+- Relocations

@@ -1,0 +1,22 @@
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
+
+    lf.add.s r1, r2, r3
+# CHECK: # encoding: [0x00,0x18,0x22,0xc8]
+
+    lf.div.s r1, r2, r3
+# CHECK: # encoding: [0x03,0x18,0x22,0xc8]
+
+    lf.ftoi.s r1, r2
+# CHECK: # encoding: [0x05,0x00,0x22,0xc8]
+
+    lf.itof.s r1, r2
+# CHECK: # encoding: [0x04,0x00,0x22,0xc8]
+
+    lf.mul.s r1, r2, r3
+# CHECK: # encoding: [0x02,0x18,0x22,0xc8]
+
+    lf.rem.s r1, r2, r3
+# CHECK: # encoding: [0x06,0x18,0x22,0xc8]
+
+    lf.sub.s r1, r2, r3
+# CHECK: # encoding: [0x01,0x18,0x22,0xc8]

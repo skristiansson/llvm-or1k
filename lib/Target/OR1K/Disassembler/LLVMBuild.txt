@@ -1,4 +1,4 @@
-;===- ./lib/Target/OR1K/LLVMBuild.txt --------------------------*- Conf -*--===;
+;===- ./lib/Target/OR1K/Disassembler/LLVMBuild.txt -------------*- Conf -*--===;
 ;
 ;                     The LLVM Compiler Infrastructure
 ;
@@ -15,20 +15,9 @@
 ;
 ;===------------------------------------------------------------------------===;
 
-[common]
-subdirectories = AsmParser Disassembler InstPrinter MCTargetDesc TargetInfo
-
 [component_0]
-type = TargetGroup
-name = OR1K
-parent = Target
-has_asmparser = 1
-has_asmprinter = 1
-has_disassembler = 1
-
-[component_1]
 type = Library
-name = OR1KCodeGen
+name = OR1KDisassembler
 parent = OR1K
-required_libraries = AsmPrinter CodeGen Core MC OR1KAsmPrinter SelectionDAG OR1KDesc OR1KInfo Support Target
+required_libraries = MC Support OR1KInfo
 add_to_library_groups = OR1K

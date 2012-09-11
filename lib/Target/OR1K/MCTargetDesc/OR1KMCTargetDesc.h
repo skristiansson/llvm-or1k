@@ -14,11 +14,30 @@
 #ifndef OR1KMCTARGETDESC_H
 #define OR1KMCTARGETDESC_H
 
+#include "llvm/Support/DataTypes.h"
+
 namespace llvm {
+class MCAsmBackend;
+class MCCodeEmitter;
+class MCContext;
+class MCInstrInfo;
+class MCObjectWriter;
+class MCRegisterInfo;
+class MCSubtargetInfo;
 class Target;
+class StringRef;
+class raw_ostream;
 
 extern Target TheOR1KTarget;
 
+MCCodeEmitter *createOR1KMCCodeEmitter(const MCInstrInfo &MCII,
+                                       const MCRegisterInfo &MRI,
+                                       const MCSubtargetInfo &STI,
+                                       MCContext &Ctx);
+
+MCAsmBackend *createOR1KAsmBackend(const Target &T, StringRef TT);
+
+MCObjectWriter *createOR1KELFObjectWriter(raw_ostream &OS, uint8_t OSABI);
 } // End llvm namespace
 
 // Defines symbolic names for OR1K registers.  This defines a mapping from

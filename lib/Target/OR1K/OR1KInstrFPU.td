@@ -90,6 +90,7 @@ class SetFlagFRR<bits<8> subOp, string asmstr, PatLeaf Cond>
   let Inst{15-11} = rB;
 }
 
+// FIXME: Do not use isCodeGenOnly = 1 to resolve conflicts
 let Defs = [SR], hasSideEffects = 1 in {
   def SFEQrrf32 : SetFlagFRR<0x08, "lf.sfeq.s", OR1K_CC_EQ>;
   def SFNErrf32 : SetFlagFRR<0x09, "lf.sfne.s", OR1K_CC_NE>;
@@ -97,15 +98,18 @@ let Defs = [SR], hasSideEffects = 1 in {
   def SFGErrf32 : SetFlagFRR<0x0b, "lf.sfge.s", OR1K_CC_GE>;
   def SFLTrrf32 : SetFlagFRR<0x0c, "lf.sflt.s", OR1K_CC_LT>;
   def SFLErrf32 : SetFlagFRR<0x0d, "lf.sfle.s", OR1K_CC_LE>;
-  def SFEQOrrf32 : SetFlagFRR<0x08, "lf.sfeq.s", OR1K_CC_EQO>;
-  def SFNEOrrf32 : SetFlagFRR<0x09, "lf.sfne.s", OR1K_CC_NEO>;
-  def SFGTOrrf32 : SetFlagFRR<0x0a, "lf.sfgt.s", OR1K_CC_GTO>;
-  def SFGEOrrf32 : SetFlagFRR<0x0b, "lf.sfge.s", OR1K_CC_GEO>;
-  def SFLTOrrf32 : SetFlagFRR<0x0c, "lf.sflt.s", OR1K_CC_LTO>;
-  def SFLEOrrf32 : SetFlagFRR<0x0d, "lf.sfle.s", OR1K_CC_LEO>;
+  let isCodeGenOnly = 1 in {
+    def SFEQOrrf32 : SetFlagFRR<0x08, "lf.sfeq.s", OR1K_CC_EQO>;
+    def SFNEOrrf32 : SetFlagFRR<0x09, "lf.sfne.s", OR1K_CC_NEO>;
+    def SFGTOrrf32 : SetFlagFRR<0x0a, "lf.sfgt.s", OR1K_CC_GTO>;
+    def SFGEOrrf32 : SetFlagFRR<0x0b, "lf.sfge.s", OR1K_CC_GEO>;
+    def SFLTOrrf32 : SetFlagFRR<0x0c, "lf.sflt.s", OR1K_CC_LTO>;
+    def SFLEOrrf32 : SetFlagFRR<0x0d, "lf.sfle.s", OR1K_CC_LEO>;
+  }
 }
 
-let Uses = [SR], Predicates = [HasCmov] in
+// FIXME: Do not use isCodeGenOnly = 1 to resolve conflicts
+let Uses = [SR], Predicates = [HasCmov], isCodeGenOnly = 1 in
   def CMOVf32 : ALU_RR<0xe, "l.cmov",
            [(set GPR:$rD, (OR1Kselectcc (f32 GPR:$rA),(f32 GPR:$rB)))]>;
 
@@ -119,14 +123,18 @@ class LOADf32<bits<4> subop, string asmstring, PatFrag opNode>
 class STOREf32<bits<4> subOp, string asmstring, PatFrag opNode>
   : STORE<subOp, asmstring, [(opNode (f32 GPR:$rB), ADDRri:$dst)]>;
 
+// FIXME: Do not use isCodeGenOnly = 1 to resolve conflicts
+let isCodeGenOnly = 1 in {
 def LWZf32 : LOADf32<0x1, "l.lwz", load>;
 def SWf32 : STOREf32<0x5, "l.sw", store>;
+}
 
 //===----------------------------------------------------------------------===//
 // Non-fpu instructions with fp immediates
 //===----------------------------------------------------------------------===//
 
-let isAsCheapAsAMove = 1 in {
+// FIXME: Do not use isCodeGenOnly = 1 to resolve conflicts
+let isAsCheapAsAMove = 1, isCodeGenOnly = 1 in {
   def MOVHIf32 : MOVHI_I<(outs GPR:$rD), (ins fimm:$imm),
                          [(set GPR:$rD, f32hi16:$imm)]>;
   def ORIf32 : ALU_RI<0xa, (outs GPR:$rD), (ins GPR:$rA, fimm:$imm),

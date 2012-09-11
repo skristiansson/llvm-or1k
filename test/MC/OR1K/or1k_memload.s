@@ -1,0 +1,16 @@
+# RUN: llvm-mc -arch=or1k -show-encoding %s | FileCheck %s
+
+    l.lbs r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x90]
+
+    l.lbz r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x8c]
+
+    l.lhs r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x98]
+
+    l.lhz r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x94]
+
+    l.lwz r1, 4(r2)
+# CHECK: # encoding: [0x04,0x00,0x22,0x84]
