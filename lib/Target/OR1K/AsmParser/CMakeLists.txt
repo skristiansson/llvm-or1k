@@ -1,4 +1,4 @@
-add_lvm_library(LLVMOR1KASMParser
+add_llvm_library(LLVMOR1KAsmParser
   OR1KAsmParser.cpp
   )
 
