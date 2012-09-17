@@ -71,10 +71,10 @@ static DecodeStatus readInstruction32(const MemoryObject &region,
   }
 
   // Encoded as big-endian 32-bit word in the stream.
-  insn = (Bytes[0] <<  0) |
-         (Bytes[1] <<  8) |
-         (Bytes[2] << 16) |
-         (Bytes[3] << 24);
+  insn = (Bytes[0] << 24) |
+         (Bytes[1] << 16) |
+         (Bytes[2] <<  8) |
+         (Bytes[3] <<  0);
 
   return MCDisassembler::Success;
 }

@@ -62,8 +62,8 @@ public:
     ++CurByte;
   }
 
-  // Emit a series of bytes (from MCBlazeMCCodeEmitter)
-  void EmitConstant(uint64_t Val, unsigned Size, unsigned &CurByte,
+  // Emit a series of bytes (little endian) (from MCBlazeMCCodeEmitter)
+  void EmitLEConstant(uint64_t Val, unsigned Size, unsigned &CurByte,
                     raw_ostream &OS) const {
     assert(Size <= 8 && "size too big in emit constant");
 
@@ -71,7 +71,16 @@ public:
       EmitByte(Val & 255, CurByte, OS);
       Val >>= 8;
     }
-  }  
+  }
+
+  // Emit a series of bytes (big endian)
+  void EmitBEConstant(uint64_t Val, unsigned Size, unsigned &CurByte,
+                      raw_ostream &OS) const {
+    assert(Size <= 8 && "size too big in emit constant");
+
+    for (int i = (Size-1)*8; i >= 0; i-=8)
+      EmitByte((Val >> i) & 255, CurByte, OS);
+  }
 
   void EncodeInstruction(const MCInst &MI, raw_ostream &OS,
                          SmallVectorImpl<MCFixup> &Fixups) const;
@@ -110,7 +119,7 @@ EncodeInstruction(const MCInst &MI, raw_ostream &OS,
   // Get instruction encoding and emit it
   ++MCNumEmitted;       // Keep track of the number of emitted insns.
   unsigned Value = getBinaryCodeForInstr(MI);
-  EmitConstant(Value, 4, CurByte, OS);
+  EmitBEConstant(Value, 4, CurByte, OS);
 }
 #include <stdio.h>
 // Encode OR1K Memory Operand
