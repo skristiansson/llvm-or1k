@@ -767,13 +767,28 @@ enum {
 
 // ELF Relocation Types for OpenRISC 1000
 enum {
-  R_OR32_NONE     = 0,
-  R_OR32_32       = 1,
-  R_OR32_16       = 2,
-  R_OR32_8        = 3,
-  R_OR32_CONST    = 4,
-  R_OR32_CONSTH   = 5,
-  R_OR32_JUMPTARG = 6
+  R_OR1K_NONE          =  0,
+  R_OR1K_32            =  1,
+  R_OR1K_16            =  2,
+  R_OR1K_8             =  3,
+  R_OR1K_LO_16_IN_INSN =  4,
+  R_OR1K_HI_16_IN_INSN =  5,
+  R_OR1K_INSN_REL_26   =  6,
+  R_OR1K_GNU_VTENTRY   =  7,
+  R_OR1K_GNU_VTINHERIT =  8,
+  R_OR1K_32_PCREL      =  9,
+  R_OR1K_16_PCREL      = 10,
+  R_OR1K_8_PCREL       = 11,
+  R_OR1K_GOTPC_HI16    = 12,
+  R_OR1K_GOTPC_LO16    = 13,
+  R_OR1K_GOT16         = 14,
+  R_OR1K_PLT26         = 15,
+  R_OR1K_GOTOFF_HI16   = 16,
+  R_OR1K_GOTOFF_LO16   = 17,
+  R_OR1K_COPY          = 18,
+  R_OR1K_GLOB_DAT      = 19,
+  R_OR1K_JMP_SLOT      = 20,
+  R_OR1K_RELATIVE      = 21
 };
 
 // Section header.
