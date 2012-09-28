@@ -66,6 +66,7 @@ OR1KTargetLowering::OR1KTargetLowering(OR1KTargetMachine &tm) :
   setOperationAction(ISD::SELECT_CC,         MVT::f32, Custom);
 
   setOperationAction(ISD::GlobalAddress,     MVT::i32, Custom);
+  setOperationAction(ISD::BlockAddress,      MVT::i32, Custom);
   setOperationAction(ISD::JumpTable,         MVT::i32, Custom);
   setOperationAction(ISD::ConstantPool,      MVT::i32, Custom);
   if (!TM.Options.UseSoftFloat)
@@ -150,6 +151,7 @@ SDValue OR1KTargetLowering::LowerOperation(SDValue Op,
   case ISD::BR_CC:              return LowerBR_CC(Op, DAG);
   case ISD::ConstantPool:       return LowerConstantPool(Op, DAG);
   case ISD::GlobalAddress:      return LowerGlobalAddress(Op, DAG);
+  case ISD::BlockAddress:       return LowerBlockAddress(Op, DAG);
   case ISD::JumpTable:          return LowerJumpTable(Op, DAG);
   case ISD::SELECT_CC:          return LowerSELECT_CC(Op, DAG);
   case ISD::VASTART:            return LowerVASTART(Op, DAG);
@@ -1066,6 +1068,25 @@ SDValue OR1KTargetLowering::LowerGlobalAddress(SDValue Op,
                                           OpFlagHi);
   SDValue Lo = DAG.getTargetGlobalAddress(GV, dl, getPointerTy(), Offset,
                                           OpFlagLo);
+  Hi = DAG.getNode(OR1KISD::HI, dl, MVT::i32, Hi);
+  Lo = DAG.getNode(OR1KISD::LO, dl, MVT::i32, Lo);
+  SDValue Result = DAG.getNode(ISD::OR, dl, MVT::i32, Hi, Lo);
+  if (IsPIC)
+    Result = DAG.getNode(ISD::ADD, dl, MVT::i32, Result,
+                         getGlobalReg(DAG, MVT::i32));
+  return Result;
+}
+
+SDValue OR1KTargetLowering::LowerBlockAddress(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  DebugLoc dl = Op.getDebugLoc();
+  const BlockAddress *BA = cast<BlockAddressSDNode>(Op)->getBlockAddress();
+  bool IsPIC = getTargetMachine().getRelocationModel() == Reloc::PIC_;
+  uint8_t OpFlagHi = IsPIC ? OR1KII::MO_GOTOFFHI : OR1KII::MO_ABS_HI;
+  uint8_t OpFlagLo = IsPIC ? OR1KII::MO_GOTOFFLO : OR1KII::MO_ABS_LO;
+
+  SDValue Hi = DAG.getBlockAddress(BA, MVT::i32, true, OpFlagHi);
+  SDValue Lo = DAG.getBlockAddress(BA, MVT::i32, true, OpFlagLo);
   Hi = DAG.getNode(OR1KISD::HI, dl, MVT::i32, Hi);
   Lo = DAG.getNode(OR1KISD::LO, dl, MVT::i32, Lo);
   SDValue Result = DAG.getNode(ISD::OR, dl, MVT::i32, Hi, Lo);

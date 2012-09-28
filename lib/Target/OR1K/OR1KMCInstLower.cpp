@@ -34,6 +34,11 @@ GetGlobalAddressSymbol(const MachineOperand &MO) const {
 }
 
 MCSymbol *OR1KMCInstLower::
+GetBlockAddressSymbol(const MachineOperand &MO) const {
+  return Printer.GetBlockAddressSymbol(MO.getBlockAddress());
+}
+
+MCSymbol *OR1KMCInstLower::
 GetExternalSymbolSymbol(const MachineOperand &MO) const {
   return Printer.GetExternalSymbolSymbol(MO.getSymbolName());
 }
@@ -118,6 +123,9 @@ void OR1KMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
       continue;
     case MachineOperand::MO_GlobalAddress:
       MCOp = LowerSymbolOperand(MO, GetGlobalAddressSymbol(MO));
+      break;
+    case MachineOperand::MO_BlockAddress:
+      MCOp = LowerSymbolOperand(MO, GetBlockAddressSymbol(MO));
       break;
     case MachineOperand::MO_ExternalSymbol:
       MCOp = LowerSymbolOperand(MO, GetExternalSymbolSymbol(MO));
