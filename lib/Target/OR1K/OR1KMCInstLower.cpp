@@ -30,39 +30,11 @@ using namespace llvm;
 
 MCSymbol *OR1KMCInstLower::
 GetGlobalAddressSymbol(const MachineOperand &MO) const {
-  switch (MO.getTargetFlags()) {
-  default: llvm_unreachable("Unknown target flag on GV operand");
-  case OR1KII::MO_NO_FLAG:
-  case OR1KII::MO_ABS_HI:
-  case OR1KII::MO_ABS_LO:
-  case OR1KII::MO_PLT:
-  case OR1KII::MO_GOTPCHI:
-  case OR1KII::MO_GOTPCLO:
-  case OR1KII::MO_GOTOFFHI:
-  case OR1KII::MO_GOTOFFLO:
-  case OR1KII::MO_GOT:
-    break;
-  }
-
   return Printer.Mang->getSymbol(MO.getGlobal());
 }
 
 MCSymbol *OR1KMCInstLower::
 GetExternalSymbolSymbol(const MachineOperand &MO) const {
-  switch (MO.getTargetFlags()) {
-  default: llvm_unreachable("Unknown target flag on GV operand");
-  case OR1KII::MO_NO_FLAG:
-  case OR1KII::MO_ABS_HI:
-  case OR1KII::MO_ABS_LO:
-  case OR1KII::MO_PLT:
-  case OR1KII::MO_GOTPCHI:
-  case OR1KII::MO_GOTPCLO:
-  case OR1KII::MO_GOTOFFHI:
-  case OR1KII::MO_GOTOFFLO:
-  case OR1KII::MO_GOT:
-    break;
-  }
-
   return Printer.GetExternalSymbolSymbol(MO.getSymbolName());
 }
 
@@ -72,21 +44,6 @@ GetJumpTableSymbol(const MachineOperand &MO) const {
   raw_svector_ostream(Name) << Printer.MAI->getPrivateGlobalPrefix() << "JTI"
                             << Printer.getFunctionNumber() << '_'
                             << MO.getIndex();
-
-  switch (MO.getTargetFlags()) {
-  default: llvm_unreachable("Unknown target flag on GV operand");
-  case OR1KII::MO_NO_FLAG:
-  case OR1KII::MO_ABS_HI:
-  case OR1KII::MO_ABS_LO:
-  case OR1KII::MO_PLT:
-  case OR1KII::MO_GOTPCHI:
-  case OR1KII::MO_GOTPCLO:
-  case OR1KII::MO_GOTOFFHI:
-  case OR1KII::MO_GOTOFFLO:
-  case OR1KII::MO_GOT:
-    break;
-  }
-
   // Create a symbol for the name.
   return Ctx.GetOrCreateSymbol(Name.str());
 }
@@ -97,21 +54,6 @@ GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
   raw_svector_ostream(Name) << Printer.MAI->getPrivateGlobalPrefix() << "CPI"
                             << Printer.getFunctionNumber() << '_'
                             << MO.getIndex();
-
-  switch (MO.getTargetFlags()) {
-  default: llvm_unreachable("Unknown target flag on GV operand");
-  case OR1KII::MO_NO_FLAG:
-  case OR1KII::MO_ABS_HI:
-  case OR1KII::MO_ABS_LO:
-  case OR1KII::MO_PLT:
-  case OR1KII::MO_GOTPCHI:
-  case OR1KII::MO_GOTPCLO:
-  case OR1KII::MO_GOTOFFHI:
-  case OR1KII::MO_GOTOFFLO:
-  case OR1KII::MO_GOT:
-    break;
-  }
-
   // Create a symbol for the name.
   return Ctx.GetOrCreateSymbol(Name.str());
 }
