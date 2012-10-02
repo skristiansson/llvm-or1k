@@ -226,13 +226,21 @@ void OR1KFrameLowering::emitEpilogue(MachineFunction &MF,
     // l.lwz  r2, stack_loc(r1)
     BuildMI(MBB, MBBI, dl, TII.get(OR1K::LWZ), OR1K::R2)
       .addReg(OR1K::R1).addImm(FPOffset);
-  } else {
-    assert(isInt<16>(StackSize) && "Offset to large for imm");
+  } else if (isInt<16>(StackSize)) {
     // l.addi r1, r1, imm
     if (StackSize) {
       BuildMI(MBB, MBBI, dl, TII.get(OR1K::ADDI), OR1K::R1)
         .addReg(OR1K::R1).addImm(StackSize);
     }
+  } else {
+    // FIXME: Allocate a scratch register.
+    unsigned ScratchReg = OR1K::R13;
+    BuildMI(MBB, MBBI, dl, TII.get(OR1K::MOVHI), ScratchReg)
+      .addImm((uint32_t)StackSize >> 16);
+    BuildMI(MBB, MBBI, dl, TII.get(OR1K::ORI), ScratchReg)
+      .addReg(ScratchReg).addImm(StackSize & 0xffffU);
+    BuildMI(MBB, MBBI, dl, TII.get(OR1K::ADD), OR1K::R1)
+      .addReg(OR1K::R1).addReg(ScratchReg);
   }
 
   // l.lwz basereg, stack_loc(r1)
