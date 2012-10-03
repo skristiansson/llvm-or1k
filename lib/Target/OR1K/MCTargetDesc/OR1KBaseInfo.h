@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains small standalone helper functions and enum definitions for
-// the Mips target useful for the compiler back-end and the MC libraries.
+// the OR1K target useful for the compiler back-end and the MC libraries.
 //
 //===----------------------------------------------------------------------===//
 #ifndef OR1KBASEINFO_H

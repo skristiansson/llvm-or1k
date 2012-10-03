@@ -537,7 +537,7 @@ let neverHasSideEffects = 1 in
   def NOP : NOP_I<0x1, "l.nop">;
 
 // FIXME: Do not use isCodeGenOnly = 1 to resolve conflicts
-let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1, isCodeGenOnly = 1 in {
+let isReturn = 1, isTerminator = 1, hasDelaySlot=1, isBarrier = 1, isCodeGenOnly = 1, Inst = 0x44004800 in {
   def RET : InstBR<0x1, (outs), (ins),
                    "l.jr\tr9",
                    [(retflag)]>;

@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MBLAZESELECTIONDAGINFO_H
-#define MBLAZESELECTIONDAGINFO_H
+#ifndef OR1KSELECTIONDAGINFO_H
+#define OR1KSELECTIONDAGINFO_H
 
 #include "llvm/Target/TargetSelectionDAGInfo.h"
 
