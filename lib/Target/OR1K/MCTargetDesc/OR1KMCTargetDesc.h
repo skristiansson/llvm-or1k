@@ -35,7 +35,9 @@ MCCodeEmitter *createOR1KMCCodeEmitter(const MCInstrInfo &MCII,
                                        const MCSubtargetInfo &STI,
                                        MCContext &Ctx);
 
-MCAsmBackend *createOR1KAsmBackend(const Target &T, StringRef TT);
+MCAsmBackend *createOR1KAsmBackend(const Target &T, StringRef TT,
+                                   StringRef CPU);
+
 
 MCObjectWriter *createOR1KELFObjectWriter(raw_ostream &OS, uint8_t OSABI);
 } // End llvm namespace
