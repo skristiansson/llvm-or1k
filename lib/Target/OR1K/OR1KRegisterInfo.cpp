@@ -150,7 +150,7 @@ bool OR1KRegisterInfo::needsStackRealignment(const MachineFunction &MF) const {
   const Function *F = MF.getFunction();
   unsigned StackAlign = MF.getTarget().getFrameLowering()->getStackAlignment();
   return ((MFI->getMaxAlignment() > StackAlign) ||
-          F->hasFnAttr(Attribute::StackAlignment));
+          F->getFnAttributes().hasStackAlignmentAttr());
 }
 
 unsigned OR1KRegisterInfo::getRARegister() const {
