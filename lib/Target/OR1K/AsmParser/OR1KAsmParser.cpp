@@ -196,9 +196,12 @@ MatchAndEmitInstruction(SMLoc IDLoc,
                         MCStreamer &Out) {
   MCInst Inst;
   SMLoc ErrorLoc;
+  unsigned Kind;
   unsigned ErrorInfo;
+  SmallVector<std::pair< unsigned, std::string >, 4> MapAndConstraints;
 
-  switch (MatchInstructionImpl(Operands, Inst, ErrorInfo)) {
+  switch (MatchInstructionImpl(Operands, Kind, Inst, MapAndConstraints,
+                               ErrorInfo, /* matchingInlineAsm = */ false)) {
     default: break;
     case Match_Success:
       Out.EmitInstruction(Inst);
@@ -207,8 +210,6 @@ MatchAndEmitInstruction(SMLoc IDLoc,
       return Error(IDLoc, "Instruction use requires option to be enabled");
     case Match_MnemonicFail:
       return Error(IDLoc, "Unrecognized instruction mnemonic");
-    case Match_ConversionFail:
-      return Error(IDLoc, "Unable to convert operands to instruction");
     case Match_InvalidOperand:
       ErrorLoc = IDLoc;
       if (ErrorInfo != ~0U) {
