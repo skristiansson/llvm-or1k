@@ -63,7 +63,8 @@ struct OR1KOperand : public MCParsedAsmOperand {
   enum KindTy {
     Token,
     Register,
-    Immediate
+    Immediate,
+    Memory
   } Kind;
 
   SMLoc StartLoc, EndLoc;
@@ -79,6 +80,11 @@ struct OR1KOperand : public MCParsedAsmOperand {
     struct {
       const MCExpr *Val;
     } Imm;
+
+    struct {
+      unsigned BaseReg;
+      const MCExpr *Off;
+    } Mem;
   };
 
   OR1KOperand(KindTy K) : MCParsedAsmOperand(), Kind(K) {}
@@ -96,6 +102,9 @@ public:
         break;
       case Token:
         Tok = o.Tok;
+        break;
+      case Memory:
+        Mem = o.Mem;
         break;
     }
   }
@@ -125,6 +134,7 @@ public:
   bool isReg() const { return Kind == Register; }
   bool isImm() const { return Kind == Immediate; }
   bool isToken() const { return Kind == Token; }
+  bool isMem() const { return Kind == Memory; }
 
   void addExpr(MCInst &Inst, const MCExpr *Expr) const {
     // Add as immediates where possible. Null MCExpr = 0
