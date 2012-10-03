@@ -146,7 +146,8 @@ public:
   inline bool isMachineOpcode() const;
   inline unsigned getMachineOpcode() const;
   inline const DebugLoc getDebugLoc() const;
-
+  inline void dump() const;
+  inline void dumpr() const;
 
   /// reachesChainWithoutSideEffects - Return true if this operand (which must
   /// be a chain) reaches the specified operand without crossing any
@@ -215,8 +216,8 @@ class SDUse {
   /// this operand.
   SDUse **Prev, *Next;
 
-  SDUse(const SDUse &U);          // Do not implement
-  void operator=(const SDUse &U); // Do not implement
+  SDUse(const SDUse &U) LLVM_DELETED_FUNCTION;
+  void operator=(const SDUse &U) LLVM_DELETED_FUNCTION;
 
 public:
   SDUse() : Val(), User(NULL), Prev(NULL), Next(NULL) {}
@@ -806,7 +807,12 @@ inline bool SDValue::hasOneUse() const {
 inline const DebugLoc SDValue::getDebugLoc() const {
   return Node->getDebugLoc();
 }
-
+inline void SDValue::dump() const {
+  return Node->dump();
+}
+inline void SDValue::dumpr() const {
+  return Node->dumpr();
+}
 // Define inline functions from the SDUse class.
 
 inline void SDUse::set(const SDValue &V) {
@@ -1005,11 +1011,6 @@ class AtomicSDNode : public MemSDNode {
     SubclassData |= SynchScope << 12;
     assert(getOrdering() == Ordering && "Ordering encoding error!");
     assert(getSynchScope() == SynchScope && "Synch-scope encoding error!");
-
-    assert((readMem() || getOrdering() <= Monotonic) &&
-           "Acquire/Release MachineMemOperand must be a load!");
-    assert((writeMem() || getOrdering() <= Monotonic) &&
-           "Acquire/Release MachineMemOperand must be a store!");
   }
 
 public:
@@ -1389,7 +1390,7 @@ public:
 /// BUILD_VECTORs.
 class BuildVectorSDNode : public SDNode {
   // These are constructed as SDNodes and then cast to BuildVectorSDNodes.
-  explicit BuildVectorSDNode();        // Do not implement
+  explicit BuildVectorSDNode() LLVM_DELETED_FUNCTION;
 public:
   /// isConstantSplat - Check if this is a constant splat, and if so, find the
   /// smallest element size that splats the vector.  If MinSplatBits is
@@ -1482,15 +1483,17 @@ public:
 
 class BlockAddressSDNode : public SDNode {
   const BlockAddress *BA;
+  int64_t Offset;
   unsigned char TargetFlags;
   friend class SelectionDAG;
   BlockAddressSDNode(unsigned NodeTy, EVT VT, const BlockAddress *ba,
-                     unsigned char Flags)
+                     int64_t o, unsigned char Flags)
     : SDNode(NodeTy, DebugLoc(), getSDVTList(VT)),
-             BA(ba), TargetFlags(Flags) {
+             BA(ba), Offset(o), TargetFlags(Flags) {
   }
 public:
   const BlockAddress *getBlockAddress() const { return BA; }
+  int64_t getOffset() const { return Offset; }
   unsigned char getTargetFlags() const { return TargetFlags; }
 
   static bool classof(const BlockAddressSDNode *) { return true; }
@@ -1744,10 +1747,10 @@ public:
 
 class SDNodeIterator : public std::iterator<std::forward_iterator_tag,
                                             SDNode, ptrdiff_t> {
-  SDNode *Node;
+  const SDNode *Node;
   unsigned Operand;
 
-  SDNodeIterator(SDNode *N, unsigned Op) : Node(N), Operand(Op) {}
+  SDNodeIterator(const SDNode *N, unsigned Op) : Node(N), Operand(Op) {}
 public:
   bool operator==(const SDNodeIterator& x) const {
     return Operand == x.Operand;
@@ -1778,8 +1781,8 @@ public:
     return Operand - Other.Operand;
   }
 
-  static SDNodeIterator begin(SDNode *N) { return SDNodeIterator(N, 0); }
-  static SDNodeIterator end  (SDNode *N) {
+  static SDNodeIterator begin(const SDNode *N) { return SDNodeIterator(N, 0); }
+  static SDNodeIterator end  (const SDNode *N) {
     return SDNodeIterator(N, N->getNumOperands());
   }
 

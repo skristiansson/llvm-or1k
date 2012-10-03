@@ -304,11 +304,10 @@ void InstrInfoEmitter::emitRecord(const CodeGenInstruction &Inst, unsigned Num,
     MinOperands = Inst.Operands.back().MIOperandNo +
                   Inst.Operands.back().MINumOperands;
 
-  Record *ItinDef = Inst.TheDef->getValueAsDef("Itinerary");
   OS << "  { ";
   OS << Num << ",\t" << MinOperands << ",\t"
      << Inst.Operands.NumDefs << ",\t"
-     << SchedModels.getItinClassIdx(ItinDef) << ",\t"
+     << SchedModels.getSchedClassIdx(Inst) << ",\t"
      << Inst.TheDef->getValueAsInt("Size") << ",\t0";
 
   // Emit all of the target indepedent flags...
@@ -319,6 +318,7 @@ void InstrInfoEmitter::emitRecord(const CodeGenInstruction &Inst, unsigned Num,
   if (Inst.isCompare)          OS << "|(1<<MCID::Compare)";
   if (Inst.isMoveImm)          OS << "|(1<<MCID::MoveImm)";
   if (Inst.isBitcast)          OS << "|(1<<MCID::Bitcast)";
+  if (Inst.isSelect)           OS << "|(1<<MCID::Select)";
   if (Inst.isBarrier)          OS << "|(1<<MCID::Barrier)";
   if (Inst.hasDelaySlot)       OS << "|(1<<MCID::DelaySlot)";
   if (Inst.isCall)             OS << "|(1<<MCID::Call)";

@@ -12,16 +12,19 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dyld"
+#include "RuntimeDyldELF.h"
+#include "JITRegistrar.h"
+#include "ObjectImageCommon.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/IntervalMap.h"
-#include "RuntimeDyldELF.h"
 #include "llvm/Object/ObjectFile.h"
+#include "llvm/ExecutionEngine/ObjectImage.h"
+#include "llvm/ExecutionEngine/ObjectBuffer.h"
 #include "llvm/Support/ELF.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Object/ELF.h"
-#include "JITRegistrar.h"
 using namespace llvm;
 using namespace llvm::object;
 
@@ -36,24 +39,16 @@ class DyldELFObject : public ELFObjectFile<target_endianness, is64Bits> {
   typedef Elf_Rel_Impl<target_endianness, is64Bits, false> Elf_Rel;
   typedef Elf_Rel_Impl<target_endianness, is64Bits, true> Elf_Rela;
 
-  typedef typename ELFObjectFile<target_endianness, is64Bits>::
-    Elf_Ehdr Elf_Ehdr;
+  typedef Elf_Ehdr_Impl<target_endianness, is64Bits> Elf_Ehdr;
 
   typedef typename ELFDataTypeTypedefHelper<
           target_endianness, is64Bits>::value_type addr_type;
 
-protected:
-  // This duplicates the 'Data' member in the 'Binary' base class
-  // but it is necessary to workaround a bug in gcc 4.2
-  MemoryBuffer *InputData;
-
 public:
-  DyldELFObject(MemoryBuffer *Object, error_code &ec);
+  DyldELFObject(MemoryBuffer *Wrapper, error_code &ec);
 
   void updateSectionAddress(const SectionRef &Sec, uint64_t Addr);
   void updateSymbolAddress(const SymbolRef &Sym, uint64_t Addr);
-
-  const MemoryBuffer& getBuffer() const { return *InputData; }
 
   // Methods for type inquiry through isa, cast and dyn_cast
   static inline bool classof(const Binary *v) {
@@ -70,14 +65,15 @@ public:
 };
 
 template<support::endianness target_endianness, bool is64Bits>
-class ELFObjectImage : public ObjectImage {
+class ELFObjectImage : public ObjectImageCommon {
   protected:
     DyldELFObject<target_endianness, is64Bits> *DyldObj;
     bool Registered;
 
   public:
-    ELFObjectImage(DyldELFObject<target_endianness, is64Bits> *Obj)
-    : ObjectImage(Obj),
+    ELFObjectImage(ObjectBuffer *Input,
+                   DyldELFObject<target_endianness, is64Bits> *Obj)
+    : ObjectImageCommon(Input, Obj),
       DyldObj(Obj),
       Registered(false) {}
 
@@ -100,20 +96,22 @@ class ELFObjectImage : public ObjectImage {
 
     virtual void registerWithDebugger()
     {
-      JITRegistrar::getGDBRegistrar().registerObject(DyldObj->getBuffer());
+      JITRegistrar::getGDBRegistrar().registerObject(*Buffer);
       Registered = true;
     }
     virtual void deregisterWithDebugger()
     {
-      JITRegistrar::getGDBRegistrar().deregisterObject(DyldObj->getBuffer());
+      JITRegistrar::getGDBRegistrar().deregisterObject(*Buffer);
     }
 };
 
+// The MemoryBuffer passed into this constructor is just a wrapper around the
+// actual memory.  Ultimately, the Binary parent class will take ownership of
+// this MemoryBuffer object but not the underlying memory.
 template<support::endianness target_endianness, bool is64Bits>
-DyldELFObject<target_endianness, is64Bits>::DyldELFObject(MemoryBuffer *Object,
+DyldELFObject<target_endianness, is64Bits>::DyldELFObject(MemoryBuffer *Wrapper,
                                                           error_code &ec)
-  : ELFObjectFile<target_endianness, is64Bits>(Object, ec),
-    InputData(Object) {
+  : ELFObjectFile<target_endianness, is64Bits>(Wrapper, ec) {
   this->isDyldELFObject = true;
 }
 
@@ -149,46 +147,39 @@ void DyldELFObject<target_endianness, is64Bits>::updateSymbolAddress(
 
 namespace llvm {
 
-ObjectImage *RuntimeDyldELF::createObjectImage(
-                                         const MemoryBuffer *ConstInputBuffer) {
-  MemoryBuffer *InputBuffer = const_cast<MemoryBuffer*>(ConstInputBuffer);
-  std::pair<unsigned char, unsigned char> Ident = getElfArchType(InputBuffer);
+ObjectImage *RuntimeDyldELF::createObjectImage(ObjectBuffer *Buffer) {
+  if (Buffer->getBufferSize() < ELF::EI_NIDENT)
+    llvm_unreachable("Unexpected ELF object size");
+  std::pair<unsigned char, unsigned char> Ident = std::make_pair(
+                         (uint8_t)Buffer->getBufferStart()[ELF::EI_CLASS],
+                         (uint8_t)Buffer->getBufferStart()[ELF::EI_DATA]);
   error_code ec;
 
   if (Ident.first == ELF::ELFCLASS32 && Ident.second == ELF::ELFDATA2LSB) {
     DyldELFObject<support::little, false> *Obj =
-           new DyldELFObject<support::little, false>(InputBuffer, ec);
-    return new ELFObjectImage<support::little, false>(Obj);
+           new DyldELFObject<support::little, false>(Buffer->getMemBuffer(), ec);
+    return new ELFObjectImage<support::little, false>(Buffer, Obj);
   }
   else if (Ident.first == ELF::ELFCLASS32 && Ident.second == ELF::ELFDATA2MSB) {
     DyldELFObject<support::big, false> *Obj =
-           new DyldELFObject<support::big, false>(InputBuffer, ec);
-    return new ELFObjectImage<support::big, false>(Obj);
+           new DyldELFObject<support::big, false>(Buffer->getMemBuffer(), ec);
+    return new ELFObjectImage<support::big, false>(Buffer, Obj);
   }
   else if (Ident.first == ELF::ELFCLASS64 && Ident.second == ELF::ELFDATA2MSB) {
     DyldELFObject<support::big, true> *Obj =
-           new DyldELFObject<support::big, true>(InputBuffer, ec);
-    return new ELFObjectImage<support::big, true>(Obj);
+           new DyldELFObject<support::big, true>(Buffer->getMemBuffer(), ec);
+    return new ELFObjectImage<support::big, true>(Buffer, Obj);
   }
   else if (Ident.first == ELF::ELFCLASS64 && Ident.second == ELF::ELFDATA2LSB) {
     DyldELFObject<support::little, true> *Obj =
-           new DyldELFObject<support::little, true>(InputBuffer, ec);
-    return new ELFObjectImage<support::little, true>(Obj);
+           new DyldELFObject<support::little, true>(Buffer->getMemBuffer(), ec);
+    return new ELFObjectImage<support::little, true>(Buffer, Obj);
   }
   else
     llvm_unreachable("Unexpected ELF format");
 }
 
-void RuntimeDyldELF::handleObjectLoaded(ObjectImage *Obj)
-{
-  Obj->registerWithDebugger();
-  // Save the loaded object.  It will deregister itself when deleted
-  LoadedObject = Obj;
-}
-
 RuntimeDyldELF::~RuntimeDyldELF() {
-  if (LoadedObject)
-    delete LoadedObject;
 }
 
 void RuntimeDyldELF::resolveX86_64Relocation(uint8_t *LocalAddress,
@@ -306,6 +297,44 @@ void RuntimeDyldELF::resolveARMRelocation(uint8_t *LocalAddress,
   }
 }
 
+void RuntimeDyldELF::resolveMIPSRelocation(uint8_t *LocalAddress,
+                                           uint32_t FinalAddress,
+                                           uint32_t Value,
+                                           uint32_t Type,
+                                           int32_t Addend) {
+  uint32_t* TargetPtr = (uint32_t*)LocalAddress;
+  Value += Addend;
+
+  DEBUG(dbgs() << "resolveMipselocation, LocalAddress: " << LocalAddress
+               << " FinalAddress: " << format("%p",FinalAddress)
+               << " Value: " << format("%x",Value)
+               << " Type: " << format("%x",Type)
+               << " Addend: " << format("%x",Addend)
+               << "\n");
+
+  switch(Type) {
+  default:
+    llvm_unreachable("Not implemented relocation type!");
+    break;
+  case ELF::R_MIPS_32:
+    *TargetPtr = Value + (*TargetPtr);
+    break;
+  case ELF::R_MIPS_26:
+    *TargetPtr = ((*TargetPtr) & 0xfc000000) | (( Value & 0x0fffffff) >> 2);
+    break;
+  case ELF::R_MIPS_HI16:
+    // Get the higher 16-bits. Also add 1 if bit 15 is 1.
+    Value += ((*TargetPtr) & 0x0000ffff) << 16;
+    *TargetPtr = ((*TargetPtr) & 0xffff0000) |
+                 (((Value + 0x8000) >> 16) & 0xffff);
+    break;
+   case ELF::R_MIPS_LO16:
+    Value += ((*TargetPtr) & 0x0000ffff);
+    *TargetPtr = ((*TargetPtr) & 0xffff0000) | (Value & 0xffff);
+    break;
+   }
+}
+
 void RuntimeDyldELF::resolveRelocation(uint8_t *LocalAddress,
                                        uint64_t FinalAddress,
                                        uint64_t Value,
@@ -325,6 +354,12 @@ void RuntimeDyldELF::resolveRelocation(uint8_t *LocalAddress,
     resolveARMRelocation(LocalAddress, (uint32_t)(FinalAddress & 0xffffffffL),
                          (uint32_t)(Value & 0xffffffffL), Type,
                          (uint32_t)(Addend & 0xffffffffL));
+    break;
+  case Triple::mips:    // Fall through.
+  case Triple::mipsel:
+    resolveMIPSRelocation(LocalAddress, (uint32_t)(FinalAddress & 0xffffffffL),
+                          (uint32_t)(Value & 0xffffffffL), Type,
+                          (uint32_t)(Addend & 0xffffffffL));
     break;
   default: llvm_unreachable("Unsupported CPU type!");
   }
@@ -423,6 +458,53 @@ void RuntimeDyldELF::processRelocationRef(const ObjRelocationInfo &Rel,
                         Section.StubOffset, RelType, 0);
       Section.StubOffset += getMaxStubSize();
     }
+  } else if (Arch == Triple::mipsel && RelType == ELF::R_MIPS_26) {
+    // This is an Mips branch relocation, need to use a stub function.
+    DEBUG(dbgs() << "\t\tThis is a Mips branch relocation.");
+    SectionEntry &Section = Sections[Rel.SectionID];
+    uint8_t *Target = Section.Address + Rel.Offset;
+    uint32_t *TargetAddress = (uint32_t *)Target;
+
+    // Extract the addend from the instruction.
+    uint32_t Addend = ((*TargetAddress) & 0x03ffffff) << 2;
+
+    Value.Addend += Addend;
+
+    //  Look up for existing stub.
+    StubMap::const_iterator i = Stubs.find(Value);
+    if (i != Stubs.end()) {
+      resolveRelocation(Target, (uint64_t)Target,
+                        (uint64_t)Section.Address +
+                        i->second, RelType, 0);
+      DEBUG(dbgs() << " Stub function found\n");
+    } else {
+      // Create a new stub function.
+      DEBUG(dbgs() << " Create a new stub function\n");
+      Stubs[Value] = Section.StubOffset;
+      uint8_t *StubTargetAddr = createStubFunction(Section.Address +
+                                                   Section.StubOffset);
+
+      // Creating Hi and Lo relocations for the filled stub instructions.
+      RelocationEntry REHi(Rel.SectionID,
+                           StubTargetAddr - Section.Address,
+                           ELF::R_MIPS_HI16, Value.Addend);
+      RelocationEntry RELo(Rel.SectionID,
+                           StubTargetAddr - Section.Address + 4,
+                           ELF::R_MIPS_LO16, Value.Addend);
+
+      if (Value.SymbolName) {
+        addRelocationForSymbol(REHi, Value.SymbolName);
+        addRelocationForSymbol(RELo, Value.SymbolName);
+      } else {
+        addRelocationForSection(REHi, Value.SectionID);
+        addRelocationForSection(RELo, Value.SectionID);
+      }
+
+      resolveRelocation(Target, (uint64_t)Target,
+                        (uint64_t)Section.Address +
+                        Section.StubOffset, RelType, 0);
+      Section.StubOffset += getMaxStubSize();
+    }
   } else {
     RelocationEntry RE(Rel.SectionID, Rel.Offset, RelType, Value.Addend);
     if (Value.SymbolName)
@@ -432,8 +514,9 @@ void RuntimeDyldELF::processRelocationRef(const ObjRelocationInfo &Rel,
   }
 }
 
-bool RuntimeDyldELF::isCompatibleFormat(const MemoryBuffer *InputBuffer) const {
-  StringRef Magic = InputBuffer->getBuffer().slice(0, ELF::EI_NIDENT);
-  return (memcmp(Magic.data(), ELF::ElfMagic, strlen(ELF::ElfMagic))) == 0;
+bool RuntimeDyldELF::isCompatibleFormat(const ObjectBuffer *Buffer) const {
+  if (Buffer->getBufferSize() < strlen(ELF::ElfMagic))
+    return false;
+  return (memcmp(Buffer->getBufferStart(), ELF::ElfMagic, strlen(ELF::ElfMagic))) == 0;
 }
 } // namespace llvm

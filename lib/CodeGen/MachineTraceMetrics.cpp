@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "early-ifcvt"
+#define DEBUG_TYPE "machine-trace-metrics"
 #include "MachineTraceMetrics.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineBranchProbabilityInfo.h"
@@ -931,17 +931,29 @@ computeInstrHeights(const MachineBasicBlock *MBB) {
     TBI.CriticalPath = 0;
 
     // Get dependencies from PHIs in the trace successor.
-    if (TBI.Succ) {
-      for (MachineBasicBlock::const_iterator
-           I = TBI.Succ->begin(), E = TBI.Succ->end();
+    const MachineBasicBlock *Succ = TBI.Succ;
+    // If MBB is the last block in the trace, and it has a back-edge to the
+    // loop header, get loop-carried dependencies from PHIs in the header. For
+    // that purpose, pretend that all the loop header PHIs have height 0.
+    if (!Succ)
+      if (const MachineLoop *Loop = getLoopFor(MBB))
+        if (MBB->isSuccessor(Loop->getHeader()))
+          Succ = Loop->getHeader();
+
+    if (Succ) {
+      for (MachineBasicBlock::const_iterator I = Succ->begin(), E = Succ->end();
            I != E && I->isPHI(); ++I) {
         const MachineInstr *PHI = I;
         Deps.clear();
         getPHIDeps(PHI, Deps, MBB, MTM.MRI);
-        if (!Deps.empty())
-          if (pushDepHeight(Deps.front(), PHI, Cycles.lookup(PHI).Height,
-                        Heights, MTM.ItinData, MTM.TII))
+        if (!Deps.empty()) {
+          // Loop header PHI heights are all 0.
+          unsigned Height = TBI.Succ ? Cycles.lookup(PHI).Height : 0;
+          DEBUG(dbgs() << "pred\t" << Height << '\t' << *PHI);
+          if (pushDepHeight(Deps.front(), PHI, Height,
+                            Heights, MTM.ItinData, MTM.TII))
             addLiveIns(Deps.front().DefMI, Stack);
+        }
       }
     }
 
@@ -1032,6 +1044,23 @@ MachineTraceMetrics::Trace::getInstrSlack(const MachineInstr *MI) const {
   return getCriticalPath() - (Cyc.Depth + Cyc.Height);
 }
 
+unsigned
+MachineTraceMetrics::Trace::getPHIDepth(const MachineInstr *PHI) const {
+  const MachineBasicBlock *MBB = TE.MTM.MF->getBlockNumbered(getBlockNum());
+  SmallVector<DataDep, 1> Deps;
+  getPHIDeps(PHI, Deps, MBB, TE.MTM.MRI);
+  assert(Deps.size() == 1 && "PHI doesn't have MBB as a predecessor");
+  DataDep &Dep = Deps.front();
+  unsigned DepCycle = getInstrCycles(Dep.DefMI).Depth;
+  // Add latency if DefMI is a real instruction. Transients get latency 0.
+  if (!Dep.DefMI->isTransient())
+    DepCycle += TE.MTM.TII->computeOperandLatency(TE.MTM.ItinData,
+                                                  Dep.DefMI, Dep.DefOp,
+                                                  PHI, Dep.UseOp,
+                                                  /* FindMin = */ false);
+  return DepCycle;
+}
+
 unsigned MachineTraceMetrics::Trace::getResourceDepth(bool Bottom) const {
   // For now, we compute the resource depth from instruction count / issue
   // width. Eventually, we should compute resource depth per functional unit
@@ -1039,6 +1068,18 @@ unsigned MachineTraceMetrics::Trace::getResourceDepth(bool Bottom) const {
   unsigned Instrs = TBI.InstrDepth;
   if (Bottom)
     Instrs += TE.MTM.BlockInfo[getBlockNum()].InstrCount;
+  if (const MCSchedModel *Model = TE.MTM.ItinData->SchedModel)
+    if (Model->IssueWidth != 0)
+      return Instrs / Model->IssueWidth;
+  // Assume issue width 1 without a schedule model.
+  return Instrs;
+}
+
+unsigned MachineTraceMetrics::Trace::
+getResourceLength(ArrayRef<const MachineBasicBlock*> Extrablocks) const {
+  unsigned Instrs = TBI.InstrDepth + TBI.InstrHeight;
+  for (unsigned i = 0, e = Extrablocks.size(); i != e; ++i)
+    Instrs += TE.MTM.getResources(Extrablocks[i])->InstrCount;
   if (const MCSchedModel *Model = TE.MTM.ItinData->SchedModel)
     if (Model->IssueWidth != 0)
       return Instrs / Model->IssueWidth;

@@ -182,9 +182,12 @@ public:
   virtual bool isProfitableToDupForIfCvt(MachineBasicBlock &MBB,
                                          unsigned NumCycles,
                                          const BranchProbability
-                                           &Probability) const {
+                                         &Probability) const {
     return NumCycles == 1;
   }
+
+  virtual bool isProfitableToUnpredicate(MachineBasicBlock &TMBB,
+                                         MachineBasicBlock &FMBB) const;
 
   /// analyzeCompare - For a comparison instruction, return the source registers
   /// in SrcReg and SrcReg2 if having two register operands, and the value it
@@ -201,6 +204,13 @@ public:
   virtual bool optimizeCompareInstr(MachineInstr *CmpInstr, unsigned SrcReg,
                                     unsigned SrcReg2, int CmpMask, int CmpValue,
                                     const MachineRegisterInfo *MRI) const;
+
+  virtual bool analyzeSelect(const MachineInstr *MI,
+                             SmallVectorImpl<MachineOperand> &Cond,
+                             unsigned &TrueOp, unsigned &FalseOp,
+                             bool &Optimizable) const;
+
+  virtual MachineInstr *optimizeSelect(MachineInstr *MI, bool) const;
 
   /// FoldImmediate - 'Reg' is known to be defined by a move immediate
   /// instruction, try to fold the immediate into the use instruction.
@@ -227,6 +237,13 @@ public:
   std::pair<uint16_t, uint16_t>
   getExecutionDomain(const MachineInstr *MI) const;
   void setExecutionDomain(MachineInstr *MI, unsigned Domain) const;
+
+  unsigned getPartialRegUpdateClearance(const MachineInstr*, unsigned,
+                                        const TargetRegisterInfo*) const;
+  void breakPartialRegDependency(MachineBasicBlock::iterator, unsigned,
+                                 const TargetRegisterInfo *TRI) const;
+  /// Get the number of addresses by LDM or VLDM or zero for unknown.
+  unsigned getNumLDMAddresses(const MachineInstr *MI) const;
 
 private:
   unsigned getInstBundleLength(const MachineInstr *MI) const;
@@ -352,6 +369,11 @@ ARMCC::CondCodes getInstrPredicate(const MachineInstr *MI, unsigned &PredReg);
 
 int getMatchingCondBranchOpcode(int Opc);
 
+/// Determine if MI can be folded into an ARM MOVCC instruction, and return the
+/// opcode of the SSA instruction representing the conditional MI.
+unsigned canFoldARMInstrIntoMOVCC(unsigned Reg,
+                                  MachineInstr *&MI,
+                                  const MachineRegisterInfo &MRI);
 
 /// Map pseudo instructions that imply an 'S' bit onto real opcodes. Whether
 /// the instruction is encoded with an 'S' bit is determined by the optional

@@ -28,6 +28,24 @@ class SubRegIndex<list<SubRegIndex> comps = []> {
   // ComposedOf - A list of two SubRegIndex instances, [A, B].
   // This indicates that this SubRegIndex is the result of composing A and B.
   list<SubRegIndex> ComposedOf = comps;
+
+  // CoveringSubRegIndices - A list of two or more sub-register indexes that
+  // cover this sub-register.
+  //
+  // This field should normally be left blank as TableGen can infer it.
+  //
+  // TableGen automatically detects sub-registers that straddle the registers
+  // in the SubRegs field of a Register definition. For example:
+  //
+  //   Q0    = dsub_0 -> D0, dsub_1 -> D1
+  //   Q1    = dsub_0 -> D2, dsub_1 -> D3
+  //   D1_D2 = dsub_0 -> D1, dsub_1 -> D2
+  //   QQ0   = qsub_0 -> Q0, qsub_1 -> Q1
+  //
+  // TableGen will infer that D1_D2 is a sub-register of QQ0. It will be given
+  // the synthetic index dsub_1_dsub_2 unless some SubRegIndex is defined with
+  // CoveringSubRegIndices = [dsub_1, dsub_2].
+  list<SubRegIndex> CoveringSubRegIndices = [];
 }
 
 // RegAltNameIndex - The alternate name set to use for register operands of
@@ -321,11 +339,12 @@ class Instruction {
   bit isCompare    = 0;     // Is this instruction a comparison instruction?
   bit isMoveImm    = 0;     // Is this instruction a move immediate instruction?
   bit isBitcast    = 0;     // Is this instruction a bitcast instruction?
+  bit isSelect     = 0;     // Is this instruction a select instruction?
   bit isBarrier    = 0;     // Can control flow fall through this instruction?
   bit isCall       = 0;     // Is this instruction a call instruction?
   bit canFoldAsLoad = 0;    // Can this be folded as a simple memory operand?
-  bit mayLoad      = 0;     // Is it possible for this inst to read memory?
-  bit mayStore     = 0;     // Is it possible for this inst to write memory?
+  bit mayLoad      = ?;     // Is it possible for this inst to read memory?
+  bit mayStore     = ?;     // Is it possible for this inst to write memory?
   bit isConvertibleToThreeAddress = 0;  // Can this 2-addr instruction promote?
   bit isCommutable = 0;     // Is this 3 operand instruction commutable?
   bit isTerminator = 0;     // Is this part of the terminator for a basic block?
@@ -350,7 +369,7 @@ class Instruction {
   //
   //  neverHasSideEffects - Set on an instruction with no pattern if it has no
   //    side effects.
-  bit hasSideEffects = 0;
+  bit hasSideEffects = ?;
   bit neverHasSideEffects = 0;
 
   // Is this instruction a "real" instruction (with a distinct machine
@@ -476,7 +495,8 @@ def ptr_rc : PointerLikeRegClass<0>;
 
 /// unknown definition - Mark this operand as being of unknown type, causing
 /// it to be resolved by inference in the context it is used.
-def unknown;
+class unknown_class;
+def unknown : unknown_class;
 
 /// AsmOperandClass - Representation for the kinds of operands which the target
 /// specific parser can create and the assembly matcher may need to distinguish.
@@ -583,23 +603,31 @@ def f64imm : Operand<f64>;
 ///
 def zero_reg;
 
+/// OperandWithDefaultOps - This Operand class can be used as the parent class
+/// for an Operand that needs to be initialized with a default value if
+/// no value is supplied in a pattern.  This class can be used to simplify the
+/// pattern definitions for instructions that have target specific flags
+/// encoded as immediate operands.
+class OperandWithDefaultOps<ValueType ty, dag defaultops>
+  : Operand<ty> {
+  dag DefaultOps = defaultops;
+}
+
 /// PredicateOperand - This can be used to define a predicate operand for an
 /// instruction.  OpTypes specifies the MIOperandInfo for the operand, and
 /// AlwaysVal specifies the value of this predicate when set to "always
 /// execute".
 class PredicateOperand<ValueType ty, dag OpTypes, dag AlwaysVal>
-  : Operand<ty> {
+  : OperandWithDefaultOps<ty, AlwaysVal> {
   let MIOperandInfo = OpTypes;
-  dag DefaultOps = AlwaysVal;
 }
 
 /// OptionalDefOperand - This is used to define a optional definition operand
 /// for an instruction. DefaultOps is the register the operand represents if
 /// none is supplied, e.g. zero_reg.
 class OptionalDefOperand<ValueType ty, dag OpTypes, dag defaultops>
-  : Operand<ty> {
+  : OperandWithDefaultOps<ty, defaultops> {
   let MIOperandInfo = OpTypes;
-  dag DefaultOps = defaultops;
 }
 
 
@@ -612,6 +640,17 @@ class InstrInfo {
   // Sparc manual specifies its instructions in the format [31..0] (big), while
   // PowerPC specifies them using the format [0..31] (little).
   bit isLittleEndianEncoding = 0;
+
+  // The instruction properties mayLoad, mayStore, and hasSideEffects are unset
+  // by default, and TableGen will infer their value from the instruction
+  // pattern when possible.
+  //
+  // Normally, TableGen will issue an error it it can't infer the value of a
+  // property that hasn't been set explicitly. When guessInstructionProperties
+  // is set, it will guess a safe value instead.
+  //
+  // This option is a temporary migration help. It will go away.
+  bit guessInstructionProperties = 1;
 }
 
 // Standard Pseudo Instructions.
@@ -715,6 +754,18 @@ def BUNDLE : Instruction {
   let InOperandList = (ins variable_ops);
   let AsmString = "BUNDLE";
 }
+def LIFETIME_START : Instruction {
+  let OutOperandList = (outs);
+  let InOperandList = (ins i32imm:$id);
+  let AsmString = "LIFETIME_START";
+  let neverHasSideEffects = 1;
+}
+def LIFETIME_END : Instruction {
+  let OutOperandList = (outs);
+  let InOperandList = (ins i32imm:$id);
+  let AsmString = "LIFETIME_END";
+  let neverHasSideEffects = 1;
+}
 }
 
 //===----------------------------------------------------------------------===//
@@ -734,6 +785,10 @@ class AsmParser {
   // function of the AsmParser class to call on every matched instruction.
   // This can be used to perform target specific instruction post-processing.
   string AsmParserInstCleanup  = "";
+
+  //ShouldEmitMatchRegisterName - Set to false if the target needs a hand
+  //written register name matcher
+  bit ShouldEmitMatchRegisterName = 1;
 }
 def DefaultAsmParser : AsmParser;
 
@@ -934,6 +989,9 @@ class Processor<string n, ProcessorItineraries pi, list<SubtargetFeature> f> {
 // ProcessorModel allows subtargets to specify the more general
 // SchedMachineModel instead if a ProcessorItinerary. Subtargets will
 // gradually move to this newer form.
+//
+// Although this class always passes NoItineraries to the Processor
+// class, the SchedMachineModel may still define valid Itineraries.
 class ProcessorModel<string n, SchedMachineModel m, list<SubtargetFeature> f>
   : Processor<n, NoItineraries, f> {
   let SchedModel = m;

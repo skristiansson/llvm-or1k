@@ -336,30 +336,6 @@ uint64_t SubtargetFeatures::getFeatureBits(const StringRef CPU,
   return Bits;
 }
 
-/// Get scheduling itinerary of a CPU.
-void *SubtargetFeatures::getItinerary(const StringRef CPU,
-                                      const SubtargetInfoKV *Table,
-                                      size_t TableSize) {
-  assert(Table && "missing table");
-#ifndef NDEBUG
-  for (size_t i = 1; i < TableSize; i++) {
-    assert(strcmp(Table[i - 1].Key, Table[i].Key) < 0 && "Table is not sorted");
-  }
-#endif
-
-  // Find entry
-  const SubtargetInfoKV *Entry = Find(CPU, Table, TableSize);
-
-  if (Entry) {
-    return Entry->Value;
-  } else {
-    errs() << "'" << CPU
-           << "' is not a recognized processor for this target"
-           << " (ignoring processor)\n";
-    return NULL;
-  }
-}
-
 /// print - Print feature string.
 ///
 void SubtargetFeatures::print(raw_ostream &OS) const {
@@ -368,11 +344,13 @@ void SubtargetFeatures::print(raw_ostream &OS) const {
   OS << "\n";
 }
 
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 /// dump - Dump feature info.
 ///
 void SubtargetFeatures::dump() const {
   print(dbgs());
 }
+#endif
 
 /// getDefaultSubtargetFeatures - Return a string listing the features
 /// associated with the target triple.

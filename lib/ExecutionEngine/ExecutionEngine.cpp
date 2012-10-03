@@ -501,7 +501,8 @@ ExecutionEngine *EngineBuilder::create(TargetMachine *TM) {
     return 0;
   }
 
-  if ((WhichEngine & EngineKind::JIT) && ExecutionEngine::JITCtor == 0) {
+  if ((WhichEngine & EngineKind::JIT) && ExecutionEngine::JITCtor == 0 &&
+      ExecutionEngine::MCJITCtor == 0) {
     if (ErrorStr)
       *ErrorStr = "JIT has not been linked in.";
   }
@@ -832,7 +833,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
 static void StoreIntToMemory(const APInt &IntVal, uint8_t *Dst,
                              unsigned StoreBytes) {
   assert((IntVal.getBitWidth()+7)/8 >= StoreBytes && "Integer too small!");
-  uint8_t *Src = (uint8_t *)IntVal.getRawData();
+  const uint8_t *Src = (const uint8_t *)IntVal.getRawData();
 
   if (sys::isLittleEndianHost()) {
     // Little-endian host - the source is ordered from LSB to MSB.  Order the

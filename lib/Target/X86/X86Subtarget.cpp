@@ -246,8 +246,11 @@ void X86Subtarget::AutoDetectSubtargetFeatures() {
     }
 
     // If it's Nehalem, unaligned memory access is fast.
-    // FIXME: Nehalem is family 6. Also include Westmere and later processors?
-    if (Family == 15 && Model == 26) {
+    // Include Westmere and Sandy Bridge as well.
+    // FIXME: add later processors.
+    if (IsIntel && ((Family == 6 && Model == 26) ||
+        (Family == 6 && Model == 44) ||
+        (Family == 6 && Model == 42))) {
       IsUAMemFast = true;
       ToggleFeature(X86::FeatureFastUAMem);
     }
@@ -343,6 +346,7 @@ X86Subtarget::X86Subtarget(const std::string &TT, const std::string &CPU,
   , HasVectorUAMem(false)
   , HasCmpxchg16b(false)
   , UseLeaForSP(false)
+  , HasSlowDivide(false)
   , PostRAScheduler(false)
   , stackAlignment(4)
   // FIXME: this is a known good value for Yonah. How about others?

@@ -717,6 +717,7 @@ public:
   const BasicBlock *getEnd() const {
     return End;
   }
+  bool isSingleEdge() const;
 };
 
 //===-------------------------------------

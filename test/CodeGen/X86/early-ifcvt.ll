@@ -1,4 +1,4 @@
-; RUN: llc < %s -enable-early-ifcvt -stress-early-ifcvt | FileCheck %s
+; RUN: llc < %s -x86-early-ifcvt -stress-early-ifcvt | FileCheck %s
 target triple = "x86_64-apple-macosx10.8.0"
 
 ; CHECK: mm2
@@ -37,3 +37,33 @@ do.end:
   %sub = sub nsw i32 %max.1, %min.1
   ret i32 %sub
 }
+
+; CHECK: multipreds
+; Deal with alternative tail predecessors
+; CHECK-NOT: LBB
+; CHECK: cmov
+; CHECK-NOT: LBB
+; CHECK: cmov
+; CHECK-NOT: LBB
+; CHECK: fprintf
+
+define void @multipreds(i32 %sw) nounwind uwtable ssp {
+entry:
+  switch i32 %sw, label %if.then29 [
+    i32 0, label %if.then37
+    i32 127, label %if.end41
+  ]
+
+if.then29:
+  br label %if.end41
+
+if.then37:
+  br label %if.end41
+
+if.end41:
+  %exit_status.0 = phi i32 [ 2, %if.then29 ], [ 0, %if.then37 ], [ 66, %entry ]
+  call void (...)* @fprintf(i32 %exit_status.0) nounwind
+  unreachable
+}
+
+declare void @fprintf(...) nounwind

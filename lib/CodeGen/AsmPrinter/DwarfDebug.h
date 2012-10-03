@@ -96,7 +96,8 @@ typedef struct DotDebugLocEntry {
   DotDebugLocEntry(const MCSymbol *B, const MCSymbol *E, const ConstantFP *FPtr)
     : Begin(B), End(E), Variable(0), Merged(false), 
       Constant(true) { Constants.CFP = FPtr; EntryKind = E_ConstantFP; }
-  DotDebugLocEntry(const MCSymbol *B, const MCSymbol *E, const ConstantInt *IPtr)
+  DotDebugLocEntry(const MCSymbol *B, const MCSymbol *E,
+                   const ConstantInt *IPtr)
     : Begin(B), End(E), Variable(0), Merged(false), 
       Constant(true) { Constants.CIP = IPtr; EntryKind = E_ConstantInt; }
 
@@ -158,11 +159,19 @@ public:
   bool isArtificial()                const {
     if (Var.isArtificial())
       return true;
-    if (Var.getTag() == dwarf::DW_TAG_arg_variable
-        && getType().isArtificial())
+    if (getType().isArtificial())
       return true;
     return false;
   }
+
+  bool isObjectPointer()             const {
+    if (Var.isObjectPointer())
+      return true;
+    if (getType().isObjectPointer())
+      return true;
+    return false;
+  }
+  
   bool variableHasComplexAddress()   const {
     assert(Var.Verify() && "Invalid complex DbgVariable!");
     return Var.hasComplexAddress();
@@ -307,6 +316,9 @@ class DwarfDebug {
   // table for the same directory as DW_at_comp_dir.
   StringRef CompilationDir;
 
+  // A holder for the DarwinGDBCompat flag so that the compile unit can use it.
+  bool isDarwinGDBCompat;
+  bool hasDwarfAccelTables;
 private:
 
   /// assignAbbrevNumber - Define a unique number for the abbreviation.
@@ -520,6 +532,11 @@ public:
   /// getStringPoolEntry - returns an entry into the string pool with the given
   /// string text.
   MCSymbol *getStringPoolEntry(StringRef Str);
+
+  /// useDarwinGDBCompat - returns whether or not to limit some of our debug
+  /// output to the limitations of darwin gdb.
+  bool useDarwinGDBCompat() { return isDarwinGDBCompat; }
+  bool useDwarfAccelTables() { return hasDwarfAccelTables; }
 };
 } // End of namespace llvm
 

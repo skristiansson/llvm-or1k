@@ -291,3 +291,36 @@ define noalias i8* @test23() nounwind uwtable ssp {
   %call = call i8* @strdup(i8* %arrayidx) nounwind
   ret i8* %call
 }
+
+; Make sure same sized store to later element is deleted
+; CHECK: @test24
+; CHECK-NOT: store i32 0
+; CHECK-NOT: store i32 0
+; CHECK: store i32 %b
+; CHECK: store i32 %c
+; CHECK: ret void
+define void @test24([2 x i32]* %a, i32 %b, i32 %c) nounwind {
+  %1 = getelementptr inbounds [2 x i32]* %a, i64 0, i64 0
+  store i32 0, i32* %1, align 4
+  %2 = getelementptr inbounds [2 x i32]* %a, i64 0, i64 1
+  store i32 0, i32* %2, align 4
+  %3 = getelementptr inbounds [2 x i32]* %a, i64 0, i64 0
+  store i32 %b, i32* %3, align 4
+  %4 = getelementptr inbounds [2 x i32]* %a, i64 0, i64 1
+  store i32 %c, i32* %4, align 4
+  ret void
+}
+
+; Check another case like PR13547 where strdup is not like malloc.
+; CHECK: @test25
+; CHECK: load i8
+; CHECK: store i8 0
+; CHECK: store i8 %tmp
+define i8* @test25(i8* %p) nounwind {
+  %p.4 = getelementptr i8* %p, i64 4
+  %tmp = load i8* %p.4, align 1
+  store i8 0, i8* %p.4, align 1
+  %q = call i8* @strdup(i8* %p) nounwind optsize
+  store i8 %tmp, i8* %p.4, align 1
+  ret i8* %q
+}

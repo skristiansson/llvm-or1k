@@ -107,6 +107,7 @@ namespace {
       (void) llvm::createProfileVerifierPass();
       (void) llvm::createPathProfileVerifierPass();
       (void) llvm::createProfileLoaderPass();
+      (void) llvm::createProfileMetadataLoaderPass();
       (void) llvm::createPathProfileLoaderPass();
       (void) llvm::createPromoteMemoryToRegisterPass();
       (void) llvm::createDemoteRegisterToMemoryPass();
@@ -140,6 +141,7 @@ namespace {
       (void) llvm::createLoopDeletionPass();
       (void) llvm::createPostDomTree();
       (void) llvm::createInstructionNamerPass();
+      (void) llvm::createMetaRenamerPass();
       (void) llvm::createFunctionAttrsPass();
       (void) llvm::createMergeFunctionsPass();
       (void) llvm::createPrintModulePass(0);

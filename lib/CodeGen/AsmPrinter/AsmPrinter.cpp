@@ -213,16 +213,16 @@ void AsmPrinter::EmitLinkage(unsigned Linkage, MCSymbol *GVSym) const {
   case GlobalValue::CommonLinkage:
   case GlobalValue::LinkOnceAnyLinkage:
   case GlobalValue::LinkOnceODRLinkage:
+  case GlobalValue::LinkOnceODRAutoHideLinkage:
   case GlobalValue::WeakAnyLinkage:
   case GlobalValue::WeakODRLinkage:
   case GlobalValue::LinkerPrivateWeakLinkage:
-  case GlobalValue::LinkerPrivateWeakDefAutoLinkage:
     if (MAI->getWeakDefDirective() != 0) {
       // .globl _foo
       OutStreamer.EmitSymbolAttribute(GVSym, MCSA_Global);
 
       if ((GlobalValue::LinkageTypes)Linkage !=
-          GlobalValue::LinkerPrivateWeakDefAutoLinkage)
+          GlobalValue::LinkOnceODRAutoHideLinkage)
         // .weak_definition _foo
         OutStreamer.EmitSymbolAttribute(GVSym, MCSA_WeakDefinition);
       else
@@ -312,8 +312,8 @@ void AsmPrinter::EmitGlobalVariable(const GlobalVariable *GV) {
       return;
     }
 
-    if (MAI->getLCOMMDirectiveType() != LCOMM::None &&
-        (MAI->getLCOMMDirectiveType() != LCOMM::NoAlignment || Align == 1)) {
+    if (Align == 1 ||
+        MAI->getLCOMMDirectiveAlignmentType() != LCOMM::NoAlignment) {
       // .lcomm _foo, 42
       OutStreamer.EmitLocalCommonSymbol(GVSym, Size, Align);
       return;
@@ -482,9 +482,8 @@ void AsmPrinter::EmitFunctionEntryLabel() {
                      "' label emitted multiple times to assembly file");
 }
 
-
-/// EmitComments - Pretty-print comments for instructions.
-static void EmitComments(const MachineInstr &MI, raw_ostream &CommentOS) {
+/// emitComments - Pretty-print comments for instructions.
+static void emitComments(const MachineInstr &MI, raw_ostream &CommentOS) {
   const MachineFunction *MF = MI.getParent()->getParent();
   const TargetMachine &TM = MF->getTarget();
 
@@ -519,16 +518,16 @@ static void EmitComments(const MachineInstr &MI, raw_ostream &CommentOS) {
     CommentOS << " Reload Reuse\n";
 }
 
-/// EmitImplicitDef - This method emits the specified machine instruction
+/// emitImplicitDef - This method emits the specified machine instruction
 /// that is an implicit def.
-static void EmitImplicitDef(const MachineInstr *MI, AsmPrinter &AP) {
+static void emitImplicitDef(const MachineInstr *MI, AsmPrinter &AP) {
   unsigned RegNo = MI->getOperand(0).getReg();
   AP.OutStreamer.AddComment(Twine("implicit-def: ") +
                             AP.TM.getRegisterInfo()->getName(RegNo));
   AP.OutStreamer.AddBlankLine();
 }
 
-static void EmitKill(const MachineInstr *MI, AsmPrinter &AP) {
+static void emitKill(const MachineInstr *MI, AsmPrinter &AP) {
   std::string Str = "kill:";
   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
     const MachineOperand &Op = MI->getOperand(i);
@@ -541,10 +540,10 @@ static void EmitKill(const MachineInstr *MI, AsmPrinter &AP) {
   AP.OutStreamer.AddBlankLine();
 }
 
-/// EmitDebugValueComment - This method handles the target-independent form
+/// emitDebugValueComment - This method handles the target-independent form
 /// of DBG_VALUE, returning true if it was able to do so.  A false return
 /// means the target will need to handle MI in EmitInstruction.
-static bool EmitDebugValueComment(const MachineInstr *MI, AsmPrinter &AP) {
+static bool emitDebugValueComment(const MachineInstr *MI, AsmPrinter &AP) {
   // This code handles only the 3-operand target-independent form.
   if (MI->getNumOperands() != 3)
     return false;
@@ -674,7 +673,7 @@ void AsmPrinter::EmitFunctionBody() {
       }
 
       if (isVerbose())
-        EmitComments(*II, OutStreamer.GetCommentOS());
+        emitComments(*II, OutStreamer.GetCommentOS());
 
       switch (II->getOpcode()) {
       case TargetOpcode::PROLOG_LABEL:
@@ -690,15 +689,15 @@ void AsmPrinter::EmitFunctionBody() {
         break;
       case TargetOpcode::DBG_VALUE:
         if (isVerbose()) {
-          if (!EmitDebugValueComment(II, *this))
+          if (!emitDebugValueComment(II, *this))
             EmitInstruction(II);
         }
         break;
       case TargetOpcode::IMPLICIT_DEF:
-        if (isVerbose()) EmitImplicitDef(II, *this);
+        if (isVerbose()) emitImplicitDef(II, *this);
         break;
       case TargetOpcode::KILL:
-        if (isVerbose()) EmitKill(II, *this);
+        if (isVerbose()) emitKill(II, *this);
         break;
       default:
         if (!TM.hasMCUseLoc())
@@ -1083,6 +1082,11 @@ void AsmPrinter::EmitJumpTableInfo() {
 
   EmitAlignment(Log2_32(MJTI->getEntryAlignment(*TM.getTargetData())));
 
+  // Jump tables in code sections are marked with a data_region directive
+  // where that's supported.
+  if (!JTInDiffSection)
+    OutStreamer.EmitDataRegion(MCDR_DataRegionJT32);
+
   for (unsigned JTI = 0, e = JT.size(); JTI != e; ++JTI) {
     const std::vector<MachineBasicBlock*> &JTBBs = JT[JTI].MBBs;
 
@@ -1123,6 +1127,8 @@ void AsmPrinter::EmitJumpTableInfo() {
     for (unsigned ii = 0, ee = JTBBs.size(); ii != ee; ++ii)
       EmitJumpTableEntry(MJTI, JTBBs[ii], JTI);
   }
+  if (!JTInDiffSection)
+    OutStreamer.EmitDataRegion(MCDR_DataRegionEnd);
 }
 
 /// EmitJumpTableEntry - Emit a jump table entry for the specified MBB to the
@@ -1422,9 +1428,9 @@ void AsmPrinter::EmitAlignment(unsigned NumBits, const GlobalValue *GV) const {
 // Constant emission.
 //===----------------------------------------------------------------------===//
 
-/// LowerConstant - Lower the specified LLVM Constant to an MCExpr.
+/// lowerConstant - Lower the specified LLVM Constant to an MCExpr.
 ///
-static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
+static const MCExpr *lowerConstant(const Constant *CV, AsmPrinter &AP) {
   MCContext &Ctx = AP.OutContext;
 
   if (CV->isNullValue() || isa<UndefValue>(CV))
@@ -1452,7 +1458,7 @@ static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
     if (Constant *C =
           ConstantFoldConstantExpression(CE, AP.TM.getTargetData()))
       if (C != CE)
-        return LowerConstant(C, AP);
+        return lowerConstant(C, AP);
 
     // Otherwise report the problem to the user.
     {
@@ -1470,15 +1476,14 @@ static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
     SmallVector<Value*, 8> IdxVec(CE->op_begin()+1, CE->op_end());
     int64_t Offset = TD.getIndexedOffset(PtrVal->getType(), IdxVec);
 
-    const MCExpr *Base = LowerConstant(CE->getOperand(0), AP);
+    const MCExpr *Base = lowerConstant(CE->getOperand(0), AP);
     if (Offset == 0)
       return Base;
 
     // Truncate/sext the offset to the pointer size.
-    if (TD.getPointerSizeInBits() != 64) {
-      int SExtAmount = 64-TD.getPointerSizeInBits();
-      Offset = (Offset << SExtAmount) >> SExtAmount;
-    }
+    unsigned Width = TD.getPointerSizeInBits();
+    if (Width < 64)
+      Offset = SignExtend64(Offset, Width);
 
     return MCBinaryExpr::CreateAdd(Base, MCConstantExpr::Create(Offset, Ctx),
                                    Ctx);
@@ -1491,7 +1496,7 @@ static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
     // is reasonable to treat their delta as a 32-bit value.
     // FALL THROUGH.
   case Instruction::BitCast:
-    return LowerConstant(CE->getOperand(0), AP);
+    return lowerConstant(CE->getOperand(0), AP);
 
   case Instruction::IntToPtr: {
     const TargetData &TD = *AP.TM.getTargetData();
@@ -1500,7 +1505,7 @@ static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
     Constant *Op = CE->getOperand(0);
     Op = ConstantExpr::getIntegerCast(Op, TD.getIntPtrType(CV->getContext()),
                                       false/*ZExt*/);
-    return LowerConstant(Op, AP);
+    return lowerConstant(Op, AP);
   }
 
   case Instruction::PtrToInt: {
@@ -1510,7 +1515,7 @@ static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
     Constant *Op = CE->getOperand(0);
     Type *Ty = CE->getType();
 
-    const MCExpr *OpExpr = LowerConstant(Op, AP);
+    const MCExpr *OpExpr = lowerConstant(Op, AP);
 
     // We can emit the pointer value into this slot if the slot is an
     // integer slot equal to the size of the pointer.
@@ -1536,8 +1541,8 @@ static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
   case Instruction::And:
   case Instruction::Or:
   case Instruction::Xor: {
-    const MCExpr *LHS = LowerConstant(CE->getOperand(0), AP);
-    const MCExpr *RHS = LowerConstant(CE->getOperand(1), AP);
+    const MCExpr *LHS = lowerConstant(CE->getOperand(0), AP);
+    const MCExpr *RHS = lowerConstant(CE->getOperand(1), AP);
     switch (CE->getOpcode()) {
     default: llvm_unreachable("Unknown binary operator constant cast expr");
     case Instruction::Add: return MCBinaryExpr::CreateAdd(LHS, RHS, Ctx);
@@ -1554,7 +1559,7 @@ static const MCExpr *LowerConstant(const Constant *CV, AsmPrinter &AP) {
   }
 }
 
-static void EmitGlobalConstantImpl(const Constant *C, unsigned AddrSpace,
+static void emitGlobalConstantImpl(const Constant *C, unsigned AddrSpace,
                                    AsmPrinter &AP);
 
 /// isRepeatedByteSequence - Determine whether the given value is
@@ -1616,7 +1621,7 @@ static int isRepeatedByteSequence(const Value *V, TargetMachine &TM) {
   return -1;
 }
 
-static void EmitGlobalConstantDataSequential(const ConstantDataSequential *CDS,
+static void emitGlobalConstantDataSequential(const ConstantDataSequential *CDS,
                                              unsigned AddrSpace,AsmPrinter &AP){
   
   // See if we can aggregate this into a .fill, if so, emit it as such.
@@ -1681,7 +1686,7 @@ static void EmitGlobalConstantDataSequential(const ConstantDataSequential *CDS,
 
 }
 
-static void EmitGlobalConstantArray(const ConstantArray *CA, unsigned AddrSpace,
+static void emitGlobalConstantArray(const ConstantArray *CA, unsigned AddrSpace,
                                     AsmPrinter &AP) {
   // See if we can aggregate some values.  Make sure it can be
   // represented as a series of bytes of the constant value.
@@ -1693,14 +1698,14 @@ static void EmitGlobalConstantArray(const ConstantArray *CA, unsigned AddrSpace,
   }
   else {
     for (unsigned i = 0, e = CA->getNumOperands(); i != e; ++i)
-      EmitGlobalConstantImpl(CA->getOperand(i), AddrSpace, AP);
+      emitGlobalConstantImpl(CA->getOperand(i), AddrSpace, AP);
   }
 }
 
-static void EmitGlobalConstantVector(const ConstantVector *CV,
+static void emitGlobalConstantVector(const ConstantVector *CV,
                                      unsigned AddrSpace, AsmPrinter &AP) {
   for (unsigned i = 0, e = CV->getType()->getNumElements(); i != e; ++i)
-    EmitGlobalConstantImpl(CV->getOperand(i), AddrSpace, AP);
+    emitGlobalConstantImpl(CV->getOperand(i), AddrSpace, AP);
 
   const TargetData &TD = *AP.TM.getTargetData();
   unsigned Size = TD.getTypeAllocSize(CV->getType());
@@ -1710,7 +1715,7 @@ static void EmitGlobalConstantVector(const ConstantVector *CV,
     AP.OutStreamer.EmitZeros(Padding, AddrSpace);
 }
 
-static void EmitGlobalConstantStruct(const ConstantStruct *CS,
+static void emitGlobalConstantStruct(const ConstantStruct *CS,
                                      unsigned AddrSpace, AsmPrinter &AP) {
   // Print the fields in successive locations. Pad to align if needed!
   const TargetData *TD = AP.TM.getTargetData();
@@ -1727,7 +1732,7 @@ static void EmitGlobalConstantStruct(const ConstantStruct *CS,
     SizeSoFar += FieldSize + PadSize;
 
     // Now print the actual field value.
-    EmitGlobalConstantImpl(Field, AddrSpace, AP);
+    emitGlobalConstantImpl(Field, AddrSpace, AP);
 
     // Insert padding - this may include padding to increase the size of the
     // current field up to the ABI size (if the struct is not packed) as well
@@ -1738,7 +1743,7 @@ static void EmitGlobalConstantStruct(const ConstantStruct *CS,
          "Layout of constant struct may be incorrect!");
 }
 
-static void EmitGlobalConstantFP(const ConstantFP *CFP, unsigned AddrSpace,
+static void emitGlobalConstantFP(const ConstantFP *CFP, unsigned AddrSpace,
                                  AsmPrinter &AP) {
   if (CFP->getType()->isHalfTy()) {
     if (AP.isVerbose()) {
@@ -1823,7 +1828,7 @@ static void EmitGlobalConstantFP(const ConstantFP *CFP, unsigned AddrSpace,
   }
 }
 
-static void EmitGlobalConstantLargeInt(const ConstantInt *CI,
+static void emitGlobalConstantLargeInt(const ConstantInt *CI,
                                        unsigned AddrSpace, AsmPrinter &AP) {
   const TargetData *TD = AP.TM.getTargetData();
   unsigned BitWidth = CI->getBitWidth();
@@ -1839,7 +1844,7 @@ static void EmitGlobalConstantLargeInt(const ConstantInt *CI,
   }
 }
 
-static void EmitGlobalConstantImpl(const Constant *CV, unsigned AddrSpace,
+static void emitGlobalConstantImpl(const Constant *CV, unsigned AddrSpace,
                                    AsmPrinter &AP) {
   const TargetData *TD = AP.TM.getTargetData();
   uint64_t Size = TD->getTypeAllocSize(CV->getType());
@@ -1858,13 +1863,13 @@ static void EmitGlobalConstantImpl(const Constant *CV, unsigned AddrSpace,
       AP.OutStreamer.EmitIntValue(CI->getZExtValue(), Size, AddrSpace);
       return;
     default:
-      EmitGlobalConstantLargeInt(CI, AddrSpace, AP);
+      emitGlobalConstantLargeInt(CI, AddrSpace, AP);
       return;
     }
   }
 
   if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV))
-    return EmitGlobalConstantFP(CFP, AddrSpace, AP);
+    return emitGlobalConstantFP(CFP, AddrSpace, AP);
 
   if (isa<ConstantPointerNull>(CV)) {
     AP.OutStreamer.EmitIntValue(0, Size, AddrSpace);
@@ -1872,19 +1877,19 @@ static void EmitGlobalConstantImpl(const Constant *CV, unsigned AddrSpace,
   }
 
   if (const ConstantDataSequential *CDS = dyn_cast<ConstantDataSequential>(CV))
-    return EmitGlobalConstantDataSequential(CDS, AddrSpace, AP);
+    return emitGlobalConstantDataSequential(CDS, AddrSpace, AP);
   
   if (const ConstantArray *CVA = dyn_cast<ConstantArray>(CV))
-    return EmitGlobalConstantArray(CVA, AddrSpace, AP);
+    return emitGlobalConstantArray(CVA, AddrSpace, AP);
 
   if (const ConstantStruct *CVS = dyn_cast<ConstantStruct>(CV))
-    return EmitGlobalConstantStruct(CVS, AddrSpace, AP);
+    return emitGlobalConstantStruct(CVS, AddrSpace, AP);
 
   if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(CV)) {
     // Look through bitcasts, which might not be able to be MCExpr'ized (e.g. of
     // vectors).
     if (CE->getOpcode() == Instruction::BitCast)
-      return EmitGlobalConstantImpl(CE->getOperand(0), AddrSpace, AP);
+      return emitGlobalConstantImpl(CE->getOperand(0), AddrSpace, AP);
 
     if (Size > 8) {
       // If the constant expression's size is greater than 64-bits, then we have
@@ -1892,23 +1897,23 @@ static void EmitGlobalConstantImpl(const Constant *CV, unsigned AddrSpace,
       // that way.
       Constant *New = ConstantFoldConstantExpression(CE, TD);
       if (New && New != CE)
-        return EmitGlobalConstantImpl(New, AddrSpace, AP);
+        return emitGlobalConstantImpl(New, AddrSpace, AP);
     }
   }
   
   if (const ConstantVector *V = dyn_cast<ConstantVector>(CV))
-    return EmitGlobalConstantVector(V, AddrSpace, AP);
+    return emitGlobalConstantVector(V, AddrSpace, AP);
     
   // Otherwise, it must be a ConstantExpr.  Lower it to an MCExpr, then emit it
   // thread the streamer with EmitValue.
-  AP.OutStreamer.EmitValue(LowerConstant(CV, AP), Size, AddrSpace);
+  AP.OutStreamer.EmitValue(lowerConstant(CV, AP), Size, AddrSpace);
 }
 
 /// EmitGlobalConstant - Print a general LLVM constant to the .s file.
 void AsmPrinter::EmitGlobalConstant(const Constant *CV, unsigned AddrSpace) {
   uint64_t Size = TM.getTargetData()->getTypeAllocSize(CV->getType());
   if (Size)
-    EmitGlobalConstantImpl(CV, AddrSpace, *this);
+    emitGlobalConstantImpl(CV, AddrSpace, *this);
   else if (MAI->hasSubsectionsViaSymbols()) {
     // If the global has zero size, emit a single byte so that two labels don't
     // look like they are at the same location.
@@ -2023,8 +2028,8 @@ static void PrintChildLoopComment(raw_ostream &OS, const MachineLoop *Loop,
   }
 }
 
-/// EmitBasicBlockLoopComments - Pretty-print comments for basic blocks.
-static void EmitBasicBlockLoopComments(const MachineBasicBlock &MBB,
+/// emitBasicBlockLoopComments - Pretty-print comments for basic blocks.
+static void emitBasicBlockLoopComments(const MachineBasicBlock &MBB,
                                        const MachineLoopInfo *LI,
                                        const AsmPrinter &AP) {
   // Add loop depth information
@@ -2090,7 +2095,7 @@ void AsmPrinter::EmitBasicBlockStart(const MachineBasicBlock *MBB) const {
     if (const BasicBlock *BB = MBB->getBasicBlock())
       if (BB->hasName())
         OutStreamer.AddComment("%" + BB->getName());
-    EmitBasicBlockLoopComments(*MBB, LI, *this);
+    emitBasicBlockLoopComments(*MBB, LI, *this);
   }
 
   // Print the main label for the block.

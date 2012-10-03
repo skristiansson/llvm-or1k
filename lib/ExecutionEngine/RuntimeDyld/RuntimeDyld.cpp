@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dyld"
+#include "ObjectImageCommon.h"
 #include "RuntimeDyldImpl.h"
 #include "RuntimeDyldELF.h"
 #include "RuntimeDyldMachO.h"
@@ -48,7 +49,7 @@ void RuntimeDyldImpl::resolveRelocations() {
   }
 }
 
-void RuntimeDyldImpl::mapSectionAddress(void *LocalAddress,
+void RuntimeDyldImpl::mapSectionAddress(const void *LocalAddress,
                                         uint64_t TargetAddress) {
   for (unsigned i = 0, e = Sections.size(); i != e; ++i) {
     if (Sections[i].Address == LocalAddress) {
@@ -61,14 +62,11 @@ void RuntimeDyldImpl::mapSectionAddress(void *LocalAddress,
 
 // Subclasses can implement this method to create specialized image instances.
 // The caller owns the pointer that is returned.
-ObjectImage *RuntimeDyldImpl::createObjectImage(const MemoryBuffer *InputBuffer) {
-  ObjectFile *ObjFile = ObjectFile::createObjectFile(const_cast<MemoryBuffer*>
-                                                                 (InputBuffer));
-  ObjectImage *Obj = new ObjectImage(ObjFile);
-  return Obj;
+ObjectImage *RuntimeDyldImpl::createObjectImage(ObjectBuffer *InputBuffer) {
+  return new ObjectImageCommon(InputBuffer);
 }
 
-bool RuntimeDyldImpl::loadObject(const MemoryBuffer *InputBuffer) {
+ObjectImage *RuntimeDyldImpl::loadObject(ObjectBuffer *InputBuffer) {
   OwningPtr<ObjectImage> obj(createObjectImage(InputBuffer));
   if (!obj)
     report_fatal_error("Unable to create object image from memory buffer!");
@@ -108,7 +106,8 @@ bool RuntimeDyldImpl::loadObject(const MemoryBuffer *InputBuffer) {
       CommonSymbols[*i] = Size;
     } else {
       if (SymType == object::SymbolRef::ST_Function ||
-          SymType == object::SymbolRef::ST_Data) {
+          SymType == object::SymbolRef::ST_Data ||
+          SymType == object::SymbolRef::ST_Unknown) {
         uint64_t FileOffset;
         StringRef SectionData;
         section_iterator si = obj->end_sections();
@@ -177,9 +176,7 @@ bool RuntimeDyldImpl::loadObject(const MemoryBuffer *InputBuffer) {
     }
   }
 
-  handleObjectLoaded(obj.take());
-
-  return false;
+  return obj.take();
 }
 
 void RuntimeDyldImpl::emitCommonSymbols(ObjectImage &Obj,
@@ -333,15 +330,31 @@ void RuntimeDyldImpl::addRelocationForSymbol(const RelocationEntry &RE,
 }
 
 uint8_t *RuntimeDyldImpl::createStubFunction(uint8_t *Addr) {
-  // TODO: There is only ARM far stub now. We should add the Thumb stub,
-  // and stubs for branches Thumb - ARM and ARM - Thumb.
   if (Arch == Triple::arm) {
+    // TODO: There is only ARM far stub now. We should add the Thumb stub,
+    // and stubs for branches Thumb - ARM and ARM - Thumb.
     uint32_t *StubAddr = (uint32_t*)Addr;
     *StubAddr = 0xe51ff004; // ldr pc,<label>
     return (uint8_t*)++StubAddr;
-  }
-  else
+  } else if (Arch == Triple::mipsel) {
+    uint32_t *StubAddr = (uint32_t*)Addr;
+    // 0:   3c190000        lui     t9,%hi(addr).
+    // 4:   27390000        addiu   t9,t9,%lo(addr).
+    // 8:   03200008        jr      t9.
+    // c:   00000000        nop.
+    const unsigned LuiT9Instr = 0x3c190000, AdduiT9Instr = 0x27390000;
+    const unsigned JrT9Instr = 0x03200008, NopInstr = 0x0;
+
+    *StubAddr = LuiT9Instr;
+    StubAddr++;
+    *StubAddr = AdduiT9Instr;
+    StubAddr++;
+    *StubAddr = JrT9Instr;
+    StubAddr++;
+    *StubAddr = NopInstr;
     return Addr;
+  }
+  return Addr;
 }
 
 // Assign an address to a symbol name and resolve all the relocations
@@ -420,7 +433,7 @@ RuntimeDyld::~RuntimeDyld() {
   delete Dyld;
 }
 
-bool RuntimeDyld::loadObject(MemoryBuffer *InputBuffer) {
+ObjectImage *RuntimeDyld::loadObject(ObjectBuffer *InputBuffer) {
   if (!Dyld) {
     sys::LLVMFileType type = sys::IdentifyFileType(
             InputBuffer->getBufferStart(),
@@ -462,6 +475,10 @@ void *RuntimeDyld::getSymbolAddress(StringRef Name) {
   return Dyld->getSymbolAddress(Name);
 }
 
+uint64_t RuntimeDyld::getSymbolLoadAddress(StringRef Name) {
+  return Dyld->getSymbolLoadAddress(Name);
+}
+
 void RuntimeDyld::resolveRelocations() {
   Dyld->resolveRelocations();
 }
@@ -471,7 +488,7 @@ void RuntimeDyld::reassignSectionAddress(unsigned SectionID,
   Dyld->reassignSectionAddress(SectionID, Addr);
 }
 
-void RuntimeDyld::mapSectionAddress(void *LocalAddress,
+void RuntimeDyld::mapSectionAddress(const void *LocalAddress,
                                     uint64_t TargetAddress) {
   Dyld->mapSectionAddress(LocalAddress, TargetAddress);
 }

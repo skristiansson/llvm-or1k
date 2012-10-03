@@ -26,7 +26,6 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/Passes.h"
-#include "llvm/Function.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCExpr.h"
@@ -134,8 +133,7 @@ bool Emitter<CodeEmitter>::runOnMachineFunction(MachineFunction &MF) {
   IsPIC = TM.getRelocationModel() == Reloc::PIC_;
 
   do {
-    DEBUG(dbgs() << "JITTing function '"
-          << MF.getFunction()->getName() << "'\n");
+    DEBUG(dbgs() << "JITTing function '" << MF.getName() << "'\n");
     MCE.startFunction(MF);
     for (MachineFunction::iterator MBB = MF.begin(), E = MF.end();
          MBB != E; ++MBB) {
@@ -922,17 +920,6 @@ void Emitter<CodeEmitter>::emitVEXOpcodePrefix(uint64_t TSFlags,
       break;  // No prefix!
   }
 
-
-  // Set the vector length to 256-bit if YMM0-YMM15 is used
-  for (unsigned i = 0; i != MI.getNumOperands(); ++i) {
-    if (!MI.getOperand(i).isReg())
-      continue;
-    if (MI.getOperand(i).isImplicit())
-      continue;
-    unsigned SrcReg = MI.getOperand(i).getReg();
-    if (SrcReg >= X86::YMM0 && SrcReg <= X86::YMM15)
-      VEX_L = 1;
-  }
 
   // Classify VEX_B, VEX_4V, VEX_R, VEX_X
   unsigned NumOps = Desc->getNumOperands();

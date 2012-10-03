@@ -52,6 +52,8 @@ void BitcodeReader::FreeState() {
   std::vector<Function*>().swap(FunctionsWithBodies);
   DeferredFunctionInfo.clear();
   MDKindMap.clear();
+
+  assert(BlockAddrFwdRefs.empty() && "Unresolved blockaddress fwd references");
 }
 
 //===----------------------------------------------------------------------===//
@@ -89,7 +91,7 @@ static GlobalValue::LinkageTypes GetDecodedLinkage(unsigned Val) {
   case 12: return GlobalValue::AvailableExternallyLinkage;
   case 13: return GlobalValue::LinkerPrivateLinkage;
   case 14: return GlobalValue::LinkerPrivateWeakLinkage;
-  case 15: return GlobalValue::LinkerPrivateWeakDefAutoLinkage;
+  case 15: return GlobalValue::LinkOnceODRAutoHideLinkage;
   }
 }
 
@@ -197,7 +199,7 @@ namespace {
   /// @brief A class for maintaining the slot number definition
   /// as a placeholder for the actual definition for forward constants defs.
   class ConstantPlaceHolder : public ConstantExpr {
-    void operator=(const ConstantPlaceHolder &); // DO NOT IMPLEMENT
+    void operator=(const ConstantPlaceHolder &) LLVM_DELETED_FUNCTION;
   public:
     // allocate space for exactly one operand
     void *operator new(size_t s) {
@@ -475,7 +477,7 @@ bool BitcodeReader::ParseAttributeBlock() {
 
       for (unsigned i = 0, e = Record.size(); i != e; i += 2) {
         Attributes ReconstitutedAttr =
-          Attribute::decodeLLVMAttributesForBitcode(Record[i+1]);
+          Attributes::decodeLLVMAttributesForBitcode(Record[i+1]);
         Record[i+1] = ReconstitutedAttr.Raw();
       }
 
@@ -1245,7 +1247,9 @@ bool BitcodeReader::ParseConstants() {
         V = ConstantExpr::getICmp(Record[3], Op0, Op1);
       break;
     }
-    case bitc::CST_CODE_INLINEASM: {
+    // This maintains backward compatibility, pre-asm dialect keywords.
+    // FIXME: Remove with the 4.0 release.
+    case bitc::CST_CODE_INLINEASM_OLD: {
       if (Record.size() < 2) return Error("Invalid INLINEASM record");
       std::string AsmStr, ConstrStr;
       bool HasSideEffects = Record[0] & 1;
@@ -1266,6 +1270,31 @@ bool BitcodeReader::ParseConstants() {
                          AsmStr, ConstrStr, HasSideEffects, IsAlignStack);
       break;
     }
+    // This version adds support for the asm dialect keywords (e.g.,
+    // inteldialect).
+    case bitc::CST_CODE_INLINEASM: {
+      if (Record.size() < 2) return Error("Invalid INLINEASM record");
+      std::string AsmStr, ConstrStr;
+      bool HasSideEffects = Record[0] & 1;
+      bool IsAlignStack = (Record[0] >> 1) & 1;
+      unsigned AsmDialect = Record[0] >> 2;
+      unsigned AsmStrSize = Record[1];
+      if (2+AsmStrSize >= Record.size())
+        return Error("Invalid INLINEASM record");
+      unsigned ConstStrSize = Record[2+AsmStrSize];
+      if (3+AsmStrSize+ConstStrSize > Record.size())
+        return Error("Invalid INLINEASM record");
+
+      for (unsigned i = 0; i != AsmStrSize; ++i)
+        AsmStr += (char)Record[2+i];
+      for (unsigned i = 0; i != ConstStrSize; ++i)
+        ConstrStr += (char)Record[3+AsmStrSize+i];
+      PointerType *PTy = cast<PointerType>(CurTy);
+      V = InlineAsm::get(cast<FunctionType>(PTy->getElementType()),
+                         AsmStr, ConstrStr, HasSideEffects, IsAlignStack,
+                         InlineAsm::AsmDialect(AsmDialect));
+      break;
+    }
     case bitc::CST_CODE_BLOCKADDRESS:{
       if (Record.size() < 3) return Error("Invalid CE_BLOCKADDRESS record");
       Type *FnTy = getTypeByID(Record[0]);
@@ -1273,13 +1302,27 @@ bool BitcodeReader::ParseConstants() {
       Function *Fn =
         dyn_cast_or_null<Function>(ValueList.getConstantFwdRef(Record[1],FnTy));
       if (Fn == 0) return Error("Invalid CE_BLOCKADDRESS record");
-      
-      GlobalVariable *FwdRef = new GlobalVariable(*Fn->getParent(),
-                                                  Type::getInt8Ty(Context),
+
+      // If the function is already parsed we can insert the block address right
+      // away.
+      if (!Fn->empty()) {
+        Function::iterator BBI = Fn->begin(), BBE = Fn->end();
+        for (size_t I = 0, E = Record[2]; I != E; ++I) {
+          if (BBI == BBE)
+            return Error("Invalid blockaddress block #");
+          ++BBI;
+        }
+        V = BlockAddress::get(Fn, BBI);
+      } else {
+        // Otherwise insert a placeholder and remember it so it can be inserted
+        // when the function is parsed.
+        GlobalVariable *FwdRef = new GlobalVariable(*Fn->getParent(),
+                                                    Type::getInt8Ty(Context),
                                             false, GlobalValue::InternalLinkage,
-                                                  0, "");
-      BlockAddrFwdRefs[Fn].push_back(std::make_pair(Record[2], FwdRef));
-      V = FwdRef;
+                                                    0, "");
+        BlockAddrFwdRefs[Fn].push_back(std::make_pair(Record[2], FwdRef));
+        V = FwdRef;
+      }
       break;
     }  
     }
@@ -2837,7 +2880,7 @@ bool BitcodeReader::InitStream() {
 }
 
 bool BitcodeReader::InitStreamFromBuffer() {
-  const unsigned char *BufPtr = (unsigned char *)Buffer->getBufferStart();
+  const unsigned char *BufPtr = (const unsigned char*)Buffer->getBufferStart();
   const unsigned char *BufEnd = BufPtr+Buffer->getBufferSize();
 
   if (Buffer->getBufferSize() & 3) {

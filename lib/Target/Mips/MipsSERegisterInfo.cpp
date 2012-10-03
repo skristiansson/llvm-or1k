@@ -40,8 +40,8 @@
 using namespace llvm;
 
 MipsSERegisterInfo::MipsSERegisterInfo(const MipsSubtarget &ST,
-                                       const TargetInstrInfo &TII)
-  : MipsRegisterInfo(ST, TII) {}
+                                       const MipsSEInstrInfo &I)
+  : MipsRegisterInfo(ST), TII(I) {}
 
 // This function eliminate ADJCALLSTACKDOWN,
 // ADJCALLSTACKUP pseudo instructions
@@ -91,8 +91,7 @@ void MipsSERegisterInfo::eliminateFI(MachineBasicBlock::iterator II,
   // getFrameRegister() returns.
   unsigned FrameReg;
 
-  if (MipsFI->isOutArgFI(FrameIndex) ||
-      (FrameIndex >= MinCSFI && FrameIndex <= MaxCSFI))
+  if (FrameIndex >= MinCSFI && FrameIndex <= MaxCSFI)
     FrameReg = Subtarget.isABI_N64() ? Mips::SP_64 : Mips::SP;
   else
     FrameReg = getFrameRegister(MF);
@@ -106,12 +105,8 @@ void MipsSERegisterInfo::eliminateFI(MachineBasicBlock::iterator II,
   //   incoming argument, callee-saved register location or local variable.
   int64_t Offset;
 
-  if (MipsFI->isOutArgFI(FrameIndex))
-    Offset = SPOffset;
-  else
-    Offset = SPOffset + (int64_t)StackSize;
-
-  Offset    += MI.getOperand(OpNo + 1).getImm();
+  Offset = SPOffset + (int64_t)StackSize;
+  Offset += MI.getOperand(OpNo + 1).getImm();
 
   DEBUG(errs() << "Offset     : " << Offset << "\n" << "<--------->\n");
 
@@ -122,15 +117,14 @@ void MipsSERegisterInfo::eliminateFI(MachineBasicBlock::iterator II,
     DebugLoc DL = II->getDebugLoc();
     unsigned ADDu = Subtarget.isABI_N64() ? Mips::DADDu : Mips::ADDu;
     unsigned ATReg = Subtarget.isABI_N64() ? Mips::AT_64 : Mips::AT;
-    MipsAnalyzeImmediate::Inst LastInst(0, 0);
+    unsigned NewImm;
 
     MipsFI->setEmitNOAT();
-    Mips::loadImmediate(Offset, Subtarget.isABI_N64(), TII, MBB, II, DL, true,
-                        &LastInst);
-    BuildMI(MBB, II, DL, TII.get(ADDu), ATReg).addReg(FrameReg).addReg(ATReg);
+    unsigned Reg = TII.loadImmediate(Offset, MBB, II, DL, &NewImm);
+    BuildMI(MBB, II, DL, TII.get(ADDu), ATReg).addReg(FrameReg).addReg(Reg);
 
     FrameReg = ATReg;
-    Offset = SignExtend64<16>(LastInst.ImmOpnd);
+    Offset = SignExtend64<16>(NewImm);
   }
 
   MI.getOperand(OpNo).ChangeToRegister(FrameReg, false);

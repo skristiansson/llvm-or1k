@@ -70,9 +70,7 @@ public:
     llvm_unreachable("macho doesn't support this directive");
   }
   virtual void EmitLocalCommonSymbol(MCSymbol *Symbol, uint64_t Size,
-                                     unsigned ByteAlignment) {
-    llvm_unreachable("macho doesn't support this directive");
-  }
+                                     unsigned ByteAlignment);
   virtual void EmitZerofill(const MCSection *Section, MCSymbol *Symbol = 0,
                             uint64_t Size = 0, unsigned ByteAlignment = 0);
   virtual void EmitTBSSSymbol(const MCSection *Section, MCSymbol *Symbol,
@@ -141,6 +139,8 @@ void MCMachOStreamer::EmitLabel(MCSymbol *Symbol) {
 }
 
 void MCMachOStreamer::EmitDataRegion(DataRegionData::KindTy Kind) {
+  if (!getAssembler().getBackend().hasDataInCodeSupport())
+    return;
   // Create a temporary label to mark the start of the data region.
   MCSymbol *Start = getContext().CreateTempSymbol();
   EmitLabel(Start);
@@ -151,6 +151,8 @@ void MCMachOStreamer::EmitDataRegion(DataRegionData::KindTy Kind) {
 }
 
 void MCMachOStreamer::EmitDataRegionEnd() {
+  if (!getAssembler().getBackend().hasDataInCodeSupport())
+    return;
   std::vector<DataRegionData> &Regions = getAssembler().getDataRegions();
   assert(Regions.size() && "Mismatched .end_data_region!");
   DataRegionData &Data = Regions.back();
@@ -323,6 +325,15 @@ void MCMachOStreamer::EmitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
   MCSymbolData &SD = getAssembler().getOrCreateSymbolData(*Symbol);
   SD.setExternal(true);
   SD.setCommon(Size, ByteAlignment);
+}
+
+void MCMachOStreamer::EmitLocalCommonSymbol(MCSymbol *Symbol, uint64_t Size,
+                                            unsigned ByteAlignment) {
+  // '.lcomm' is equivalent to '.zerofill'.
+  return EmitZerofill(getContext().getMachOSection("__DATA", "__bss",
+                                                   MCSectionMachO::S_ZEROFILL,
+                                                   0, SectionKind::getBSS()),
+                      Symbol, Size, ByteAlignment);
 }
 
 void MCMachOStreamer::EmitZerofill(const MCSection *Section, MCSymbol *Symbol,

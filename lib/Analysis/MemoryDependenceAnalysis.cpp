@@ -148,7 +148,7 @@ AliasAnalysis::ModRefResult GetLocation(const Instruction *Inst,
     return AliasAnalysis::ModRef;
   }
 
-  if (const CallInst *CI = isFreeCall(Inst)) {
+  if (const CallInst *CI = isFreeCall(Inst, AA->getTargetLibraryInfo())) {
     // calls to free() deallocate the entire structure
     Loc = AliasAnalysis::Location(CI->getArgOperand(0));
     return AliasAnalysis::Mod;
@@ -227,13 +227,18 @@ getCallSiteDependencyFrom(CallSite CS, bool isReadOnlyCall,
 
         // Otherwise if the two calls don't interact (e.g. InstCS is readnone)
         // keep scanning.
-        break;
+        continue;
       default:
         return MemDepResult::getClobber(Inst);
       }
     }
+
+    // If we could not obtain a pointer for the instruction and the instruction
+    // touches memory then assume that this is a dependency.
+    if (MR != AliasAnalysis::NoModRef)
+      return MemDepResult::getClobber(Inst);
   }
-  
+
   // No dependence found.  If this is the entry block of the function, it is
   // unknown, otherwise it is non-local.
   if (BB != &BB->getParent()->getEntryBlock())
@@ -322,7 +327,7 @@ getLoadLoadClobberFullWidthSize(const Value *MemLocBase, int64_t MemLocOffs,
       return 0;
 
     if (LIOffs+NewLoadByteSize > MemLocEnd &&
-        LI->getParent()->getParent()->hasFnAttr(Attribute::AddressSafety)) {
+        LI->getParent()->getParent()->getFnAttributes().hasAddressSafetyAttr()){
       // We will be reading past the location accessed by the original program.
       // While this is safe in a regular build, Address Safety analysis tools
       // may start reporting false warnings. So, don't do widening.
@@ -474,12 +479,20 @@ getPointerDependencyFrom(const AliasAnalysis::Location &MemLoc, bool isLoad,
     // a subsequent bitcast of the malloc call result.  There can be stores to
     // the malloced memory between the malloc call and its bitcast uses, and we
     // need to continue scanning until the malloc call.
-    if (isa<AllocaInst>(Inst) || isNoAliasFn(Inst)) {
+    const TargetLibraryInfo *TLI = AA->getTargetLibraryInfo();
+    if (isa<AllocaInst>(Inst) || isNoAliasFn(Inst, TLI)) {
       const Value *AccessPtr = GetUnderlyingObject(MemLoc.Ptr, TD);
       
       if (AccessPtr == Inst || AA->isMustAlias(Inst, AccessPtr))
         return MemDepResult::getDef(Inst);
-      continue;
+      // Be conservative if the accessed pointer may alias the allocation.
+      if (AA->alias(Inst, AccessPtr) != AliasAnalysis::NoAlias)
+        return MemDepResult::getClobber(Inst);
+      // If the allocation is not aliased and does not read memory (like
+      // strdup), it is safe to ignore.
+      if (isa<AllocaInst>(Inst) ||
+          isMallocLikeFn(Inst, TLI) || isCallocLikeFn(Inst, TLI))
+        continue;
     }
 
     // See if this instruction (e.g. a call or vaarg) mod/ref's the pointer.

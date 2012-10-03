@@ -25,7 +25,6 @@ template <typename T> class SmallVectorImpl;
 class MCTargetAsmParser : public MCAsmParserExtension {
 public:
   enum MatchResultTy {
-    Match_ConversionFail,
     Match_InvalidOperand,
     Match_MissingFeature,
     Match_MnemonicFail,
@@ -34,8 +33,8 @@ public:
   };
 
 private:
-  MCTargetAsmParser(const MCTargetAsmParser &);   // DO NOT IMPLEMENT
-  void operator=(const MCTargetAsmParser &);  // DO NOT IMPLEMENT
+  MCTargetAsmParser(const MCTargetAsmParser &) LLVM_DELETED_FUNCTION;
+  void operator=(const MCTargetAsmParser &) LLVM_DELETED_FUNCTION;
 protected: // Can only create subclasses.
   MCTargetAsmParser();
 
@@ -79,6 +78,26 @@ public:
   /// \param DirectiveID - the identifier token of the directive.
   virtual bool ParseDirective(AsmToken DirectiveID) = 0;
 
+  /// mnemonicIsValid - This returns true if this is a valid mnemonic and false
+  /// otherwise.
+  virtual bool mnemonicIsValid(StringRef Mnemonic) = 0;
+
+  /// MatchInstruction - Recognize a series of operands of a parsed instruction
+  /// as an actual MCInst.  This returns false on success and returns true on
+  /// failure to match.
+  ///
+  /// On failure, the target parser is responsible for emitting a diagnostic
+  /// explaining the match failure.
+  virtual bool
+  MatchInstruction(SMLoc IDLoc, 
+                   SmallVectorImpl<MCParsedAsmOperand*> &Operands,
+                   MCStreamer &Out, unsigned &Kind, unsigned &Opcode,
+        SmallVectorImpl<std::pair< unsigned, std::string > > &MapAndConstraints,
+                   unsigned &OrigErrorInfo, bool matchingInlineAsm = false) {
+    OrigErrorInfo = ~0x0;
+    return true;
+  }
+
   /// MatchAndEmitInstruction - Recognize a series of operands of a parsed
   /// instruction as an actual MCInst and emit it to the specified MCStreamer.
   /// This returns false on success and returns true on failure to match.
@@ -96,6 +115,9 @@ public:
     return Match_Success;
   }
 
+  virtual void convertToMapAndConstraints(unsigned Kind,
+                           const SmallVectorImpl<MCParsedAsmOperand*> &Operands,
+   SmallVectorImpl<std::pair< unsigned, std::string > > &MapAndConstraints) = 0;
 };
 
 } // End llvm namespace

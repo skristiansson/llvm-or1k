@@ -157,9 +157,9 @@ bool X86FastISel::isTypeLegal(Type *Ty, MVT &VT, bool AllowI1) {
   // For now, require SSE/SSE2 for performing floating-point operations,
   // since x87 requires additional work.
   if (VT == MVT::f64 && !X86ScalarSSEf64)
-     return false;
+    return false;
   if (VT == MVT::f32 && !X86ScalarSSEf32)
-     return false;
+    return false;
   // Similarly, no f80 support yet.
   if (VT == MVT::f80)
     return false;
@@ -545,7 +545,7 @@ bool X86FastISel::X86SelectAddress(const Value *V, X86AddressMode &AM) {
         StubAM.GVOpFlags = GVFlags;
 
         // Prepare for inserting code in the local-value area.
-        SavePoint SaveInsertPt = enterLocalValueArea();
+	MachineBasicBlock::iterator SaveIter = enterLocalValueArea();
 
         if (TLI.getPointerTy() == MVT::i64) {
           Opc = X86::MOV64rm;
@@ -564,7 +564,7 @@ bool X86FastISel::X86SelectAddress(const Value *V, X86AddressMode &AM) {
         addFullAddress(LoadMI, StubAM);
 
         // Ok, back to normal mode.
-        leaveLocalValueArea(SaveInsertPt);
+        leaveLocalValueArea(SaveIter);
 
         // Prevent loading GV stub multiple times in same MBB.
         LocalValueMap[V] = LoadReg;
@@ -710,6 +710,8 @@ bool X86FastISel::X86SelectStore(const Instruction *I) {
 bool X86FastISel::X86SelectRet(const Instruction *I) {
   const ReturnInst *Ret = cast<ReturnInst>(I);
   const Function &F = *I->getParent()->getParent();
+  const X86MachineFunctionInfo *X86MFInfo =
+      FuncInfo.MF->getInfo<X86MachineFunctionInfo>();
 
   if (!FuncInfo.CanLowerReturn)
     return false;
@@ -724,8 +726,7 @@ bool X86FastISel::X86SelectRet(const Instruction *I) {
     return false;
 
   // Don't handle popping bytes on return for now.
-  if (FuncInfo.MF->getInfo<X86MachineFunctionInfo>()
-        ->getBytesToPopOnReturn() != 0)
+  if (X86MFInfo->getBytesToPopOnReturn() != 0)
     return 0;
 
   // fastcc with -tailcallopt is intended to provide a guaranteed
@@ -807,6 +808,19 @@ bool X86FastISel::X86SelectRet(const Instruction *I) {
 
     // Mark the register as live out of the function.
     MRI.addLiveOut(VA.getLocReg());
+  }
+
+  // The x86-64 ABI for returning structs by value requires that we copy
+  // the sret argument into %rax for the return. We saved the argument into
+  // a virtual register in the entry block, so now we copy the value out
+  // and into %rax.
+  if (Subtarget->is64Bit() && F.hasStructRetAttr()) {
+    unsigned Reg = X86MFInfo->getSRetReturnReg();
+    assert(Reg &&
+           "SRetReturnReg should have been set in LowerFormalArguments()!");
+    BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DL, TII.get(TargetOpcode::COPY),
+            X86::RAX).addReg(Reg);
+    MRI.addLiveOut(X86::RAX);
   }
 
   // Now emit the RET.
@@ -1529,7 +1543,7 @@ static unsigned computeBytesPoppedByCallee(const X86Subtarget &Subtarget,
     return 0;
   if (!CS.paramHasAttr(1, Attribute::StructRet))
     return 0;
- if (CS.paramHasAttr(1, Attribute::InReg))
+  if (CS.paramHasAttr(1, Attribute::InReg))
     return 0;
   return 4;
 }
@@ -2014,13 +2028,17 @@ X86FastISel::TargetSelectInstruction(const Instruction *I)  {
 unsigned X86FastISel::TargetMaterializeConstant(const Constant *C) {
   MVT VT;
   if (!isTypeLegal(C->getType(), VT))
-    return false;
+    return 0;
+
+  // Can't handle alternate code models yet.
+  if (TM.getCodeModel() != CodeModel::Small)
+    return 0;
 
   // Get opcode and regclass of the output for the given load instruction.
   unsigned Opc = 0;
   const TargetRegisterClass *RC = NULL;
   switch (VT.SimpleTy) {
-  default: return false;
+  default: return 0;
   case MVT::i8:
     Opc = X86::MOV8rm;
     RC  = &X86::GR8RegClass;
@@ -2058,7 +2076,7 @@ unsigned X86FastISel::TargetMaterializeConstant(const Constant *C) {
     break;
   case MVT::f80:
     // No f80 support yet.
-    return false;
+    return 0;
   }
 
   // Materialize addresses with LEA instructions.
@@ -2142,28 +2160,28 @@ unsigned X86FastISel::TargetMaterializeFloatZero(const ConstantFP *CF) {
   unsigned Opc = 0;
   const TargetRegisterClass *RC = NULL;
   switch (VT.SimpleTy) {
-    default: return false;
-    case MVT::f32:
-      if (X86ScalarSSEf32) {
-        Opc = X86::FsFLD0SS;
-        RC  = &X86::FR32RegClass;
-      } else {
-        Opc = X86::LD_Fp032;
-        RC  = &X86::RFP32RegClass;
-      }
-      break;
-    case MVT::f64:
-      if (X86ScalarSSEf64) {
-        Opc = X86::FsFLD0SD;
-        RC  = &X86::FR64RegClass;
-      } else {
-        Opc = X86::LD_Fp064;
-        RC  = &X86::RFP64RegClass;
-      }
-      break;
-    case MVT::f80:
-      // No f80 support yet.
-      return false;
+  default: return false;
+  case MVT::f32:
+    if (X86ScalarSSEf32) {
+      Opc = X86::FsFLD0SS;
+      RC  = &X86::FR32RegClass;
+    } else {
+      Opc = X86::LD_Fp032;
+      RC  = &X86::RFP32RegClass;
+    }
+    break;
+  case MVT::f64:
+    if (X86ScalarSSEf64) {
+      Opc = X86::FsFLD0SD;
+      RC  = &X86::FR64RegClass;
+    } else {
+      Opc = X86::LD_Fp064;
+      RC  = &X86::RFP64RegClass;
+    }
+    break;
+  case MVT::f80:
+    // No f80 support yet.
+    return false;
   }
 
   unsigned ResultReg = createResultReg(RC);
@@ -2182,7 +2200,7 @@ bool X86FastISel::TryToFoldLoad(MachineInstr *MI, unsigned OpNo,
   if (!X86SelectAddress(LI->getOperand(0), AM))
     return false;
 
-  X86InstrInfo &XII = (X86InstrInfo&)TII;
+  const X86InstrInfo &XII = (const X86InstrInfo&)TII;
 
   unsigned Size = TD.getTypeAllocSize(LI->getType());
   unsigned Alignment = LI->getAlignment();

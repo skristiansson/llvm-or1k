@@ -574,7 +574,7 @@ static bool ProfitableToMerge(MachineBasicBlock *MBB1,
   // instructions that would be deleted in the merge.
   MachineFunction *MF = MBB1->getParent();
   if (EffectiveTailLen >= 2 &&
-      MF->getFunction()->hasFnAttr(Attribute::OptimizeForSize) &&
+      MF->getFunction()->getFnAttributes().hasOptimizeForSizeAttr() &&
       (I1 == MBB1->begin() || I2 == MBB2->begin()))
     return true;
 
@@ -1554,8 +1554,7 @@ MachineBasicBlock::iterator findHoistingInsertPosAndDeps(MachineBasicBlock *MBB,
       for (MCRegAliasIterator AI(Reg, TRI, true); AI.isValid(); ++AI)
         Uses.insert(*AI);
     } else {
-      if (Uses.count(Reg)) {
-        Uses.erase(Reg);
+      if (Uses.erase(Reg)) {
         for (MCSubRegIterator SubRegs(Reg, TRI); SubRegs.isValid(); ++SubRegs)
           Uses.erase(*SubRegs); // Use sub-registers to be conservative
       }

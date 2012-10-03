@@ -1,4 +1,4 @@
-; RUN: opt -objc-arc -S < %s | FileCheck %s
+; RUN: opt -basicaa -objc-arc -S < %s | FileCheck %s
 
 target datalayout = "e-p:64:64:64"
 
@@ -1272,7 +1272,7 @@ g:
 ; Delete retain,release pairs around loops.
 
 ; CHECK: define void @test39(
-; CHECK_NOT: @objc_
+; CHECK-NOT: @objc_
 ; CHECK: }
 define void @test39(i8* %p) {
 entry:
@@ -1290,7 +1290,7 @@ exit:                                             ; preds = %loop
 ; Delete retain,release pairs around loops containing uses.
 
 ; CHECK: define void @test39b(
-; CHECK_NOT: @objc_
+; CHECK-NOT: @objc_
 ; CHECK: }
 define void @test39b(i8* %p) {
 entry:
@@ -1309,7 +1309,7 @@ exit:                                             ; preds = %loop
 ; Delete retain,release pairs around loops containing potential decrements.
 
 ; CHECK: define void @test39c(
-; CHECK_NOT: @objc_
+; CHECK-NOT: @objc_
 ; CHECK: }
 define void @test39c(i8* %p) {
 entry:
@@ -1329,7 +1329,7 @@ exit:                                             ; preds = %loop
 ; the successors are in a different order.
 
 ; CHECK: define void @test40(
-; CHECK_NOT: @objc_
+; CHECK-NOT: @objc_
 ; CHECK: }
 define void @test40(i8* %p) {
 entry:
@@ -1498,7 +1498,7 @@ define i8* @test49(i8* %p) nounwind {
 }
 
 ; Do delete retain+release with intervening stores of the
-; address value;
+; address value.
 
 ; CHECK: define void @test50(
 ; CHECK-NOT: @objc_

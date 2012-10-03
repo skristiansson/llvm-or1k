@@ -44,7 +44,7 @@ static void MangleLetter(SmallVectorImpl<char> &OutName, unsigned char C) {
   OutName.push_back('_');
 }
 
-/// NameNeedsEscaping - Return true if the identifier \arg Str needs quotes
+/// NameNeedsEscaping - Return true if the identifier \p Str needs quotes
 /// for this assembler.
 static bool NameNeedsEscaping(StringRef Str, const MCAsmInfo &MAI) {
   assert(!Str.empty() && "Cannot create an empty MCSymbol");
@@ -183,8 +183,7 @@ void Mangler::getNameWithPrefix(SmallVectorImpl<char> &OutName,
   ManglerPrefixTy PrefixTy = Mangler::Default;
   if (GV->hasPrivateLinkage() || isImplicitlyPrivate)
     PrefixTy = Mangler::Private;
-  else if (GV->hasLinkerPrivateLinkage() || GV->hasLinkerPrivateWeakLinkage() ||
-           GV->hasLinkerPrivateWeakDefAutoLinkage())
+  else if (GV->hasLinkerPrivateLinkage() || GV->hasLinkerPrivateWeakLinkage())
     PrefixTy = Mangler::LinkerPrivate;
   
   // If this global has a name, handle it simply.

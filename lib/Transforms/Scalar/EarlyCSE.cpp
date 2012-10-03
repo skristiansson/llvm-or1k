@@ -274,7 +274,8 @@ private:
         CallScope(*availableCalls) {}
 
    private:
-    NodeScope(const NodeScope&); // DO NOT IMPLEMENT
+    NodeScope(const NodeScope&) LLVM_DELETED_FUNCTION;
+    void operator=(const NodeScope&) LLVM_DELETED_FUNCTION;
 
     ScopedHTType::ScopeTy Scope;
     LoadHTType::ScopeTy LoadScope;
@@ -313,7 +314,8 @@ private:
     void process() { Processed = true; }
 
    private:
-    StackNode(const StackNode&); // DO NOT IMPLEMENT
+    StackNode(const StackNode&) LLVM_DELETED_FUNCTION;
+    void operator=(const StackNode&) LLVM_DELETED_FUNCTION;
 
     // Members.
     unsigned CurrentGeneration;
@@ -374,7 +376,7 @@ bool EarlyCSE::processNode(DomTreeNode *Node) {
     Instruction *Inst = I++;
 
     // Dead instructions should just be removed.
-    if (isInstructionTriviallyDead(Inst)) {
+    if (isInstructionTriviallyDead(Inst, TLI)) {
       DEBUG(dbgs() << "EarlyCSE DCE: " << *Inst << '\n');
       Inst->eraseFromParent();
       Changed = true;

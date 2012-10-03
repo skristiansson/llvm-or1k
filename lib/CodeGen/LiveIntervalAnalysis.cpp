@@ -34,6 +34,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "LiveRangeCalc.h"
+#include "VirtRegMap.h"
 #include <algorithm>
 #include <limits>
 #include <cmath>
@@ -155,9 +156,11 @@ void LiveIntervals::printInstrs(raw_ostream &OS) const {
   MF->print(OS, Indexes);
 }
 
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void LiveIntervals::dumpInstrs() const {
   printInstrs(dbgs());
 }
+#endif
 
 static
 bool MultipleDefsBySameMI(const MachineInstr &MI, unsigned MOIdx) {
@@ -382,8 +385,7 @@ void LiveIntervals::handleRegisterDef(MachineBasicBlock *MBB,
 /// which a variable is live
 void LiveIntervals::computeIntervals() {
   DEBUG(dbgs() << "********** COMPUTING LIVE INTERVALS **********\n"
-               << "********** Function: "
-               << ((Value*)MF->getFunction())->getName() << '\n');
+               << "********** Function: " << MF->getName() << '\n');
 
   RegMaskBlocks.resize(MF->getNumBlockIDs());
 
@@ -440,7 +442,7 @@ void LiveIntervals::computeIntervals() {
 
     // Compute the number of register mask instructions in this block.
     std::pair<unsigned, unsigned> &RMB = RegMaskBlocks[MBB->getNumber()];
-    RMB.second = RegMaskSlots.size() - RMB.first;;
+    RMB.second = RegMaskSlots.size() - RMB.first;
   }
 
   // Create empty intervals for registers defined by implicit_def's (except
@@ -497,7 +499,7 @@ void LiveIntervals::computeRegMasks() {
           RegMaskBits.push_back(MO->getRegMask());
       }
     // Compute the number of register mask instructions in this block.
-    RMB.second = RegMaskSlots.size() - RMB.first;;
+    RMB.second = RegMaskSlots.size() - RMB.first;
   }
 }
 
@@ -729,17 +731,97 @@ bool LiveIntervals::shrinkToUses(LiveInterval *li,
   return CanSeparate;
 }
 
+void LiveIntervals::extendToIndices(LiveInterval *LI,
+                                    ArrayRef<SlotIndex> Indices) {
+  assert(LRCalc && "LRCalc not initialized.");
+  LRCalc->reset(MF, getSlotIndexes(), DomTree, &getVNInfoAllocator());
+  for (unsigned i = 0, e = Indices.size(); i != e; ++i)
+    LRCalc->extend(LI, Indices[i]);
+}
+
+void LiveIntervals::pruneValue(LiveInterval *LI, SlotIndex Kill,
+                               SmallVectorImpl<SlotIndex> *EndPoints) {
+  LiveRangeQuery LRQ(*LI, Kill);
+  VNInfo *VNI = LRQ.valueOut();
+  if (!VNI)
+    return;
+
+  MachineBasicBlock *KillMBB = Indexes->getMBBFromIndex(Kill);
+  SlotIndex MBBStart, MBBEnd;
+  tie(MBBStart, MBBEnd) = Indexes->getMBBRange(KillMBB);
+
+  // If VNI isn't live out from KillMBB, the value is trivially pruned.
+  if (LRQ.endPoint() < MBBEnd) {
+    LI->removeRange(Kill, LRQ.endPoint());
+    if (EndPoints) EndPoints->push_back(LRQ.endPoint());
+    return;
+  }
+
+  // VNI is live out of KillMBB.
+  LI->removeRange(Kill, MBBEnd);
+  if (EndPoints) EndPoints->push_back(MBBEnd);
+
+  // Find all blocks that are reachable from MBB without leaving VNI's live
+  // range.
+  for (df_iterator<MachineBasicBlock*>
+       I = df_begin(KillMBB), E = df_end(KillMBB); I != E;) {
+    MachineBasicBlock *MBB = *I;
+    // KillMBB itself was already handled.
+    if (MBB == KillMBB) {
+      ++I;
+      continue;
+    }
+
+    // Check if VNI is live in to MBB.
+    tie(MBBStart, MBBEnd) = Indexes->getMBBRange(MBB);
+    LiveRangeQuery LRQ(*LI, MBBStart);
+    if (LRQ.valueIn() != VNI) {
+      // This block isn't part of the VNI live range. Prune the search.
+      I.skipChildren();
+      continue;
+    }
+
+    // Prune the search if VNI is killed in MBB.
+    if (LRQ.endPoint() < MBBEnd) {
+      LI->removeRange(MBBStart, LRQ.endPoint());
+      if (EndPoints) EndPoints->push_back(LRQ.endPoint());
+      I.skipChildren();
+      continue;
+    }
+
+    // VNI is live through MBB.
+    LI->removeRange(MBBStart, MBBEnd);
+    if (EndPoints) EndPoints->push_back(MBBEnd);
+    ++I;
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Register allocator hooks.
 //
 
-void LiveIntervals::addKillFlags() {
+void LiveIntervals::addKillFlags(const VirtRegMap *VRM) {
+  // Keep track of regunit ranges.
+  SmallVector<std::pair<LiveInterval*, LiveInterval::iterator>, 8> RU;
+
   for (unsigned i = 0, e = MRI->getNumVirtRegs(); i != e; ++i) {
     unsigned Reg = TargetRegisterInfo::index2VirtReg(i);
     if (MRI->reg_nodbg_empty(Reg))
       continue;
     LiveInterval *LI = &getInterval(Reg);
+    if (LI->empty())
+      continue;
+
+    // Find the regunit intervals for the assigned register. They may overlap
+    // the virtual register live range, cancelling any kills.
+    RU.clear();
+    for (MCRegUnitIterator Units(VRM->getPhys(Reg), TRI); Units.isValid();
+         ++Units) {
+      LiveInterval *RUInt = &getRegUnit(*Units);
+      if (RUInt->empty())
+        continue;
+      RU.push_back(std::make_pair(RUInt, RUInt->find(LI->begin()->end)));
+    }
 
     // Every instruction that kills Reg corresponds to a live range end point.
     for (LiveInterval::iterator RI = LI->begin(), RE = LI->end(); RI != RE;
@@ -750,7 +832,32 @@ void LiveIntervals::addKillFlags() {
       MachineInstr *MI = getInstructionFromIndex(RI->end);
       if (!MI)
         continue;
-      MI->addRegisterKilled(Reg, NULL);
+
+      // Check if any of the reguints are live beyond the end of RI. That could
+      // happen when a physreg is defined as a copy of a virtreg:
+      //
+      //   %EAX = COPY %vreg5
+      //   FOO %vreg5         <--- MI, cancel kill because %EAX is live.
+      //   BAR %EAX<kill>
+      //
+      // There should be no kill flag on FOO when %vreg5 is rewritten as %EAX.
+      bool CancelKill = false;
+      for (unsigned u = 0, e = RU.size(); u != e; ++u) {
+        LiveInterval *RInt = RU[u].first;
+        LiveInterval::iterator &I = RU[u].second;
+        if (I == RInt->end())
+          continue;
+        I = RInt->advanceTo(I, RI->end);
+        if (I == RInt->end() || I->start >= RI->end)
+          continue;
+        // I is overlapping RI.
+        CancelKill = true;
+        break;
+      }
+      if (CancelKill)
+        MI->clearRegisterKills(Reg, NULL);
+      else
+        MI->addRegisterKilled(Reg, NULL);
     }
   }
 }
@@ -1057,18 +1164,17 @@ private:
 
       unsigned Reg = MO.getReg();
 
-      // TODO: Currently we're skipping uses that are reserved or have no
-      // interval, but we're not updating their kills. This should be
-      // fixed.
-      if (TargetRegisterInfo::isPhysicalRegister(Reg) && LIS.isReserved(Reg))
-        continue;
+      // Don't track uses of reserved registers - they're not accurate.
+      // Reserved register live ranges look like a set of dead defs.
+      bool Resv =
+        TargetRegisterInfo::isPhysicalRegister(Reg) && LIS.isReserved(Reg);
 
       // Collect ranges for register units. These live ranges are computed on
       // demand, so just skip any that haven't been computed yet.
       if (TargetRegisterInfo::isPhysicalRegister(Reg)) {
         for (MCRegUnitIterator Units(Reg, &TRI); Units.isValid(); ++Units)
           if (LiveInterval *LI = LIS.getCachedRegUnit(*Units))
-            collectRanges(MO, LI, Entering, Internal, Exiting, OldIdx);
+            collectRanges(MO, LI, Entering, Internal, Exiting, OldIdx, Resv);
       } else {
         // Collect ranges for individual virtual registers.
         collectRanges(MO, &LIS.getInterval(Reg),
@@ -1079,8 +1185,8 @@ private:
 
   void collectRanges(const MachineOperand &MO, LiveInterval *LI,
                      RangeSet &Entering, RangeSet &Internal, RangeSet &Exiting,
-                     SlotIndex OldIdx) {
-    if (MO.readsReg()) {
+                     SlotIndex OldIdx, bool IgnoreReads = false) {
+    if (!IgnoreReads && MO.readsReg()) {
       LiveRange* LR = LI->getLiveRangeContaining(OldIdx);
       if (LR != 0)
         Entering.insert(std::make_pair(LI, LR));
@@ -1153,14 +1259,35 @@ private:
   // Return the last use of reg between NewIdx and OldIdx.
   SlotIndex findLastUseBefore(unsigned Reg, SlotIndex OldIdx) {
     SlotIndex LastUse = NewIdx;
-    for (MachineRegisterInfo::use_nodbg_iterator
-           UI = MRI.use_nodbg_begin(Reg),
-           UE = MRI.use_nodbg_end();
-         UI != UE; UI.skipInstruction()) {
-      const MachineInstr* MI = &*UI;
-      SlotIndex InstSlot = LIS.getSlotIndexes()->getInstructionIndex(MI);
-      if (InstSlot > LastUse && InstSlot < OldIdx)
-        LastUse = InstSlot;
+
+    if (TargetRegisterInfo::isVirtualRegister(Reg)) {
+      for (MachineRegisterInfo::use_nodbg_iterator
+             UI = MRI.use_nodbg_begin(Reg),
+             UE = MRI.use_nodbg_end();
+           UI != UE; UI.skipInstruction()) {
+        const MachineInstr* MI = &*UI;
+        SlotIndex InstSlot = LIS.getSlotIndexes()->getInstructionIndex(MI);
+        if (InstSlot > LastUse && InstSlot < OldIdx)
+          LastUse = InstSlot;
+      }
+    } else {
+      MachineInstr* MI = LIS.getSlotIndexes()->getInstructionFromIndex(NewIdx);
+      MachineBasicBlock::iterator MII(MI);
+      ++MII;
+      MachineBasicBlock* MBB = MI->getParent();
+      for (; MII != MBB->end() && LIS.getInstructionIndex(MII) < OldIdx; ++MII){
+        for (MachineInstr::mop_iterator MOI = MII->operands_begin(),
+                                        MOE = MII->operands_end();
+             MOI != MOE; ++MOI) {
+          const MachineOperand& mop = *MOI;
+          if (!mop.isReg() || mop.getReg() == 0 ||
+              TargetRegisterInfo::isVirtualRegister(mop.getReg()))
+            continue;
+
+          if (TRI.hasRegUnit(mop.getReg(), Reg))
+            LastUse = LIS.getInstructionIndex(MII);
+        }
+      }
     }
     return LastUse;
   }
@@ -1174,7 +1301,7 @@ private:
     SlotIndex LastUse = findLastUseBefore(LI->reg, OldIdx);
     if (LastUse != NewIdx)
       moveKillFlags(LI->reg, NewIdx, LastUse);
-    LR->end = LastUse.getRegSlot();
+    LR->end = LastUse.getRegSlot(LR->end.isEarlyClobber());
   }
 
   void moveEnteringDownFrom(SlotIndex OldIdx, IntRangePair& P) {
@@ -1188,7 +1315,7 @@ private:
         assert(LR->end > OldIdx && "LiveRange does not cover original slot");
         moveKillFlags(LI->reg, LR->end, NewIdx);
       }
-      LR->end = NewIdx.getRegSlot();
+      LR->end = NewIdx.getRegSlot(LR->end.isEarlyClobber());
     }
   }
 

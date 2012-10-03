@@ -57,6 +57,20 @@ class MachineRegisterInfo {
   /// physical registers.
   MachineOperand **PhysRegUseDefLists;
 
+  /// getRegUseDefListHead - Return the head pointer for the register use/def
+  /// list for the specified virtual or physical register.
+  MachineOperand *&getRegUseDefListHead(unsigned RegNo) {
+    if (TargetRegisterInfo::isVirtualRegister(RegNo))
+      return VRegInfo[RegNo].second;
+    return PhysRegUseDefLists[RegNo];
+  }
+
+  MachineOperand *getRegUseDefListHead(unsigned RegNo) const {
+    if (TargetRegisterInfo::isVirtualRegister(RegNo))
+      return VRegInfo[RegNo].second;
+    return PhysRegUseDefLists[RegNo];
+  }
+
   /// Get the next element in the use-def chain.
   static MachineOperand *getNextOperandForReg(const MachineOperand *MO) {
     assert(MO && MO->isReg() && "This is not a register operand!");
@@ -92,8 +106,8 @@ class MachineRegisterInfo {
   std::vector<std::pair<unsigned, unsigned> > LiveIns;
   std::vector<unsigned> LiveOuts;
 
-  MachineRegisterInfo(const MachineRegisterInfo&); // DO NOT IMPLEMENT
-  void operator=(const MachineRegisterInfo&);      // DO NOT IMPLEMENT
+  MachineRegisterInfo(const MachineRegisterInfo&) LLVM_DELETED_FUNCTION;
+  void operator=(const MachineRegisterInfo&) LLVM_DELETED_FUNCTION;
 public:
   explicit MachineRegisterInfo(const TargetRegisterInfo &TRI);
   ~MachineRegisterInfo();
@@ -134,6 +148,12 @@ public:
   //===--------------------------------------------------------------------===//
   // Register Info
   //===--------------------------------------------------------------------===//
+
+  // Strictly for use by MachineInstr.cpp.
+  void addRegOperandToUseList(MachineOperand *MO);
+
+  // Strictly for use by MachineInstr.cpp.
+  void removeRegOperandFromUseList(MachineOperand *MO);
 
   /// reg_begin/reg_end - Provide iteration support to walk over all definitions
   /// and uses of a register within the MachineFunction that corresponds to this
@@ -240,20 +260,6 @@ public:
   /// That function will return NULL if the virtual registers have incompatible
   /// constraints.
   void replaceRegWith(unsigned FromReg, unsigned ToReg);
-
-  /// getRegUseDefListHead - Return the head pointer for the register use/def
-  /// list for the specified virtual or physical register.
-  MachineOperand *&getRegUseDefListHead(unsigned RegNo) {
-    if (TargetRegisterInfo::isVirtualRegister(RegNo))
-      return VRegInfo[RegNo].second;
-    return PhysRegUseDefLists[RegNo];
-  }
-
-  MachineOperand *getRegUseDefListHead(unsigned RegNo) const {
-    if (TargetRegisterInfo::isVirtualRegister(RegNo))
-      return VRegInfo[RegNo].second;
-    return PhysRegUseDefLists[RegNo];
-  }
 
   /// getVRegDef - Return the machine instr that defines the specified virtual
   /// register or null if none is found.  This assumes that the code is in SSA
@@ -462,10 +468,6 @@ public:
                         const TargetRegisterInfo &TRI,
                         const TargetInstrInfo &TII);
 
-private:
-  void HandleVRegListReallocation();
-
-public:
   /// defusechain_iterator - This class provides iterator support for machine
   /// operands in the function that use or define a specific register.  If
   /// ReturnUses is true it returns uses of registers, if ReturnDefs is true it
@@ -511,11 +513,20 @@ public:
       assert(Op && "Cannot increment end iterator!");
       Op = getNextOperandForReg(Op);
 
-      // If this is an operand we don't care about, skip it.
-      while (Op && ((!ReturnUses && Op->isUse()) ||
-                    (!ReturnDefs && Op->isDef()) ||
-                    (SkipDebug && Op->isDebug())))
-        Op = getNextOperandForReg(Op);
+      // All defs come before the uses, so stop def_iterator early.
+      if (!ReturnUses) {
+        if (Op) {
+          if (Op->isUse())
+            Op = 0;
+          else
+            assert(!Op->isDebug() && "Can't have debug defs");
+        }
+      } else {
+        // If this is an operand we don't care about, skip it.
+        while (Op && ((!ReturnDefs && Op->isDef()) ||
+                      (SkipDebug && Op->isDebug())))
+          Op = getNextOperandForReg(Op);
+      }
 
       return *this;
     }

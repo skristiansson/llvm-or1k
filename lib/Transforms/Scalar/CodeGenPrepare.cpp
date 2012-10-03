@@ -18,6 +18,7 @@
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
+#include "llvm/GlobalVariable.h"
 #include "llvm/IRBuilder.h"
 #include "llvm/InlineAsm.h"
 #include "llvm/Instructions.h"
@@ -43,6 +44,7 @@
 #include "llvm/Transforms/Utils/AddrModeMatcher.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/BuildLibCalls.h"
+#include "llvm/Transforms/Utils/BypassSlowDivision.h"
 #include "llvm/Transforms/Utils/Local.h"
 using namespace llvm;
 using namespace llvm::PatternMatch;
@@ -65,11 +67,6 @@ STATISTIC(NumSelectsExpanded, "Number of selects turned into branches");
 static cl::opt<bool> DisableBranchOpts(
   "disable-cgp-branch-opts", cl::Hidden, cl::init(false),
   cl::desc("Disable branch optimizations in CodeGenPrepare"));
-
-// FIXME: Remove this abomination once all of the tests pass without it!
-static cl::opt<bool> DisableDeleteDeadBlocks(
-  "disable-cgp-delete-dead-blocks", cl::Hidden, cl::init(false),
-  cl::desc("Disable deleting dead blocks in CodeGenPrepare"));
 
 static cl::opt<bool> DisableSelectToBranch(
   "disable-cgp-select2branch", cl::Hidden, cl::init(false),
@@ -116,6 +113,7 @@ namespace {
     }
 
   private:
+    bool EliminateFallThrough(Function &F);
     bool EliminateMostlyEmptyBlocks(Function &F);
     bool CanMergeBlocks(const BasicBlock *BB, const BasicBlock *DestBB) const;
     void EliminateMostlyEmptyBlock(BasicBlock *BB);
@@ -129,6 +127,7 @@ namespace {
     bool OptimizeSelectInst(SelectInst *SI);
     bool DupRetToEnableTailCallOpts(ReturnInst *RI);
     bool PlaceDbgValues(Function &F);
+    bool ConvertLoadToSwitch(LoadInst *LI);
   };
 }
 
@@ -150,9 +149,17 @@ bool CodeGenPrepare::runOnFunction(Function &F) {
   TLInfo = &getAnalysis<TargetLibraryInfo>();
   DT = getAnalysisIfAvailable<DominatorTree>();
   PFI = getAnalysisIfAvailable<ProfileInfo>();
-  OptSize = F.hasFnAttr(Attribute::OptimizeForSize);
+  OptSize = F.getFnAttributes().hasOptimizeForSizeAttr();
 
-  // First pass, eliminate blocks that contain only PHI nodes and an
+  /// This optimization identifies DIV instructions that can be
+  /// profitably bypassed and carried out with a shorter, faster divide.
+  if (TLI && TLI->isSlowDivBypassed()) {
+    const DenseMap<Type*, Type*> &BypassTypeMap = TLI->getBypassSlowDivTypes();
+    for (Function::iterator I = F.begin(); I != F.end(); I++)
+      EverMadeChange |= bypassSlowDivision(F, I, BypassTypeMap);
+  }
+
+  // Eliminate blocks that contain only PHI nodes and an
   // unconditional branch.
   EverMadeChange |= EliminateMostlyEmptyBlocks(F);
 
@@ -164,7 +171,7 @@ bool CodeGenPrepare::runOnFunction(Function &F) {
   bool MadeChange = true;
   while (MadeChange) {
     MadeChange = false;
-    for (Function::iterator I = F.begin(), E = F.end(); I != E; ) {
+    for (Function::iterator I = F.begin(); I != F.end(); ) {
       BasicBlock *BB = I++;
       MadeChange |= OptimizeBlock(*BB);
     }
@@ -187,10 +194,14 @@ bool CodeGenPrepare::runOnFunction(Function &F) {
           WorkList.insert(*II);
     }
 
-    if (!DisableDeleteDeadBlocks)
-      for (SmallPtrSet<BasicBlock*, 8>::iterator
-             I = WorkList.begin(), E = WorkList.end(); I != E; ++I)
-        DeleteDeadBlock(*I);
+    for (SmallPtrSet<BasicBlock*, 8>::iterator
+           I = WorkList.begin(), E = WorkList.end(); I != E; ++I)
+      DeleteDeadBlock(*I);
+
+    // Merge pairs of basic blocks with unconditional branches, connected by
+    // a single edge.
+    if (EverMadeChange || MadeChange)
+      MadeChange |= EliminateFallThrough(F);
 
     if (MadeChange)
       ModifiedDT = true;
@@ -201,6 +212,40 @@ bool CodeGenPrepare::runOnFunction(Function &F) {
     DT->DT->recalculate(F);
 
   return EverMadeChange;
+}
+
+/// EliminateFallThrough - Merge basic blocks which are connected
+/// by a single edge, where one of the basic blocks has a single successor
+/// pointing to the other basic block, which has a single predecessor.
+bool CodeGenPrepare::EliminateFallThrough(Function &F) {
+  bool Changed = false;
+  // Scan all of the blocks in the function, except for the entry block.
+  for (Function::iterator I = ++F.begin(), E = F.end(); I != E; ) {
+    BasicBlock *BB = I++;
+    // If the destination block has a single pred, then this is a trivial
+    // edge, just collapse it.
+    BasicBlock *SinglePred = BB->getSinglePredecessor();
+
+    // Don't merge if BB's address is taken.
+    if (!SinglePred || SinglePred == BB || BB->hasAddressTaken()) continue;
+
+    BranchInst *Term = dyn_cast<BranchInst>(SinglePred->getTerminator());
+    if (Term && !Term->isConditional()) {
+      Changed = true;
+      DEBUG(dbgs() << "To merge:\n"<< *SinglePred << "\n\n\n");
+      // Remember if SinglePred was the entry block of the function.
+      // If so, we will need to move BB back to the entry position.
+      bool isEntry = SinglePred == &SinglePred->getParent()->getEntryBlock();
+      MergeBasicBlockIntoOnlyPred(BB, this);
+
+      if (isEntry && BB != &BB->getParent()->getEntryBlock())
+        BB->moveBefore(&BB->getParent()->getEntryBlock());
+
+      // We have erased a block. Update the iterator.
+      I = BB;
+    }
+  }
+  return Changed;
 }
 
 /// EliminateMostlyEmptyBlocks - eliminate blocks that contain only PHI nodes,
@@ -616,6 +661,7 @@ bool CodeGenPrepare::OptimizeCallInst(CallInst *CI) {
 /// DupRetToEnableTailCallOpts - Look for opportunities to duplicate return
 /// instructions to the predecessor to enable tail call optimizations. The
 /// case it is currently looking for is:
+/// @code
 /// bb0:
 ///   %tmp0 = tail call i32 @f0()
 ///   br label %return
@@ -628,9 +674,11 @@ bool CodeGenPrepare::OptimizeCallInst(CallInst *CI) {
 /// return:
 ///   %retval = phi i32 [ %tmp0, %bb0 ], [ %tmp1, %bb1 ], [ %tmp2, %bb2 ]
 ///   ret i32 %retval
+/// @endcode
 ///
 /// =>
 ///
+/// @code
 /// bb0:
 ///   %tmp0 = tail call i32 @f0()
 ///   ret i32 %tmp0
@@ -640,7 +688,7 @@ bool CodeGenPrepare::OptimizeCallInst(CallInst *CI) {
 /// bb2:
 ///   %tmp2 = tail call i32 @f2()
 ///   ret i32 %tmp2
-///
+/// @endcode
 bool CodeGenPrepare::DupRetToEnableTailCallOpts(ReturnInst *RI) {
   if (!TLI)
     return false;
@@ -741,7 +789,7 @@ bool CodeGenPrepare::DupRetToEnableTailCallOpts(ReturnInst *RI) {
   }
 
   // If we eliminated all predecessors of the block, delete the block now.
-  if (Changed && pred_begin(BB) == pred_end(BB))
+  if (Changed && !BB->hasAddressTaken() && pred_begin(BB) == pred_end(BB))
     BB->eraseFromParent();
 
   return Changed;
@@ -955,7 +1003,7 @@ bool CodeGenPrepare::OptimizeMemoryInst(Instruction *MemoryInst, Value *Addr,
     WeakVH IterHandle(CurInstIterator);
     BasicBlock *BB = CurInstIterator->getParent();
 
-    RecursivelyDeleteTriviallyDeadInstructions(Repl);
+    RecursivelyDeleteTriviallyDeadInstructions(Repl, TLInfo);
 
     if (IterHandle != CurInstIterator) {
       // If the iterator instruction was recursively deleted, start over at the
@@ -1141,16 +1189,31 @@ static bool isFormingBranchFromSelectProfitable(SelectInst *SI) {
 }
 
 
+/// If we have a SelectInst that will likely profit from branch prediction,
+/// turn it into a branch.
 bool CodeGenPrepare::OptimizeSelectInst(SelectInst *SI) {
-  // If we have a SelectInst that will likely profit from branch prediction,
-  // turn it into a branch.
-  if (DisableSelectToBranch || OptSize || !TLI ||
-      !TLI->isPredictableSelectExpensive())
+  bool VectorCond = !SI->getCondition()->getType()->isIntegerTy(1);
+
+  // Can we convert the 'select' to CF ?
+  if (DisableSelectToBranch || OptSize || !TLI || VectorCond)
     return false;
 
-  if (!SI->getCondition()->getType()->isIntegerTy(1) ||
-      !isFormingBranchFromSelectProfitable(SI))
-    return false;
+  TargetLowering::SelectSupportKind SelectKind;
+  if (VectorCond)
+    SelectKind = TargetLowering::VectorMaskSelect;
+  else if (SI->getType()->isVectorTy())
+    SelectKind = TargetLowering::ScalarCondVectorVal;
+  else
+    SelectKind = TargetLowering::ScalarValSelect;
+
+  // Do we have efficient codegen support for this kind of 'selects' ?
+  if (TLI->isSelectSupported(SelectKind)) {
+    // We have efficient codegen support for the select instruction.
+    // Check if it is profitable to keep this 'select'.
+    if (!TLI->isPredictableSelectExpensive() ||
+        !isFormingBranchFromSelectProfitable(SI))
+      return false;
+  }
 
   ModifiedDT = true;
 
@@ -1223,9 +1286,11 @@ bool CodeGenPrepare::OptimizeInst(Instruction *I) {
     return OptimizeCmpExpression(CI);
 
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
+    bool Changed = false;
     if (TLI)
-      return OptimizeMemoryInst(I, I->getOperand(0), LI->getType());
-    return false;
+      Changed |= OptimizeMemoryInst(I, I->getOperand(0), LI->getType());
+    Changed |= ConvertLoadToSwitch(LI);
+    return Changed;
   }
 
   if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
@@ -1269,7 +1334,7 @@ bool CodeGenPrepare::OptimizeBlock(BasicBlock &BB) {
   bool MadeChange = false;
 
   CurInstIterator = BB.begin();
-  for (BasicBlock::iterator E = BB.end(); CurInstIterator != E; )
+  while (CurInstIterator != BB.end())
     MadeChange |= OptimizeInst(CurInstIterator++);
 
   return MadeChange;
@@ -1304,4 +1369,110 @@ bool CodeGenPrepare::PlaceDbgValues(Function &F) {
     }
   }
   return MadeChange;
+}
+
+static bool TargetSupportsJumpTables(const TargetLowering &TLI) {
+  return TLI.supportJumpTables() &&
+          (TLI.isOperationLegalOrCustom(ISD::BR_JT, MVT::Other) ||
+           TLI.isOperationLegalOrCustom(ISD::BRIND, MVT::Other));
+}
+
+/// ConvertLoadToSwitch - Convert loads from constant lookup tables into
+/// switches. This undos the switch-to-lookup table transformation in
+/// SimplifyCFG for targets where that is inprofitable.
+bool CodeGenPrepare::ConvertLoadToSwitch(LoadInst *LI) {
+  // This only applies to targets that don't support jump tables.
+  if (!TLI || TargetSupportsJumpTables(*TLI))
+    return false;
+
+  // FIXME: In the future, it would be desirable to have enough target
+  // information in SimplifyCFG, so we could decide at that stage whether to
+  // transform the switch to a lookup table or not, and this
+  // reverse-transformation could be removed.
+
+  GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(LI->getPointerOperand());
+  if (!GEP || !GEP->isInBounds() || GEP->getPointerAddressSpace())
+    return false;
+  if (GEP->getNumIndices() != 2)
+    return false;
+  Value *FirstIndex = GEP->idx_begin()[0];
+  ConstantInt *FirstIndexInt = dyn_cast<ConstantInt>(FirstIndex);
+  if (!FirstIndexInt || !FirstIndexInt->isZero())
+    return false;
+
+  Value *TableIndex = GEP->idx_begin()[1];
+  IntegerType *TableIndexTy = cast<IntegerType>(TableIndex->getType());
+
+  GlobalVariable *GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand());
+  if (!GV || !GV->isConstant() || !GV->hasDefinitiveInitializer())
+    return false;
+
+  Constant *Arr = GV->getInitializer();
+  uint64_t NumElements;
+  if (ConstantArray *CA = dyn_cast<ConstantArray>(Arr))
+    NumElements = CA->getType()->getNumElements();
+  else if (ConstantDataArray *CDA = dyn_cast<ConstantDataArray>(Arr))
+    NumElements = CDA->getNumElements();
+  else
+    return false;
+  if (NumElements < 2)
+    return false;
+
+  // Split the block.
+  BasicBlock *OriginalBB = LI->getParent();
+  BasicBlock *PostSwitchBB = OriginalBB->splitBasicBlock(LI);
+
+  // Replace OriginalBB's terminator with a switch.
+  IRBuilder<> Builder(OriginalBB->getTerminator());
+  SwitchInst *Switch = Builder.CreateSwitch(TableIndex, PostSwitchBB,
+                                            NumElements - 1);
+  OriginalBB->getTerminator()->eraseFromParent();
+
+  // Count the frequency of each value to decide which to use as default.
+  SmallDenseMap<Constant*, uint64_t> ValueFreq;
+  for (uint64_t I = 0; I < NumElements; ++I)
+    ++ValueFreq[Arr->getAggregateElement(I)];
+  uint64_t MaxCount = 0;
+  Constant *DefaultValue = NULL;
+  for (SmallDenseMap<Constant*, uint64_t>::iterator I = ValueFreq.begin(),
+       E = ValueFreq.end(); I != E; ++I) {
+    if (I->second > MaxCount) {
+      MaxCount = I->second;
+      DefaultValue = I->first;
+    }
+  }
+  assert(DefaultValue && "No values in the array?");
+
+  // Create the phi node in PostSwitchBB, which will replace the load.
+  Builder.SetInsertPoint(PostSwitchBB->begin());
+  PHINode *PHI = Builder.CreatePHI(LI->getType(), NumElements);
+  PHI->addIncoming(DefaultValue, OriginalBB);
+
+  // Build basic blocks to target with the switch.
+  for (uint64_t I = 0; I < NumElements; ++I) {
+    Constant *C = Arr->getAggregateElement(I);
+    if (C == DefaultValue) continue; // Already covered by the default case.
+
+    BasicBlock *BB = BasicBlock::Create(PostSwitchBB->getContext(),
+                                        "lookup.bb",
+                                        PostSwitchBB->getParent(),
+                                        PostSwitchBB);
+    Switch->addCase(ConstantInt::get(TableIndexTy, I), BB);
+    Builder.SetInsertPoint(BB);
+    Builder.CreateBr(PostSwitchBB);
+    PHI->addIncoming(C, BB);
+  }
+
+  // Remove the load.
+  LI->replaceAllUsesWith(PHI);
+  LI->eraseFromParent();
+
+  // Clean up.
+  if (GEP->use_empty())
+    GEP->eraseFromParent();
+  if (GV->hasUnnamedAddr() && GV->hasPrivateLinkage() && GV->use_empty())
+    GV->eraseFromParent();
+
+  CurInstIterator = Switch;
+  return true;
 }

@@ -400,8 +400,8 @@ void Verifier::visitGlobalValue(GlobalValue &GV) {
             "Only global arrays can have appending linkage!", GVar);
   }
 
-  Assert1(!GV.hasLinkerPrivateWeakDefAutoLinkage() || GV.hasDefaultVisibility(),
-          "linker_private_weak_def_auto can only have default visibility!",
+  Assert1(!GV.hasLinkOnceODRAutoHideLinkage() || GV.hasDefaultVisibility(),
+          "linkonce_odr_auto_hide can only have default visibility!",
           &GV);
 }
 
@@ -530,12 +530,12 @@ void Verifier::VerifyParameterAttrs(Attributes Attrs, Type *Ty,
     return;
 
   Attributes FnCheckAttr = Attrs & Attribute::FunctionOnly;
-  Assert1(!FnCheckAttr, "Attribute " + Attribute::getAsString(FnCheckAttr) +
+  Assert1(!FnCheckAttr, "Attribute " + FnCheckAttr.getAsString() +
           " only applies to the function!", V);
 
   if (isReturnValue) {
     Attributes RetI = Attrs & Attribute::ParameterOnly;
-    Assert1(!RetI, "Attribute " + Attribute::getAsString(RetI) +
+    Assert1(!RetI, "Attribute " + RetI.getAsString() +
             " does not apply to return values!", V);
   }
 
@@ -543,21 +543,21 @@ void Verifier::VerifyParameterAttrs(Attributes Attrs, Type *Ty,
        i < array_lengthof(Attribute::MutuallyIncompatible); ++i) {
     Attributes MutI = Attrs & Attribute::MutuallyIncompatible[i];
     Assert1(MutI.isEmptyOrSingleton(), "Attributes " +
-            Attribute::getAsString(MutI) + " are incompatible!", V);
+            MutI.getAsString() + " are incompatible!", V);
   }
 
-  Attributes TypeI = Attrs & Attribute::typeIncompatible(Ty);
+  Attributes TypeI = Attrs & Attributes::typeIncompatible(Ty);
   Assert1(!TypeI, "Wrong type for attribute " +
-          Attribute::getAsString(TypeI), V);
+          TypeI.getAsString(), V);
 
   Attributes ByValI = Attrs & Attribute::ByVal;
   if (PointerType *PTy = dyn_cast<PointerType>(Ty)) {
     Assert1(!ByValI || PTy->getElementType()->isSized(),
-            "Attribute " + Attribute::getAsString(ByValI) +
+            "Attribute " + ByValI.getAsString() +
             " does not support unsized types!", V);
   } else {
     Assert1(!ByValI,
-            "Attribute " + Attribute::getAsString(ByValI) +
+            "Attribute " + ByValI.getAsString() +
             " only applies to parameters with pointer type!", V);
   }
 }
@@ -585,25 +585,25 @@ void Verifier::VerifyFunctionAttrs(FunctionType *FT,
 
     VerifyParameterAttrs(Attr.Attrs, Ty, Attr.Index == 0, V);
 
-    if (Attr.Attrs & Attribute::Nest) {
+    if (Attr.Attrs.hasNestAttr()) {
       Assert1(!SawNest, "More than one parameter has attribute nest!", V);
       SawNest = true;
     }
 
-    if (Attr.Attrs & Attribute::StructRet)
+    if (Attr.Attrs.hasStructRetAttr())
       Assert1(Attr.Index == 1, "Attribute sret not on first parameter!", V);
   }
 
   Attributes FAttrs = Attrs.getFnAttributes();
   Attributes NotFn = FAttrs & (~Attribute::FunctionOnly);
-  Assert1(!NotFn, "Attribute " + Attribute::getAsString(NotFn) +
+  Assert1(!NotFn, "Attribute " + NotFn.getAsString() +
           " does not apply to the function!", V);
 
   for (unsigned i = 0;
        i < array_lengthof(Attribute::MutuallyIncompatible); ++i) {
     Attributes MutI = FAttrs & Attribute::MutuallyIncompatible[i];
     Assert1(MutI.isEmptyOrSingleton(), "Attributes " +
-            Attribute::getAsString(MutI) + " are incompatible!", V);
+            MutI.getAsString() + " are incompatible!", V);
   }
 }
 
@@ -1093,7 +1093,7 @@ void Verifier::visitBitCastInst(BitCastInst &I) {
 
   // BitCast implies a no-op cast of type only. No bits change.
   // However, you can't cast pointers to anything but pointers.
-  Assert1(DestTy->isPointerTy() == DestTy->isPointerTy(),
+  Assert1(SrcTy->isPointerTy() == DestTy->isPointerTy(),
           "Bitcast requires both operands to be pointer or neither", &I);
   Assert1(SrcBitSize == DestBitSize, "Bitcast requires types of same width",&I);
 
@@ -1171,7 +1171,7 @@ void Verifier::VerifyCallSite(CallSite CS) {
       VerifyParameterAttrs(Attr, CS.getArgument(Idx-1)->getType(), false, I);
 
       Attributes VArgI = Attr & Attribute::VarArgsIncompatible;
-      Assert1(!VArgI, "Attribute " + Attribute::getAsString(VArgI) +
+      Assert1(!VArgI, "Attribute " + VArgI.getAsString() +
               " cannot be used for vararg call arguments!", I);
     }
 
@@ -1378,6 +1378,15 @@ void Verifier::visitLoadInst(LoadInst &LI) {
             "Load cannot have Release ordering", &LI);
     Assert1(LI.getAlignment() != 0,
             "Atomic load must specify explicit alignment", &LI);
+    if (!ElTy->isPointerTy()) {
+      Assert2(ElTy->isIntegerTy(),
+              "atomic store operand must have integer type!",
+              &LI, ElTy);
+      unsigned Size = ElTy->getPrimitiveSizeInBits();
+      Assert2(Size >= 8 && !(Size & (Size - 1)),
+              "atomic store operand must be power-of-two byte-sized integer",
+              &LI, ElTy);
+    }
   } else {
     Assert1(LI.getSynchScope() == CrossThread,
             "Non-atomic load cannot have SynchronizationScope specified", &LI);
@@ -1444,6 +1453,15 @@ void Verifier::visitStoreInst(StoreInst &SI) {
             "Store cannot have Acquire ordering", &SI);
     Assert1(SI.getAlignment() != 0,
             "Atomic store must specify explicit alignment", &SI);
+    if (!ElTy->isPointerTy()) {
+      Assert2(ElTy->isIntegerTy(),
+              "atomic store operand must have integer type!",
+              &SI, ElTy);
+      unsigned Size = ElTy->getPrimitiveSizeInBits();
+      Assert2(Size >= 8 && !(Size & (Size - 1)),
+              "atomic store operand must be power-of-two byte-sized integer",
+              &SI, ElTy);
+    }
   } else {
     Assert1(SI.getSynchScope() == CrossThread,
             "Non-atomic store cannot have SynchronizationScope specified", &SI);
@@ -1471,6 +1489,13 @@ void Verifier::visitAtomicCmpXchgInst(AtomicCmpXchgInst &CXI) {
   PointerType *PTy = dyn_cast<PointerType>(CXI.getOperand(0)->getType());
   Assert1(PTy, "First cmpxchg operand must be a pointer.", &CXI);
   Type *ElTy = PTy->getElementType();
+  Assert2(ElTy->isIntegerTy(),
+          "cmpxchg operand must have integer type!",
+          &CXI, ElTy);
+  unsigned Size = ElTy->getPrimitiveSizeInBits();
+  Assert2(Size >= 8 && !(Size & (Size - 1)),
+          "cmpxchg operand must be power-of-two byte-sized integer",
+          &CXI, ElTy);
   Assert2(ElTy == CXI.getOperand(1)->getType(),
           "Expected value type does not match pointer operand type!",
           &CXI, ElTy);
@@ -1488,6 +1513,13 @@ void Verifier::visitAtomicRMWInst(AtomicRMWInst &RMWI) {
   PointerType *PTy = dyn_cast<PointerType>(RMWI.getOperand(0)->getType());
   Assert1(PTy, "First atomicrmw operand must be a pointer.", &RMWI);
   Type *ElTy = PTy->getElementType();
+  Assert2(ElTy->isIntegerTy(),
+          "atomicrmw operand must have integer type!",
+          &RMWI, ElTy);
+  unsigned Size = ElTy->getPrimitiveSizeInBits();
+  Assert2(Size >= 8 && !(Size & (Size - 1)),
+          "atomicrmw operand must be power-of-two byte-sized integer",
+          &RMWI, ElTy);
   Assert2(ElTy == RMWI.getOperand(1)->getType(),
           "Argument value type does not match pointer operand type!",
           &RMWI, ElTy);
@@ -1536,7 +1568,7 @@ void Verifier::visitLandingPadInst(LandingPadInst &LPI) {
   // landing pad block may be branched to only by the unwind edge of an invoke.
   for (pred_iterator I = pred_begin(BB), E = pred_end(BB); I != E; ++I) {
     const InvokeInst *II = dyn_cast<InvokeInst>((*I)->getTerminator());
-    Assert1(II && II->getUnwindDest() == BB,
+    Assert1(II && II->getUnwindDest() == BB && II->getNormalDest() != BB,
             "Block containing LandingPadInst must be jumped to "
             "only by the unwind edge of an invoke.", &LPI);
   }
@@ -1575,6 +1607,13 @@ void Verifier::visitLandingPadInst(LandingPadInst &LPI) {
 
 void Verifier::verifyDominatesUse(Instruction &I, unsigned i) {
   Instruction *Op = cast<Instruction>(I.getOperand(i));
+  // If the we have an invalid invoke, don't try to compute the dominance.
+  // We already reject it in the invoke specific checks and the dominance
+  // computation doesn't handle multiple edges.
+  if (InvokeInst *II = dyn_cast<InvokeInst>(Op)) {
+    if (II->getNormalDest() == II->getUnwindDest())
+      return;
+  }
 
   const Use &U = I.getOperandUse(i);
   Assert2(InstsInThisBlock.count(Op) || DT->dominates(Op, U),

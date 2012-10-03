@@ -258,10 +258,24 @@ bool MCObjectStreamer::EmitValueToOffset(const MCExpr *Offset,
 void MCObjectStreamer::EmitGPRel32Value(const MCExpr *Value) {
   MCDataFragment *DF = getOrCreateDataFragment();
 
-  DF->addFixup(MCFixup::Create(DF->getContents().size(),
-                               Value,
-                               FK_GPRel_4));
+  DF->addFixup(MCFixup::Create(DF->getContents().size(), Value, FK_GPRel_4));
   DF->getContents().resize(DF->getContents().size() + 4, 0);
+}
+
+// Associate GPRel32 fixup with data and resize data area
+void MCObjectStreamer::EmitGPRel64Value(const MCExpr *Value) {
+  MCDataFragment *DF = getOrCreateDataFragment();
+
+  DF->addFixup(MCFixup::Create(DF->getContents().size(), Value, FK_GPRel_4));
+  DF->getContents().resize(DF->getContents().size() + 8, 0);
+}
+
+void MCObjectStreamer::EmitFill(uint64_t NumBytes, uint8_t FillValue,
+                                unsigned AddrSpace) {
+  assert(AddrSpace == 0 && "Address space must be 0!");
+  // FIXME: A MCFillFragment would be more memory efficient but MCExpr has
+  //        problems evaluating expressions across multiple fragments.
+  getOrCreateDataFragment()->getContents().append(NumBytes, FillValue);
 }
 
 void MCObjectStreamer::FinishImpl() {

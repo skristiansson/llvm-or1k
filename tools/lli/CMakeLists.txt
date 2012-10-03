@@ -1,6 +1,4 @@
 
-link_directories( ${LLVM_INTEL_JITEVENTS_LIBDIR} )
-
 set(LLVM_LINK_COMPONENTS mcjit jit interpreter nativecodegen bitreader asmparser selectiondag)
 
 if( LLVM_USE_OPROFILE )
@@ -19,4 +17,6 @@ endif( LLVM_USE_INTEL_JITEVENTS )
 
 add_llvm_tool(lli
   lli.cpp
+  RecordingMemoryManager.cpp
+  RemoteTarget.cpp
   )

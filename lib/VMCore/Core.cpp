@@ -568,6 +568,19 @@ const char *LLVMGetMDString(LLVMValueRef V, unsigned* Len) {
   return 0;
 }
 
+unsigned LLVMGetMDNodeNumOperands(LLVMValueRef V)
+{
+  return cast<MDNode>(unwrap(V))->getNumOperands();
+}
+
+void LLVMGetMDNodeOperands(LLVMValueRef V, LLVMValueRef *Dest)
+{
+  const MDNode *N = cast<MDNode>(unwrap(V));
+  const unsigned numOperands = N->getNumOperands();
+  for (unsigned i = 0; i < numOperands; i++)
+    Dest[i] = wrap(N->getOperand(i));
+}
+
 unsigned LLVMGetNamedMetadataNumOperands(LLVMModuleRef M, const char* name)
 {
   if (NamedMDNode *N = unwrap(M)->getNamedMetadata(name)) {
@@ -1084,6 +1097,8 @@ LLVMLinkage LLVMGetLinkage(LLVMValueRef Global) {
     return LLVMLinkOnceAnyLinkage;
   case GlobalValue::LinkOnceODRLinkage:
     return LLVMLinkOnceODRLinkage;
+  case GlobalValue::LinkOnceODRAutoHideLinkage:
+    return LLVMLinkOnceODRAutoHideLinkage;
   case GlobalValue::WeakAnyLinkage:
     return LLVMWeakAnyLinkage;
   case GlobalValue::WeakODRLinkage:
@@ -1098,8 +1113,6 @@ LLVMLinkage LLVMGetLinkage(LLVMValueRef Global) {
     return LLVMLinkerPrivateLinkage;
   case GlobalValue::LinkerPrivateWeakLinkage:
     return LLVMLinkerPrivateWeakLinkage;
-  case GlobalValue::LinkerPrivateWeakDefAutoLinkage:
-    return LLVMLinkerPrivateWeakDefAutoLinkage;
   case GlobalValue::DLLImportLinkage:
     return LLVMDLLImportLinkage;
   case GlobalValue::DLLExportLinkage:
@@ -1129,6 +1142,9 @@ void LLVMSetLinkage(LLVMValueRef Global, LLVMLinkage Linkage) {
   case LLVMLinkOnceODRLinkage:
     GV->setLinkage(GlobalValue::LinkOnceODRLinkage);
     break;
+  case LLVMLinkOnceODRAutoHideLinkage:
+    GV->setLinkage(GlobalValue::LinkOnceODRAutoHideLinkage);
+    break;
   case LLVMWeakAnyLinkage:
     GV->setLinkage(GlobalValue::WeakAnyLinkage);
     break;
@@ -1149,9 +1165,6 @@ void LLVMSetLinkage(LLVMValueRef Global, LLVMLinkage Linkage) {
     break;
   case LLVMLinkerPrivateWeakLinkage:
     GV->setLinkage(GlobalValue::LinkerPrivateWeakLinkage);
-    break;
-  case LLVMLinkerPrivateWeakDefAutoLinkage:
-    GV->setLinkage(GlobalValue::LinkerPrivateWeakDefAutoLinkage);
     break;
   case LLVMDLLImportLinkage:
     GV->setLinkage(GlobalValue::DLLImportLinkage);
@@ -1462,7 +1475,7 @@ LLVMAttribute LLVMGetAttribute(LLVMValueRef Arg) {
 
 void LLVMSetParamAlignment(LLVMValueRef Arg, unsigned align) {
   unwrap<Argument>(Arg)->addAttr(
-          Attribute::constructAlignmentFromInt(align));
+          Attributes::constructAlignmentFromInt(align));
 }
 
 /*--.. Operations on basic blocks ..........................................--*/
@@ -1667,7 +1680,7 @@ void LLVMSetInstrParamAlignment(LLVMValueRef Instr, unsigned index,
   CallSite Call = CallSite(unwrap<Instruction>(Instr));
   Call.setAttributes(
     Call.getAttributes().addAttr(index, 
-        Attribute::constructAlignmentFromInt(align)));
+        Attributes::constructAlignmentFromInt(align)));
 }
 
 /*--.. Operations on call instructions (only) ..............................--*/

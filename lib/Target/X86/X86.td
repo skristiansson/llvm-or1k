@@ -17,14 +17,14 @@
 include "llvm/Target/Target.td"
 
 //===----------------------------------------------------------------------===//
-// X86 Subtarget state.
+// X86 Subtarget state
 //
 
 def Mode64Bit : SubtargetFeature<"64bit-mode", "In64BitMode", "true",
                                   "64-bit mode (x86_64)">;
 
 //===----------------------------------------------------------------------===//
-// X86 Subtarget features.
+// X86 Subtarget features
 //===----------------------------------------------------------------------===//
 
 def FeatureCMOV    : SubtargetFeature<"cmov","HasCMov", "true",
@@ -97,7 +97,7 @@ def FeatureFMA4    : SubtargetFeature<"fma4", "HasFMA4", "true",
                                       [FeatureAVX, FeatureSSE4A]>;
 def FeatureXOP     : SubtargetFeature<"xop", "HasXOP", "true",
                                       "Enable XOP instructions",
-                                      [FeatureAVX, FeatureSSE4A]>;
+                                      [FeatureFMA4]>;
 def FeatureVectorUAMem : SubtargetFeature<"vector-unaligned-mem",
                                           "HasVectorUAMem", "true",
                  "Allow unaligned memory operands on vector/SIMD instructions">;
@@ -120,6 +120,9 @@ def FeatureBMI2    : SubtargetFeature<"bmi2", "HasBMI2", "true",
                                       "Support BMI2 instructions">;
 def FeatureLeaForSP : SubtargetFeature<"lea-sp", "UseLeaForSP", "true",
                                      "Use LEA for adjusting the stack pointer">;
+def FeatureSlowDivide : SubtargetFeature<"idiv-to-divb",
+                          "HasSlowDivide", "true",
+                          "Use small divide for positive values less than 256">;
 
 //===----------------------------------------------------------------------===//
 // X86 processors supported.
@@ -160,7 +163,8 @@ def : Proc<"core2",           [FeatureSSSE3, FeatureCMPXCHG16B,
 def : Proc<"penryn",          [FeatureSSE41, FeatureCMPXCHG16B,
                                FeatureSlowBTMem]>;
 def : AtomProc<"atom",        [ProcIntelAtom, FeatureSSE3, FeatureCMPXCHG16B,
-                               FeatureMOVBE, FeatureSlowBTMem, FeatureLeaForSP]>;
+                               FeatureMOVBE, FeatureSlowBTMem, FeatureLeaForSP,
+                               FeatureSlowDivide]>;
 // "Arrandale" along with corei3 and corei5
 def : Proc<"corei7",          [FeatureSSE42, FeatureCMPXCHG16B,
                                FeatureSlowBTMem, FeatureFastUAMem,
@@ -226,7 +230,8 @@ def : Proc<"bdver1",          [FeatureXOP, FeatureFMA4, FeatureCMPXCHG16B,
 def : Proc<"bdver2",          [FeatureXOP, FeatureFMA4, FeatureCMPXCHG16B,
                                FeatureAES, FeaturePCLMUL,
                                FeatureF16C, FeatureLZCNT,
-                               FeaturePOPCNT, FeatureBMI]>;
+                               FeaturePOPCNT, FeatureBMI, FeatureFMA]>;
+def : Proc<"geode",           [Feature3DNowA]>;
 
 def : Proc<"winchip-c6",      [FeatureMMX]>;
 def : Proc<"winchip2",        [Feature3DNow]>;

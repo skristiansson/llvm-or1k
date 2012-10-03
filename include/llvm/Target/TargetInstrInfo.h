@@ -45,8 +45,8 @@ template<class T> class SmallVectorImpl;
 /// TargetInstrInfo - Interface to description of machine instruction set
 ///
 class TargetInstrInfo : public MCInstrInfo {
-  TargetInstrInfo(const TargetInstrInfo &);  // DO NOT IMPLEMENT
-  void operator=(const TargetInstrInfo &);   // DO NOT IMPLEMENT
+  TargetInstrInfo(const TargetInstrInfo &) LLVM_DELETED_FUNCTION;
+  void operator=(const TargetInstrInfo &) LLVM_DELETED_FUNCTION;
 public:
   TargetInstrInfo(int CFSetupOpcode = -1, int CFDestroyOpcode = -1)
     : CallFrameSetupOpcode(CFSetupOpcode),
@@ -187,14 +187,6 @@ public:
                              unsigned DestReg, unsigned SubIdx,
                              const MachineInstr *Orig,
                              const TargetRegisterInfo &TRI) const = 0;
-
-  /// scheduleTwoAddrSource - Schedule the copy / re-mat of the source of the
-  /// two-addrss instruction inserted by two-address pass.
-  virtual void scheduleTwoAddrSource(MachineInstr *SrcMI,
-                                     MachineInstr *UseMI,
-                                     const TargetRegisterInfo &TRI) const {
-    // Do nothing.
-  }
 
   /// duplicate - Create a duplicate of the Orig instruction in MF. This is like
   /// MachineFunction::CloneMachineInstr(), but the target may update operands
@@ -421,7 +413,59 @@ public:
     llvm_unreachable("Target didn't implement TargetInstrInfo::insertSelect!");
   }
 
+  /// analyzeSelect - Analyze the given select instruction, returning true if
+  /// it cannot be understood. It is assumed that MI->isSelect() is true.
+  ///
+  /// When successful, return the controlling condition and the operands that
+  /// determine the true and false result values.
+  ///
+  ///   Result = SELECT Cond, TrueOp, FalseOp
+  ///
+  /// Some targets can optimize select instructions, for example by predicating
+  /// the instruction defining one of the operands. Such targets should set
+  /// Optimizable.
+  ///
+  /// @param         MI Select instruction to analyze.
+  /// @param Cond    Condition controlling the select.
+  /// @param TrueOp  Operand number of the value selected when Cond is true.
+  /// @param FalseOp Operand number of the value selected when Cond is false.
+  /// @param Optimizable Returned as true if MI is optimizable.
+  /// @returns False on success.
+  virtual bool analyzeSelect(const MachineInstr *MI,
+                             SmallVectorImpl<MachineOperand> &Cond,
+                             unsigned &TrueOp, unsigned &FalseOp,
+                             bool &Optimizable) const {
+    assert(MI && MI->isSelect() && "MI must be a select instruction");
+    return true;
+  }
+
+  /// optimizeSelect - Given a select instruction that was understood by
+  /// analyzeSelect and returned Optimizable = true, attempt to optimize MI by
+  /// merging it with one of its operands. Returns NULL on failure.
+  ///
+  /// When successful, returns the new select instruction. The client is
+  /// responsible for deleting MI.
+  ///
+  /// If both sides of the select can be optimized, PreferFalse is used to pick
+  /// a side.
+  ///
+  /// @param MI          Optimizable select instruction.
+  /// @param PreferFalse Try to optimize FalseOp instead of TrueOp.
+  /// @returns Optimized instruction or NULL.
+  virtual MachineInstr *optimizeSelect(MachineInstr *MI,
+                                       bool PreferFalse = false) const {
+    // This function must be implemented if Optimizable is ever set.
+    llvm_unreachable("Target must implement TargetInstrInfo::optimizeSelect!");
+  }
+
   /// copyPhysReg - Emit instructions to copy a pair of physical registers.
+  ///
+  /// This function should support copies within any legal register class as
+  /// well as any cross-class copies created during instruction selection.
+  ///
+  /// The source and destination registers may overlap, which may require a
+  /// careful implementation when multiple copy instructions are required for
+  /// large registers. See for example the ARM target.
   virtual void copyPhysReg(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator MI, DebugLoc DL,
                            unsigned DestReg, unsigned SrcReg,
@@ -757,20 +801,6 @@ public:
                                  const MachineInstr *UseMI, unsigned UseIdx,
                                  bool FindMin = false) const;
 
-  /// computeOperandLatency - Compute and return the latency of the given data
-  /// dependent def and use. DefMI must be a valid def. UseMI may be NULL for
-  /// an unknown use. If the subtarget allows, this may or may not need to call
-  /// getOperandLatency().
-  ///
-  /// FindMin may be set to get the minimum vs. expected latency. Minimum
-  /// latency is used for scheduling groups, while expected latency is for
-  /// instruction cost and critical path.
-  unsigned computeOperandLatency(const InstrItineraryData *ItinData,
-                                 const TargetRegisterInfo *TRI,
-                                 const MachineInstr *DefMI,
-                                 const MachineInstr *UseMI,
-                                 unsigned Reg, bool FindMin) const;
-
   /// getOutputLatency - Compute and return the output dependency latency of a
   /// a given pair of defs which both target the same register. This is usually
   /// one.
@@ -793,6 +823,9 @@ public:
   /// Return the default expected latency for a def based on it's opcode.
   unsigned defaultDefLatency(const MCSchedModel *SchedModel,
                              const MachineInstr *DefMI) const;
+
+  int computeDefOperandLatency(const InstrItineraryData *ItinData,
+                               const MachineInstr *DefMI, bool FindMin) const;
 
   /// isHighLatencyDef - Return true if this opcode has high latency to its
   /// result.

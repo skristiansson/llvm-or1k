@@ -242,13 +242,14 @@ bool MipsDAGToDAGISel::ReplaceUsesWithZeroReg(MachineRegisterInfo *MRI,
 
   // Replace uses with ZeroReg.
   for (MachineRegisterInfo::use_iterator U = MRI->use_begin(DstReg),
-       E = MRI->use_end(); U != E; ++U) {
+       E = MRI->use_end(); U != E;) {
     MachineOperand &MO = U.getOperand();
+    unsigned OpNo = U.getOperandNo();
     MachineInstr *MI = MO.getParent();
+    ++U;
 
     // Do not replace if it is a phi's operand or is tied to def operand.
-    if (MI->isPHI() || MI->isRegTiedToDefOperand(U.getOperandNo()) ||
-        MI->isPseudo())
+    if (MI->isPHI() || MI->isRegTiedToDefOperand(OpNo) || MI->isPseudo())
       continue;
 
     MO.setReg(ZeroReg);
@@ -336,8 +337,9 @@ SelectAddr(SDNode *Parent, SDValue Addr, SDValue &Base, SDValue &Offset) {
     // Generate:
     //  lui $2, %hi($CPI1_0)
     //  lwc1 $f0, %lo($CPI1_0)($2)
-    if (Addr.getOperand(1).getOpcode() == MipsISD::Lo) {
-      SDValue LoVal = Addr.getOperand(1), Opnd0 = LoVal.getOperand(0);
+    if (Addr.getOperand(1).getOpcode() == MipsISD::Lo ||
+        Addr.getOperand(1).getOpcode() == MipsISD::GPRel) {
+      SDValue Opnd0 = Addr.getOperand(1).getOperand(0);
       if (isa<ConstantPoolSDNode>(Opnd0) || isa<GlobalAddressSDNode>(Opnd0) ||
           isa<JumpTableSDNode>(Opnd0)) {
         Base = Addr.getOperand(0);
@@ -537,6 +539,15 @@ SDNode* MipsDAGToDAGISel::Select(SDNode *Node) {
 
     return RegOpnd;
   }
+
+#ifndef NDEBUG
+  case ISD::LOAD:
+  case ISD::STORE:
+    assert(cast<MemSDNode>(Node)->getMemoryVT().getSizeInBits() / 8 <=
+           cast<MemSDNode>(Node)->getAlignment() &&
+           "Unexpected unaligned loads/stores.");
+    break;
+#endif
 
   case MipsISD::ThreadPointer: {
     EVT PtrVT = TLI.getPointerTy();

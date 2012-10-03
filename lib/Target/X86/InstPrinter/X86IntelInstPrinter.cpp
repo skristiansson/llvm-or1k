@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "asm-printer"
 #include "X86IntelInstPrinter.h"
 #include "X86InstComments.h"
+#include "MCTargetDesc/X86BaseInfo.h"
 #include "MCTargetDesc/X86MCTargetDesc.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCExpr.h"
@@ -32,6 +33,12 @@ void X86IntelInstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
 
 void X86IntelInstPrinter::printInst(const MCInst *MI, raw_ostream &OS,
                                     StringRef Annot) {
+  const MCInstrDesc &Desc = MII.get(MI->getOpcode());
+  uint64_t TSFlags = Desc.TSFlags;
+
+  if (TSFlags & X86II::LOCK)
+    OS << "\tlock\n";
+
   printInstruction(MI, OS);
 
   // Next always print the annotation.
@@ -82,10 +89,10 @@ void X86IntelInstPrinter::printSSECC(const MCInst *MI, unsigned Op,
   }
 }
 
-/// print_pcrel_imm - This is used to print an immediate value that ends up
+/// printPCRelImm - This is used to print an immediate value that ends up
 /// being encoded as a pc-relative value.
-void X86IntelInstPrinter::print_pcrel_imm(const MCInst *MI, unsigned OpNo,
-                                          raw_ostream &O) {
+void X86IntelInstPrinter::printPCRelImm(const MCInst *MI, unsigned OpNo,
+                                        raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())
     O << Op.getImm();

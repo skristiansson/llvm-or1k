@@ -235,7 +235,7 @@ bool TwoAddressInstructionPass::Sink3AddrInstruction(MachineBasicBlock *MBB,
   // appropriate location, we can try to sink the current instruction
   // past it.
   if (!KillMI || KillMI->getParent() != MBB || KillMI == MI ||
-      KillMI->isTerminator())
+      KillMI == OldPos || KillMI->isTerminator())
     return false;
 
   // If any of the definitions are used by another instruction between the
@@ -278,6 +278,7 @@ bool TwoAddressInstructionPass::Sink3AddrInstruction(MachineBasicBlock *MBB,
       }
     }
   }
+  assert(KillMO && "Didn't find kill");
 
   // Update kill and LV information.
   KillMO->setIsKill(false);
@@ -1201,8 +1202,7 @@ bool TwoAddressInstructionPass::
 collectTiedOperands(MachineInstr *MI, TiedOperandMap &TiedOperands) {
   const MCInstrDesc &MCID = MI->getDesc();
   bool AnyOps = false;
-  unsigned NumOps = MI->isInlineAsm() ?
-    MI->getNumOperands() : MCID.getNumOperands();
+  unsigned NumOps = MI->getNumOperands();
 
   for (unsigned SrcIdx = 0; SrcIdx < NumOps; ++SrcIdx) {
     unsigned DstIdx = 0;
@@ -1351,17 +1351,6 @@ TwoAddressInstructionPass::processTiedPairs(MachineInstr *MI,
       }
     }
   }
-
-  // We didn't change anything if there was a single tied pair, and that
-  // pair didn't require copies.
-  if (AllUsesCopied || TiedPairs.size() > 1) {
-    // Schedule the source copy / remat inserted to form two-address
-    // instruction. FIXME: Does it matter the distance map may not be
-    // accurate after it's scheduled?
-    MachineBasicBlock::iterator PrevMI = MI;
-    --PrevMI;
-    TII->scheduleTwoAddrSource(PrevMI, MI, *TRI);
-  }
 }
 
 /// runOnMachineFunction - Reduce two-address instructions to two operands.
@@ -1383,7 +1372,7 @@ bool TwoAddressInstructionPass::runOnMachineFunction(MachineFunction &Func) {
 
   DEBUG(dbgs() << "********** REWRITING TWO-ADDR INSTRS **********\n");
   DEBUG(dbgs() << "********** Function: "
-        << MF->getFunction()->getName() << '\n');
+        << MF->getName() << '\n');
 
   // This pass takes the function out of SSA form.
   MRI->leaveSSA();
@@ -1769,10 +1758,6 @@ bool TwoAddressInstructionPass::EliminateRegSequences() {
         if (MO.isReg() && MO.isDef() && MO.getReg() == DstReg)
           MO.setIsUndef();
       }
-      // Make sure there is a full non-subreg imp-def operand on the
-      // instruction.  This shouldn't be necessary, but it seems that at least
-      // RAFast requires it.
-      Def->addRegisterDefined(DstReg, TRI);
       DEBUG(dbgs() << "First def: " << *Def);
     }
 

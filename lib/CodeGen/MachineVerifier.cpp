@@ -23,8 +23,9 @@
 // the verifier errors.
 //===----------------------------------------------------------------------===//
 
+#include "llvm/BasicBlock.h"
+#include "llvm/InlineAsm.h"
 #include "llvm/Instructions.h"
-#include "llvm/Function.h"
 #include "llvm/CodeGen/LiveIntervalAnalysis.h"
 #include "llvm/CodeGen/LiveVariables.h"
 #include "llvm/CodeGen/LiveStackAnalysis.h"
@@ -73,8 +74,10 @@ namespace {
     typedef SmallVector<const uint32_t*, 4> RegMaskVector;
     typedef DenseSet<unsigned> RegSet;
     typedef DenseMap<unsigned, const MachineInstr*> RegMap;
+    typedef SmallPtrSet<const MachineBasicBlock*, 8> BlockSet;
 
     const MachineInstr *FirstTerminator;
+    BlockSet FunctionBlocks;
 
     BitVector regsReserved;
     BitVector regsAllocatable;
@@ -116,6 +119,9 @@ namespace {
       // Vregs that must pass through MBB because they are needed by a successor
       // block. This set is disjoint from regsLiveOut.
       RegSet vregsRequired;
+
+      // Set versions of block's predecessor and successor lists.
+      BlockSet Preds, Succs;
 
       BBInfo() : reachable(false) {}
 
@@ -207,6 +213,8 @@ namespace {
                 const LiveInterval &LI);
     void report(const char *msg, const MachineBasicBlock *MBB,
                 const LiveInterval &LI);
+
+    void verifyInlineAsm(const MachineInstr *MI);
 
     void checkLiveness(const MachineOperand *MO, unsigned MONum);
     void markReachable(const MachineBasicBlock *MBB);
@@ -352,7 +360,7 @@ void MachineVerifier::report(const char *msg, const MachineFunction *MF) {
     MF->print(*OS, Indexes);
   }
   *OS << "*** Bad machine code: " << msg << " ***\n"
-      << "- function:    " << MF->getFunction()->getName() << "\n";
+      << "- function:    " << MF->getName() << "\n";
 }
 
 void MachineVerifier::report(const char *msg, const MachineBasicBlock *MBB) {
@@ -360,7 +368,7 @@ void MachineVerifier::report(const char *msg, const MachineBasicBlock *MBB) {
   report(msg, MBB->getParent());
   *OS << "- basic block: BB#" << MBB->getNumber()
       << ' ' << MBB->getName()
-      << " (" << (void*)MBB << ')';
+      << " (" << (const void*)MBB << ')';
   if (Indexes)
     *OS << " [" << Indexes->getMBBStartIdx(MBB)
         << ';' <<  Indexes->getMBBEndIdx(MBB) << ')';
@@ -434,6 +442,22 @@ void MachineVerifier::visitMachineFunctionBefore() {
   regsAllocatable = TRI->getAllocatableSet(*MF);
 
   markReachable(&MF->front());
+
+  // Build a set of the basic blocks in the function.
+  FunctionBlocks.clear();
+  for (MachineFunction::const_iterator
+       I = MF->begin(), E = MF->end(); I != E; ++I) {
+    FunctionBlocks.insert(I);
+    BBInfo &MInfo = MBBInfoMap[I];
+
+    MInfo.Preds.insert(I->pred_begin(), I->pred_end());
+    if (MInfo.Preds.size() != I->pred_size())
+      report("MBB has duplicate entries in its predecessor list.", I);
+
+    MInfo.Succs.insert(I->succ_begin(), I->succ_end());
+    if (MInfo.Succs.size() != I->succ_size())
+      report("MBB has duplicate entries in its successor list.", I);
+  }
 }
 
 // Does iterator point to a and b as the first two elements?
@@ -470,6 +494,25 @@ MachineVerifier::visitMachineBasicBlockBefore(const MachineBasicBlock *MBB) {
        E = MBB->succ_end(); I != E; ++I) {
     if ((*I)->isLandingPad())
       LandingPadSuccs.insert(*I);
+    if (!FunctionBlocks.count(*I))
+      report("MBB has successor that isn't part of the function.", MBB);
+    if (!MBBInfoMap[*I].Preds.count(MBB)) {
+      report("Inconsistent CFG", MBB);
+      *OS << "MBB is not in the predecessor list of the successor BB#"
+          << (*I)->getNumber() << ".\n";
+    }
+  }
+
+  // Check the predecessor list.
+  for (MachineBasicBlock::const_pred_iterator I = MBB->pred_begin(),
+       E = MBB->pred_end(); I != E; ++I) {
+    if (!FunctionBlocks.count(*I))
+      report("MBB has predecessor that isn't part of the function.", MBB);
+    if (!MBBInfoMap[*I].Succs.count(MBB)) {
+      report("Inconsistent CFG", MBB);
+      *OS << "MBB is not in the successor list of the predecessor BB#"
+          << (*I)->getNumber() << ".\n";
+    }
   }
 
   const MCAsmInfo *AsmInfo = TM->getMCAsmInfo();
@@ -540,7 +583,15 @@ MachineVerifier::visitMachineBasicBlockBefore(const MachineBasicBlock *MBB) {
       ++MBBI;
       if (MBBI == MF->end()) {
         report("MBB conditionally falls through out of function!", MBB);
-      } if (MBB->succ_size() != 2) {
+      } if (MBB->succ_size() == 1) {
+        // A conditional branch with only one successor is weird, but allowed.
+        if (&*MBBI != TBB)
+          report("MBB exits via conditional branch/fall-through but only has "
+                 "one CFG successor!", MBB);
+        else if (TBB != *MBB->succ_begin())
+          report("MBB exits via conditional branch/fall-through but the CFG "
+                 "successor don't match the actual successor!", MBB);
+      } else if (MBB->succ_size() != 2) {
         report("MBB exits via conditional branch/fall-through but doesn't have "
                "exactly two CFG successors!", MBB);
       } else if (!matchPair(MBB->succ_begin(), TBB, MBBI)) {
@@ -560,7 +611,15 @@ MachineVerifier::visitMachineBasicBlockBefore(const MachineBasicBlock *MBB) {
     } else if (TBB && FBB) {
       // Block conditionally branches somewhere, otherwise branches
       // somewhere else.
-      if (MBB->succ_size() != 2) {
+      if (MBB->succ_size() == 1) {
+        // A conditional branch with only one successor is weird, but allowed.
+        if (FBB != TBB)
+          report("MBB exits via conditional branch/branch through but only has "
+                 "one CFG successor!", MBB);
+        else if (TBB != *MBB->succ_begin())
+          report("MBB exits via conditional branch/branch through but the CFG "
+                 "successor don't match the actual successor!", MBB);
+      } else if (MBB->succ_size() != 2) {
         report("MBB exits via conditional branch/branch but doesn't have "
                "exactly two CFG successors!", MBB);
       } else if (!matchPair(MBB->succ_begin(), TBB, FBB)) {
@@ -639,6 +698,49 @@ void MachineVerifier::visitMachineBundleBefore(const MachineInstr *MI) {
   }
 }
 
+// The operands on an INLINEASM instruction must follow a template.
+// Verify that the flag operands make sense.
+void MachineVerifier::verifyInlineAsm(const MachineInstr *MI) {
+  // The first two operands on INLINEASM are the asm string and global flags.
+  if (MI->getNumOperands() < 2) {
+    report("Too few operands on inline asm", MI);
+    return;
+  }
+  if (!MI->getOperand(0).isSymbol())
+    report("Asm string must be an external symbol", MI);
+  if (!MI->getOperand(1).isImm())
+    report("Asm flags must be an immediate", MI);
+  // Allowed flags are Extra_HasSideEffects = 1, and Extra_IsAlignStack = 2.
+  if (!isUInt<2>(MI->getOperand(1).getImm()))
+    report("Unknown asm flags", &MI->getOperand(1), 1);
+
+  assert(InlineAsm::MIOp_FirstOperand == 2 && "Asm format changed");
+
+  unsigned OpNo = InlineAsm::MIOp_FirstOperand;
+  unsigned NumOps;
+  for (unsigned e = MI->getNumOperands(); OpNo < e; OpNo += NumOps) {
+    const MachineOperand &MO = MI->getOperand(OpNo);
+    // There may be implicit ops after the fixed operands.
+    if (!MO.isImm())
+      break;
+    NumOps = 1 + InlineAsm::getNumOperandRegisters(MO.getImm());
+  }
+
+  if (OpNo > MI->getNumOperands())
+    report("Missing operands in last group", MI);
+
+  // An optional MDNode follows the groups.
+  if (OpNo < MI->getNumOperands() && MI->getOperand(OpNo).isMetadata())
+    ++OpNo;
+
+  // All trailing operands must be implicit registers.
+  for (unsigned e = MI->getNumOperands(); OpNo < e; ++OpNo) {
+    const MachineOperand &MO = MI->getOperand(OpNo);
+    if (!MO.isReg() || !MO.isImplicit())
+      report("Expected implicit register after groups", &MO, OpNo);
+  }
+}
+
 void MachineVerifier::visitMachineInstrBefore(const MachineInstr *MI) {
   const MCInstrDesc &MCID = MI->getDesc();
   if (MI->getNumOperands() < MCID.getNumOperands()) {
@@ -646,6 +748,10 @@ void MachineVerifier::visitMachineInstrBefore(const MachineInstr *MI) {
     *OS << MCID.getNumOperands() << " operands expected, but "
         << MI->getNumExplicitOperands() << " given.\n";
   }
+
+  // Check the tied operands.
+  if (MI->isInlineAsm())
+    verifyInlineAsm(MI);
 
   // Check the MachineMemOperands for basic consistency.
   for (MachineInstr::mmo_iterator I = MI->memoperands_begin(),
@@ -681,10 +787,10 @@ void
 MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
   const MachineInstr *MI = MO->getParent();
   const MCInstrDesc &MCID = MI->getDesc();
-  const MCOperandInfo &MCOI = MCID.OpInfo[MONum];
 
   // The first MCID.NumDefs operands must be explicit register defines
   if (MONum < MCID.getNumDefs()) {
+    const MCOperandInfo &MCOI = MCID.OpInfo[MONum];
     if (!MO->isReg())
       report("Explicit definition must be a register", MO, MONum);
     else if (!MO->isDef() && !MCOI.isOptionalDef())
@@ -692,6 +798,7 @@ MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
     else if (MO->isImplicit())
       report("Explicit definition marked as implicit", MO, MONum);
   } else if (MONum < MCID.getNumOperands()) {
+    const MCOperandInfo &MCOI = MCID.OpInfo[MONum];
     // Don't check if it's the last operand in a variadic instruction. See,
     // e.g., LDM_RET in the arm back end.
     if (MO->isReg() &&
@@ -701,6 +808,17 @@ MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
       if (MO->isImplicit())
         report("Explicit operand marked as implicit", MO, MONum);
     }
+
+    int TiedTo = MCID.getOperandConstraint(MONum, MCOI::TIED_TO);
+    if (TiedTo != -1) {
+      if (!MO->isReg())
+        report("Tied use must be a register", MO, MONum);
+      else if (!MO->isTied())
+        report("Operand should be tied", MO, MONum);
+      else if (unsigned(TiedTo) != MI->findTiedOperandIdx(MONum))
+        report("Tied def doesn't match MCInstrDesc", MO, MONum);
+    } else if (MO->isReg() && MO->isTied())
+      report("Explicit operand should not be tied", MO, MONum);
   } else {
     // ARM adds %reg0 operands to indicate predicates. We'll allow that.
     if (MO->isReg() && !MO->isImplicit() && !MI->isVariadic() && MO->getReg())
@@ -714,6 +832,28 @@ MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
       return;
     if (MRI->tracksLiveness() && !MI->isDebugValue())
       checkLiveness(MO, MONum);
+
+    // Verify the consistency of tied operands.
+    if (MO->isTied()) {
+      unsigned OtherIdx = MI->findTiedOperandIdx(MONum);
+      const MachineOperand &OtherMO = MI->getOperand(OtherIdx);
+      if (!OtherMO.isReg())
+        report("Must be tied to a register", MO, MONum);
+      if (!OtherMO.isTied())
+        report("Missing tie flags on tied operand", MO, MONum);
+      if (MI->findTiedOperandIdx(OtherIdx) != MONum)
+        report("Inconsistent tie links", MO, MONum);
+      if (MONum < MCID.getNumDefs()) {
+        if (OtherIdx < MCID.getNumOperands()) {
+          if (-1 == MCID.getOperandConstraint(OtherIdx, MCOI::TIED_TO))
+            report("Explicit def tied to explicit use without tie constraint",
+                   MO, MONum);
+        } else {
+          if (!OtherMO.isImplicit())
+            report("Explicit def should be tied to implicit use", MO, MONum);
+        }
+      }
+    }
 
     // Verify two-address constraints after leaving SSA form.
     unsigned DefIdx;
