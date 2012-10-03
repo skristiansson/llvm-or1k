@@ -17,6 +17,7 @@
 #include "OR1KRegisterInfo.h"
 #include "llvm/MC/EDInstInfo.h"
 #include "llvm/MC/MCDisassembler.h"
+#include "llvm/MC/MCFixedLenDisassembler.h"
 #include "llvm/Support/MemoryObject.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -95,7 +96,8 @@ OR1KDisassembler::getInstruction(MCInst &instr,
     return MCDisassembler::Fail;
 
   // Call auto-generated decoder function
-  Result = decodeOR1KInstruction32(instr, Insn, Address, this, STI);
+  Result = decodeInstruction(DecoderTableOR1K32, instr, Insn, Address,
+                             this, STI);
   if (Result != MCDisassembler::Fail) {
     Size = 4;
     return Result;
